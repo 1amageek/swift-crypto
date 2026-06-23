@@ -11,14 +11,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 extension Insecure {
     /// An implementation of SHA1 hashing.
     ///
@@ -39,11 +35,6 @@ extension Insecure {
     public struct SHA1: HashFunctionImplementationDetails, Sendable {
         /// The number of bytes that represents the hash function’s internal
         /// state.
-        #if !CRYPTOKIT_STATIC_LIBRARY
-        @available(iOS 13.2, macOS 10.15, watchOS 6.1, tvOS 13.2, macCatalyst 13.2, *)
-        #else // CRYPTOKIT_STATIC_LIBRARY
-        @available(iOS 13.2, macOS 10.13, watchOS 6.1, tvOS 13.2, macCatalyst 13.2, visionOS 1.0, *)
-        #endif
         public static let blockByteCount: Int = 64
         
         /// The number of bytes in a SHA1 digest.
@@ -124,11 +115,6 @@ extension Insecure {
     public struct MD5: HashFunctionImplementationDetails, Sendable {
         /// The number of bytes that represents the hash function’s internal
         /// state.
-        #if !CRYPTOKIT_STATIC_LIBRARY
-        @available(iOS 13.2, macOS 10.15, watchOS 6.1, tvOS 13.2, macCatalyst 13.2, *)
-        #else // CRYPTOKIT_STATIC_LIBRARY
-        @available(iOS 13.2, macOS 10.13, watchOS 6.1, tvOS 13.2, macCatalyst 13.2, visionOS 1.0, *)
-        #endif
         public static let blockByteCount: Int = 64
         /// The number of bytes in an MD5 digest.
         public static let byteCount: Int = 16
@@ -189,4 +175,4 @@ extension Insecure {
         }
     }
 }
-#endif  // Linux or !SwiftPM
+#endif  // canImport(CryptoKit)

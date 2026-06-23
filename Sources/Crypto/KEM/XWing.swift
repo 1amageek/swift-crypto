@@ -11,54 +11,29 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-#if CRYPTOKIT_STATIC_LIBRARY
-@_exported import CryptoKit_Static
-#else
+#if canImport(CryptoKit)
 @_exported import CryptoKit
-#endif
 #else
 
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-import SwiftSystem
-#else
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import Foundation
 #endif
-#endif
 
-#if (!CRYPTO_IN_SWIFTPM_FORCE_BUILD_API) || CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-typealias XWingPublicKeyImpl = CoreCryptoXWingPublicKeyImpl
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-typealias XWingPrivateKeyImpl = CoreCryptoXWingPrivateKeyImpl
-#else
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 typealias XWingPublicKeyImpl = OpenSSLXWingPublicKeyImpl
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 typealias XWingPrivateKeyImpl = OpenSSLXWingPrivateKeyImpl
-#endif
 
 /// The X-Wing (ML-KEM768 with X25519) Key Encapsulation Mechanism, defined in
 /// https://datatracker.ietf.org/doc/html/draft-connolly-cfrg-xwing-kem-06
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, macCatalyst 26.0, visionOS 26.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 16.0, macOS 10.13, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 1.0, *)
-#endif
+@nonexhaustive
 public enum XWingMLKEM768X25519: Sendable {}
 
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, macCatalyst 26.0, visionOS 26.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 16.0, macOS 10.13, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 1.0, *)
-#endif
 extension XWingMLKEM768X25519 {
     public struct PublicKey: KEMPublicKey {
         var impl: XWingPublicKeyImpl
@@ -120,7 +95,6 @@ extension XWingMLKEM768X25519 {
         }
     }
     
-    @available(iOS 27.0, macOS 27.0, watchOS 27.0, tvOS 27.0, macCatalyst 27.0, visionOS 27.0, *)
     /// A one-time-use private key to decapsulate a shared secret with the X-Wing key encapsulation mechanism.
     ///
     /// The associated decapsulation function can be multiple times faster than the one implemented for PrivateKey,
@@ -156,11 +130,6 @@ extension XWingMLKEM768X25519 {
     }
 }
 
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, macCatalyst 26.0, visionOS 26.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 16.0, macOS 10.13, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 1.0, *)
-#endif
 extension XWingMLKEM768X25519.PrivateKey: HPKEKEMPrivateKeyGeneration {
     public init() throws {
         self = try Self.generate()
@@ -190,11 +159,6 @@ extension XWingMLKEM768X25519.PrivateKey: HPKEKEMPrivateKeyGeneration {
     }
 }
 
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, macCatalyst 26.0, visionOS 26.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 16.0, macOS 10.13, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 1.0, *)
-#endif
 extension XWingMLKEM768X25519.PublicKey: HPKEKEMPublicKey {
     /// The type of the ephemeral private key associated with this public key.
     public typealias EphemeralPrivateKey = XWingMLKEM768X25519.PrivateKey
@@ -237,4 +201,4 @@ extension XWingMLKEM768X25519.PublicKey: HPKEKEMPublicKey {
     public typealias HPKEEphemeralPrivateKey = XWingMLKEM768X25519.PrivateKey
 }
 #endif
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

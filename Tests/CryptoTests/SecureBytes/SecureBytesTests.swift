@@ -11,16 +11,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
+
 import XCTest
 
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+#if canImport(CryptoKit)
 // Skip tests that require @testable imports of CryptoKit.
 #else
-#if !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-@testable import CryptoKit
-#else
 @testable import Crypto
-#endif
 
 final class SecureBytesTests: XCTestCase {
     func testBasicSoundness() {
@@ -177,7 +174,6 @@ final class SecureBytesTests: XCTestCase {
         XCTAssertThrowsError(try testThrowingInitialization(), error: CryptoKitError.incorrectKeySize)
     }
 
-    @available(macOS 26, iOS 26, tvOS 26, watchOS 26, visionOS 26, *)
     func testAppendingDataPerformsACoW() {
         var base = SecureBytes(repeating: 0, count: 10)
         let copy = base
@@ -200,7 +196,6 @@ final class SecureBytesTests: XCTestCase {
         XCTAssertEqual(Array(copy), [0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     }
 
-    @available(macOS 26, iOS 26, tvOS 26, watchOS 26, visionOS 26, *)
     func testDataCausesCoWs() {
         var base = SecureBytes(repeating: 0, count: 10)
         let copy = Data(base)
@@ -212,7 +207,6 @@ final class SecureBytesTests: XCTestCase {
         XCTAssertEqual(copy.count, 10)
     }
 
-    @available(macOS 26, iOS 26, tvOS 26, watchOS 26, visionOS 26, *)
     func testDataFromSlice() {
         var base = SecureBytes(0..<10)
         let copy = Data(base.prefix(5))
@@ -225,4 +219,4 @@ final class SecureBytesTests: XCTestCase {
     }
 }
 
-#endif // CRYPTO_IN_SWIFTPM
+#endif // canImport(CryptoKit)

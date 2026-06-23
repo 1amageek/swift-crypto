@@ -11,27 +11,20 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-import SwiftSystem
-#else
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import Foundation
 #endif
-#endif
 
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 17.0, macOS 14.0, watchOS 10.0, tvOS 17.0, macCatalyst 17.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 16.0, macOS 10.13, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 1.0, *)
-#endif
 extension HPKE {
     /// Hybrid public key encryption (HPKE) errors that CryptoKit uses.
+    @nonexhaustive
     public enum Errors: Error {
 		/// The parameters for initializing an HPKE sender or receiver are inconsistent.
         case inconsistentParameters
@@ -52,4 +45,4 @@ extension HPKE {
     }
 }
 
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

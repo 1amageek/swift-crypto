@@ -11,36 +11,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
-#else
-#if (!CRYPTO_IN_SWIFTPM_FORCE_BUILD_API) || CRYPTOKIT_NO_ACCESS_TO_FOUNDATION || CRYPTOKIT_NO_IMPORT_FOUNDATION
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
-typealias DigestImpl = CoreCryptoDigestImpl
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
-typealias DigestImplSHA3 = CoreCryptoDigestImpl
 #else
 typealias DigestImpl = OpenSSLDigestImpl
 typealias DigestImplSHA3 = XKCPDigestImpl
-#endif
 
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-public import SwiftSystem
-#elseif CRYPTOKIT_NO_IMPORT_FOUNDATION
-#else
 #if canImport(FoundationEssentials)
 public import FoundationEssentials
 #else
 public import Foundation
-#endif
 #endif
 
 /// A type that performs cryptographically secure hashing.
@@ -61,30 +42,11 @@ public import Foundation
 /// authentication code (MAC) like ``HMAC`` instead. MACs rely on hashing, but
 /// incorporate a secret cryptographic key into the digest computation. Only a
 /// user that has the key can generate a valid MAC.
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 @preconcurrency
 public protocol HashFunction: Sendable {
     /// The number of bytes that represents the hash function’s internal state.
-    #if !CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 13.2, macOS 10.15, watchOS 6.1, tvOS 13.2, macCatalyst 13.2, *)
-    #else // CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 13.2, macOS 10.13, watchOS 6.1, tvOS 13.2, macCatalyst 13.2, visionOS 1.0, *)
-    #endif
     static var blockByteCount: Int { get }
-    #if (!CRYPTO_IN_SWIFTPM_FORCE_BUILD_API) || CRYPTOKIT_NO_ACCESS_TO_FOUNDATION || CRYPTOKIT_NO_IMPORT_FOUNDATION
-    /// The type of the digest returned by the hash function.
-    #if CRYPTOKIT_STATIC_LIBRARY
-    associatedtype Digest: CryptoKit_Static.Digest
-    #else
-    associatedtype Digest: CryptoKit.Digest
-    #endif
-    #else
     associatedtype Digest: Crypto.Digest
-    #endif
 
     /// Creates a hash function.
     ///
@@ -139,11 +101,6 @@ extension HashFunction {
     }
 }
 
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 extension HashFunction {
     /// Computes a digest of the buffer.
     ///
@@ -216,4 +173,4 @@ extension HashFunction {
         }
     }
 }
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

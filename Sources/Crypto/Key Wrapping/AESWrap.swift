@@ -11,32 +11,23 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-public import SwiftSystem
-#else
 #if canImport(FoundationEssentials)
 public import FoundationEssentials
 #else
 public import Foundation
 #endif
-#endif
 
-#if (!CRYPTO_IN_SWIFTPM_FORCE_BUILD_API) || CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-@available(iOS 15.0, macOS 12.0, watchOS 8.0, tvOS 15.0, macCatalyst 15.0, *)
-typealias AESWRAPImpl = CoreCryptoAESWRAPImpl
-#else
 typealias AESWRAPImpl = BoringSSLAESWRAPImpl
-#endif
 
-@available(iOS 15.0, macOS 12.0, watchOS 8.0, tvOS 15.0, macCatalyst 15.0, *)
 extension AES {
     /// An implementation of AES Key Wrapping in accordance with the IETF RFC
     /// 3394 specification.
-    @available(iOS 15.0, macOS 12.0, watchOS 8.0, tvOS 15.0, macCatalyst 15.0, *)
+    @nonexhaustive
     public enum KeyWrap: Sendable {
         /// Wraps a key using the AES wrap algorithm.
         ///
@@ -48,7 +39,6 @@ extension AES {
         ///   - kek: The key encryption key.
         ///
         /// - Returns: The wrapped key.
-        @available(iOS 15.0, macOS 12.0, watchOS 8.0, tvOS 15.0, macCatalyst 15.0, *)
         public static func wrap(_ keyToWrap: SymmetricKey, using kek: SymmetricKey) throws -> Data {
             return try AESWRAPImpl.wrap(key: kek, keyToWrap: keyToWrap)
         }
@@ -64,11 +54,10 @@ extension AES {
         ///   - kek: The key encryption key.
         ///
         /// - Returns: The unwrapped key.
-        @available(iOS 15.0, macOS 12.0, watchOS 8.0, tvOS 15.0, macCatalyst 15.0, *)
         public static func unwrap<WrappedKey: DataProtocol>(_ wrappedKey: WrappedKey, using kek: SymmetricKey) throws -> SymmetricKey {
             return try AESWRAPImpl.unwrap(key: kek, wrappedKey: wrappedKey)
         }
     }
 }
 
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

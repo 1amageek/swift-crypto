@@ -11,18 +11,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-import SwiftSystem
-#else
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import Foundation
-#endif
 #endif
 
 
@@ -36,11 +33,6 @@ extension Data {
     }
 }
 
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 17.0, macOS 10.15, watchOS 10.0, tvOS 17.0, macCatalyst 17.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 16.0, macOS 10.13, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 1.0, *)
-#endif
 internal func ExtractAndExpand(zz: ContiguousBytes, kemContext: Data, suiteID: Data, kem: HPKE.KEM, kdf: HPKE.KDF) -> SymmetricKey {
     let eaePrk = LabeledExtract(salt: Data(), label: eaePRKLabel, ikm: zz, suiteID: suiteID, kdf: kdf)
     
@@ -48,11 +40,6 @@ internal func ExtractAndExpand(zz: ContiguousBytes, kemContext: Data, suiteID: D
                          info: kemContext, outputByteCount: kem.nSecret, suiteID: suiteID, kdf: kdf)
 }
 
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 17.0, macOS 10.15, watchOS 10.0, tvOS 17.0, macCatalyst 17.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 16.0, macOS 10.13, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 1.0, *)
-#endif
 internal func LabeledExtract(salt: Data?, label: Data, ikm: ContiguousBytes?, suiteID: Data, kdf: HPKE.KDF) -> SymmetricKey {
     var labeled_ikm = protocolLabel
     labeled_ikm.append(suiteID)
@@ -61,11 +48,6 @@ internal func LabeledExtract(salt: Data?, label: Data, ikm: ContiguousBytes?, su
     return kdf.extract(salt: salt ?? Data(), ikm: SymmetricKey(data: labeled_ikm))
 }
 
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 17.0, macOS 10.15, watchOS 10.0, tvOS 17.0, macCatalyst 17.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 16.0, macOS 10.13, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 1.0, *)
-#endif
 internal func LabeledExpand<Info: DataProtocol>(prk: SymmetricKey, label: Data, info: Info, outputByteCount: UInt16, suiteID: Data, kdf: HPKE.KDF) -> SymmetricKey {
     var labeled_info = I2OSP(value: Int(outputByteCount), outputByteCount: 2)
     labeled_info.append(protocolLabel)
@@ -75,22 +57,12 @@ internal func LabeledExpand<Info: DataProtocol>(prk: SymmetricKey, label: Data, 
     return kdf.expand(prk: prk, info: labeled_info, outputByteCount: Int(outputByteCount))
 }
 
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 17.0, macOS 10.15, watchOS 10.0, tvOS 17.0, macCatalyst 17.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 16.0, macOS 10.13, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 1.0, *)
-#endif
 internal func NonSecretOutputLabeledExtract(salt: Data?, label: Data, ikm: ContiguousBytes?, suiteID: Data, kdf: HPKE.KDF) -> Data {
     return Data(unsafeFromContiguousBytes: LabeledExtract(salt: salt, label: label, ikm: ikm, suiteID: suiteID, kdf: kdf))
 }
 
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 17.0, macOS 10.15, watchOS 10.0, tvOS 17.0, macCatalyst 17.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 16.0, macOS 10.13, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 1.0, *)
-#endif
 internal func NonSecretOutputLabeledExpand(prk: SymmetricKey, label: Data, info: Data, outputByteCount: UInt16, suiteID: Data, kdf: HPKE.KDF) -> Data {
     return Data(unsafeFromContiguousBytes: LabeledExpand(prk: prk, label: label, info: info, outputByteCount: outputByteCount, suiteID: suiteID, kdf: kdf))
 }
 
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

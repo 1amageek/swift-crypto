@@ -11,24 +11,16 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 /// A container for Advanced Encryption Standard (AES) ciphers.
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
+@nonexhaustive
 public enum AES: Sendable {
     static let blockSizeByteCount = 16
 }
 
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 extension AES {
     static func isValidKey(_ key: SymmetricKey) -> Bool {
         switch key.bitCount {
@@ -43,4 +35,4 @@ extension AES {
         }
     }
 }
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

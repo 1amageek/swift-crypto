@@ -11,39 +11,25 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-#if CRYPTOKIT_STATIC_LIBRARY
-@_exported import CryptoKit_Static
-#else
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
-#endif
-#else
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-public import SwiftSystem
-#elseif CRYPTOKIT_NO_IMPORT_FOUNDATION
 #else
 #if canImport(FoundationEssentials)
 public import FoundationEssentials
 #else
 public import Foundation
 #endif
-#endif
 
 #if hasFeature(Embedded)
 /// A type that represents a message authentication code.
 @preconcurrency
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
 public protocol MessageAuthenticationCode: Hashable, ContiguousBytes, Sendable, Sequence where Element == UInt8 {
     /// The number of bytes in the message authentication code.
     var byteCount: Int { get }
 }
 #else
 /// A type that represents a message authentication code.
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 @preconcurrency
 public protocol MessageAuthenticationCode: Hashable, ContiguousBytes, Sendable, CustomStringConvertible, Sequence where Element == UInt8 {
     /// The number of bytes in the message authentication code.
@@ -51,11 +37,6 @@ public protocol MessageAuthenticationCode: Hashable, ContiguousBytes, Sendable, 
 }
 #endif
 
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 extension MessageAuthenticationCode {
     /// Returns a Boolean value indicating whether two message authentication
     /// codes are equal.
@@ -100,4 +81,4 @@ extension MessageAuthenticationCode {
     }
 #endif
 }
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

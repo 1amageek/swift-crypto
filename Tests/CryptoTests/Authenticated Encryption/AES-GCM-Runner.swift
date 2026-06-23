@@ -11,23 +11,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 import XCTest
 
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-// Skip tests that use @available annotations on tests unless running on Linux.
+#if canImport(CryptoKit)
+// Skip tests that require @testable imports of CryptoKit.
 #else
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-import Crypto
-#elseif !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-import CryptoKit
-#else
-import Crypto
-#endif
+@testable import Crypto
 
 struct AEADTestGroup: Codable {
     let ivSize: Int
@@ -47,7 +36,6 @@ struct AESGCMTestVector: Codable {
     let result: String
 }
 
-@available(iOS 17.4, macOS 14.4, watchOS 10.4, tvOS 17.4, macCatalyst 17.4, *)
 class AESGCMTests: XCTestCase {
     func testPropertiesStayTheSameAfterFailedOpening() throws {
         let message = Data("this is a message".utf8)
@@ -101,7 +89,6 @@ class AESGCMTests: XCTestCase {
         XCTAssertEqual(recoveredPlaintextWithoutAAD.startIndex, 0)
     }
 
-    @available(macOS 27, iOS 27, tvOS 27, watchOS 27, visionOS 27, *)
     func testEncryptDecryptSpan() throws {
         let plaintext: [UInt8] = Array("Some Super Secret Message".utf8)
 
@@ -296,4 +283,4 @@ class AESGCMTests: XCTestCase {
         }
     }
 }
-#endif  // CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+#endif

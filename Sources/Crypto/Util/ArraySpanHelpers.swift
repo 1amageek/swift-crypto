@@ -11,11 +11,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, macCatalyst 26.0, visionOS 26.0, *)
+
 extension InlineArray where Element == UInt8 {
     /// Copy of the bytes of the given raw span into this array. The span
     /// must have exactly count bytes in it.
@@ -28,7 +28,6 @@ extension InlineArray where Element == UInt8 {
         }
     }
 }
-#endif
 
 extension Array where Element == UInt8 {
     /// Copy of the bytes of the given raw span into this array. The span
@@ -89,4 +88,5 @@ extension UnsafeMutableRawBufferPointer {
         }
     }
 }
-#endif // Linux or !SwiftPM
+
+#endif

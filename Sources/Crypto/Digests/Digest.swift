@@ -11,44 +11,26 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-#if CRYPTOKIT_STATIC_LIBRARY
-@_exported import CryptoKit_Static
-#else
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
-#endif
 #else
 
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-public import SwiftSystem
-#elseif CRYPTOKIT_NO_IMPORT_FOUNDATION
-#else
 #if canImport(FoundationEssentials)
 public import FoundationEssentials
 #else
 public import Foundation
 #endif
-#endif
 
 #if hasFeature(Embedded)
 /// A type that represents the output of a hash.
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 @preconcurrency
 public protocol Digest: Hashable, Sendable, ContiguousBytes, Sequence where Element == UInt8 {
     /// The number of bytes in the digest.
     static var byteCount: Int { get }
 }
-#else // hasFeature(Embedded)
+#else
 /// A type that represents the output of a hash.
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 @preconcurrency
 public protocol Digest: Hashable, Sendable, ContiguousBytes, CustomStringConvertible, Sequence where Element == UInt8 {
     /// The number of bytes in the digest.
@@ -56,20 +38,10 @@ public protocol Digest: Hashable, Sendable, ContiguousBytes, CustomStringConvert
 }
 #endif // hasFeature(Embedded)
 
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 protocol DigestPrivate: Digest {
     init?(initializingWith body: (inout OutputRawSpan) -> ())
 }
 
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 extension DigestPrivate {
     @inlinable
     init?(copying bytes: RawSpan) {
@@ -79,11 +51,6 @@ extension DigestPrivate {
     }
 }
 
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 extension Digest {
     public func makeIterator() -> Array<UInt8>.Iterator {
         self.withUnsafeBytes({ (buffPtr) in
@@ -93,11 +60,6 @@ extension Digest {
 }
 
 // We want to implement constant-time comparison for digests.
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 extension Digest {
     /// Determines whether two digests are equal.
     ///
@@ -130,7 +92,6 @@ extension Digest {
 }
 
 #if !hasFeature(Embedded)
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
 extension Digest {
     public var description: String {
         return "\(Self.self): \(Array(self).hexString)"
@@ -138,4 +99,4 @@ extension Digest {
 }
 #endif
 
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

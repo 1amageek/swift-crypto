@@ -11,24 +11,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-#if CRYPTOKIT_STATIC_LIBRARY
-@_exported import CryptoKit_Static
-#else
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
-#endif
-#else
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-public import SwiftSystem
-#elseif CRYPTOKIT_NO_IMPORT_FOUNDATION
 #else
 #if canImport(FoundationEssentials)
 public import FoundationEssentials
 #else
 public import Foundation
 #endif
-#endif
-
 
 /// A hash-based message authentication algorithm.
 ///
@@ -43,11 +34,6 @@ public import Foundation
 /// need to encrypt the data as well as authenticate it, use a cipher like
 /// ``AES`` or ``ChaChaPoly`` to put the data into a sealed box (an instance of
 /// ``AES/GCM/SealedBox`` or ``ChaChaPoly/SealedBox``).
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else //CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 public struct HMAC<H: HashFunction>: MACAlgorithm, Sendable {
     /// An alias for the symmetric key type used to compute or verify a message
     /// authentication code.
@@ -130,11 +116,6 @@ public struct HMAC<H: HashFunction>: MACAlgorithm, Sendable {
     ///   - key: The symmetric key used to secure the computation.
     ///
     /// - Returns: The message authentication code.
-#if !CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 27.0, macOS 27.0, watchOS 27.0, tvOS 27.0, macCatalyst 27.0, visionOS 27.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 14.0, macOS 10.13, watchOS 7.0, tvOS 14.0, macCatalyst 14.0, visionOS 1.0, *)
-#endif
     public static func authenticationCode(for data: RawSpan, using key: SymmetricKey) -> MAC {
         var authenticator = Self(key: key)
         authenticator.update(bytes: data)
@@ -166,11 +147,6 @@ public struct HMAC<H: HashFunction>: MACAlgorithm, Sendable {
     ///
     /// - Returns: A Boolean value that’s `true` if the message authentication
     /// code is valid for the specified block of data.
-    #if !CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 13.2, macOS 10.15, watchOS 6.1, tvOS 13.2, macCatalyst 13.2, *)
-    #else // CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 13.2, macOS 10.13, watchOS 6.1, tvOS 13.2, macCatalyst 13.2, visionOS 1.0, *)
-    #endif
     public static func isValidAuthenticationCode<C: ContiguousBytes, D: DataProtocol>(_ authenticationCode: C,
                                                                                       authenticating authenticatedData: D,
                                                                                       using key: SymmetricKey) -> Bool {
@@ -190,11 +166,6 @@ public struct HMAC<H: HashFunction>: MACAlgorithm, Sendable {
         }
     }
     
-#if !CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 27.0, macOS 27.0, watchOS 27.0, tvOS 27.0, macCatalyst 27.0, visionOS 27.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 14.0, macOS 10.13, watchOS 7.0, tvOS 14.0, macCatalyst 14.0, visionOS 1.0, *)
-#endif
     public mutating func update(bytes: RawSpan) {
         innerHasher.update(bytes: bytes)
     }
@@ -245,11 +216,6 @@ public struct HMAC<H: HashFunction>: MACAlgorithm, Sendable {
 }
 
 /// A hash-based message authentication code.
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 public struct HashedAuthenticationCode<H: HashFunction>: MessageAuthenticationCode, Sendable {
     let digest: H.Digest
     
@@ -283,4 +249,4 @@ public struct HashedAuthenticationCode<H: HashFunction>: MessageAuthenticationCo
     }
     #endif
 }
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

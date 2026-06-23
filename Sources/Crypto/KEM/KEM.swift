@@ -11,32 +11,21 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-#if CRYPTOKIT_STATIC_LIBRARY
-@_exported import CryptoKit_Static
-#else
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
-#endif
 #else
 
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-public import SwiftSystem
-#else
 #if canImport(FoundationEssentials)
 public import FoundationEssentials
 #else
 public import Foundation
 #endif
-#endif
 
 /// A key encapsulation mechanism.
 ///
 /// Use a key encapsulation mechanism (KEM) to protect a symmetric cryptographic key that you share with another party.
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 17.0, macOS 14.0, watchOS 10.0, tvOS 17.0, macCatalyst 17.0, *)
-#else //CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 16.0, macOS 10.13, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 1.0, *)
-#endif
+@nonexhaustive
 public enum KEM: Sendable {
     /// The result of a key encapsulation operation.
     public struct EncapsulationResult: Sendable {
@@ -54,11 +43,6 @@ public enum KEM: Sendable {
 }
 
 /// The public key for a key encapsulation mechanism.
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 17.0, macOS 14.0, watchOS 10.0, tvOS 17.0, macCatalyst 17.0, *)
-#else //CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 16.0, macOS 10.13, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 1.0, *)
-#endif
 @preconcurrency
 public protocol KEMPublicKey: Sendable {
     /// Generates and encapsulates a shared secret.
@@ -70,11 +54,6 @@ public protocol KEMPublicKey: Sendable {
 }
 
 /// The private key for a key encapsulation mechanism.
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 17.0, macOS 14.0, watchOS 10.0, tvOS 17.0, macCatalyst 17.0, *)
-#else //CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 16.0, macOS 10.13, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 1.0, *)
-#endif
 @preconcurrency
 public protocol KEMPrivateKey: Sendable {
     associatedtype PublicKey: KEMPublicKey
@@ -96,7 +75,6 @@ public protocol KEMPrivateKey: Sendable {
 }
 
 /// A one-time private key for a key encapsulation mechanism, which can only decapsulate once but it does so faster.
-@available(iOS 27.0, macOS 27.0, watchOS 27.0, tvOS 27.0, macCatalyst 27.0, visionOS 27.0, *)
 @preconcurrency
 public protocol KEMOneTimePrivateKey: ~Copyable, Sendable {
     associatedtype PublicKey: KEMPublicKey
@@ -116,4 +94,4 @@ public protocol KEMOneTimePrivateKey: ~Copyable, Sendable {
     /// The associated public key.
     var publicKey: PublicKey { get }
 }
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

@@ -11,7 +11,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 #if canImport(FoundationEssentials)
@@ -20,21 +21,14 @@ public import FoundationEssentials
 public import Foundation
 #endif
 
-#if (!CRYPTO_IN_SWIFTPM_FORCE_BUILD_API) || CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-@available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, macCatalyst 26.0, visionOS 26.0, *)
-typealias MLKEMPublicKeyImpl = CoreCryptoMLKEMPublicKeyImpl
-typealias MLKEMPrivateKeyImpl = CoreCryptoMLKEMPrivateKeyImpl
-#else
 typealias MLKEMPublicKeyImpl = OpenSSLMLKEMPublicKeyImpl
 typealias MLKEMPrivateKeyImpl = OpenSSLMLKEMPrivateKeyImpl
-#endif
 
 
 /// The Module-Lattice key encapsulation mechanism (KEM).
-@available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, macCatalyst 26.0, visionOS 26.0, *)
+@nonexhaustive
 public enum MLKEM768: Sendable {}
 
-@available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, macCatalyst 26.0, visionOS 26.0, *)
 extension MLKEM768 {
     /// A public key you use to encapsulate shared secrets with the Module-Lattice key encapsulation mechanism.
     public struct PublicKey: KEMPublicKey, Sendable {
@@ -151,7 +145,6 @@ extension MLKEM768 {
         }
     }
 
-    @available(iOS 27.0, macOS 27.0, watchOS 27.0, tvOS 27.0, macCatalyst 27.0, visionOS 27.0, *)
     /// A one-time-use private key to decapsulate a shared secret with the Module-Lattice key encapsulation mechanism.
     ///
     /// The associated decapsulation function can be multiple times faster than the one implemented for PrivateKey,
@@ -194,10 +187,9 @@ extension MLKEM768 {
 
 
 /// The Module-Lattice key encapsulation mechanism (KEM).
-@available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, macCatalyst 26.0, visionOS 26.0, *)
+@nonexhaustive
 public enum MLKEM1024: Sendable {}
 
-@available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, macCatalyst 26.0, visionOS 26.0, *)
 extension MLKEM1024 {
     /// A public key you use to encapsulate shared secrets with the Module-Lattice key encapsulation mechanism.
     public struct PublicKey: KEMPublicKey, Sendable {
@@ -314,7 +306,6 @@ extension MLKEM1024 {
         }
     }
 
-    @available(iOS 27.0, macOS 27.0, watchOS 27.0, tvOS 27.0, macCatalyst 27.0, visionOS 27.0, *)
     /// A one-time-use private key to decapsulate a shared secret with the Module-Lattice key encapsulation mechanism.
     ///
     /// The associated decapsulation function can be multiple times faster than the one implemented for PrivateKey,
@@ -356,4 +347,4 @@ extension MLKEM1024 {
 }
 
 
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

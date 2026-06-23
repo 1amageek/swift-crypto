@@ -11,19 +11,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-#if CRYPTOKIT_STATIC_LIBRARY
-@_exported import CryptoKit_Static
-#else
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
-#endif
 #else
 /// General cryptography errors used by CryptoKit.
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
+@nonexhaustive
 public enum CryptoKitError: Error {
     /// The key size is incorrect.
     case incorrectKeySize
@@ -35,29 +28,17 @@ public enum CryptoKitError: Error {
     /// action.
     case underlyingCoreCryptoError(error: Int32)
     /// The framework can't wrap the specified key.
-    @available(iOS 15.0, macOS 12.0, watchOS 8.0, tvOS 15.0, macCatalyst 15.0, *)
     case wrapFailure
     /// The framework can't unwrap the specified key.
-    @available(iOS 15.0, macOS 12.0, watchOS 8.0, tvOS 15.0, macCatalyst 15.0, *)
     case unwrapFailure
     /// The parameter is invalid.
-    #if !CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, *)
-    #else // CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 16.0, macOS 10.13, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 1.0, *)
-    #endif
     case invalidParameter
 }
 
-@available(iOS 17.4, macOS 14.4, watchOS 10.4, tvOS 17.4, macCatalyst 17.4, *)
 extension CryptoKitError: Equatable, Hashable {}
 
 /// Errors from decoding ASN.1 content.
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 14.0, macOS 11.0, watchOS 7.0, tvOS 14.0, macCatalyst 14.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 14.0, macOS 10.13, watchOS 7.0, tvOS 14.0, macCatalyst 14.0, visionOS 1.0, *)
-#endif
+@nonexhaustive
 public enum CryptoKitASN1Error: Equatable, Error, Hashable {
     /// The ASN.1 tag for this field is invalid or unsupported.
     case invalidFieldIdentifier
@@ -107,6 +88,7 @@ struct RSAPSSSPKIError: Error {
 #endif
 
 #if hasFeature(Embedded)
+@nonexhaustive
 public enum CryptoKitMetaError: Error {
     case cryptoKitError(underlyingError: CryptoKitError)
     case asn1Error(underlyingError: CryptoKitASN1Error)
@@ -122,7 +104,7 @@ internal func error(_ error: CryptoKitASN1Error) -> CryptoKitMetaError {
 internal func error(_ error: RSAPSSSPKIErrors) -> CryptoKitMetaError {
     .rsapssspkiError(underlyingError: RSAPSSSPKIError(error: error))
 }
-#else /* !hasFeature(Embedded) */
+#else
 public typealias CryptoKitMetaError = any Error
 internal func error(_ error: CryptoKitError) -> CryptoKitError { error }
 internal func error(_ error: CryptoKitASN1Error) -> CryptoKitASN1Error { error }

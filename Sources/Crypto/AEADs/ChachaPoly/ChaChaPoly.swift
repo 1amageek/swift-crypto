@@ -11,38 +11,21 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
-#if (!CRYPTO_IN_SWIFTPM_FORCE_BUILD_API) || CRYPTOKIT_NO_ACCESS_TO_FOUNDATION || CRYPTOKIT_NO_IMPORT_FOUNDATION
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
-typealias ChaChaPolyImpl = CoreCryptoChaChaPolyImpl
-#else
 typealias ChaChaPolyImpl = OpenSSLChaChaPolyImpl
-#endif
 
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-public import SwiftSystem
-#elseif CRYPTOKIT_NO_IMPORT_FOUNDATION
-#else
 #if canImport(FoundationEssentials)
 public import FoundationEssentials
 #else
 public import Foundation
 #endif
-#endif
 
 
 /// An implementation of the ChaCha20-Poly1305 cipher.
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
+@nonexhaustive
 public enum ChaChaPoly: Cipher, Sendable {
     static let tagByteCount = 16
     static let keyBitsCount = 256
@@ -87,7 +70,6 @@ public enum ChaChaPoly: Cipher, Sendable {
     ///   - nonce: The nonce the sealing process requires.
     ///   - authenticatedData: Additional data to be authenticated.
     ///   - tag: Will be updated with the 16-byte authentication tag.
-    @available(iOS 27.0, macOS 27.0, watchOS 27.0, tvOS 27.0, macCatalyst 27.0, visionOS 27.0, *)
     #if swift(<6.3)
     @_lifetime(message: copy message)
     #endif
@@ -157,7 +139,6 @@ public enum ChaChaPoly: Cipher, Sendable {
     ///   - authenticatedData: Additional data that was authenticated.
     ///
     /// The call throws an error if decryption or authentication fail.
-    @available(iOS 27.0, macOS 27.0, watchOS 27.0, tvOS 27.0, macCatalyst 27.0, visionOS 27.0, *)
     #if swift(<6.3)
     @_lifetime(message: copy message)
     #endif
@@ -187,11 +168,6 @@ public enum ChaChaPoly: Cipher, Sendable {
     }
 }
 
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 extension ChaChaPoly {
     /// A secure container for your data that you access using a cipher.
     ///
@@ -208,11 +184,6 @@ extension ChaChaPoly {
     /// The receiver uses another instance of the same cipher, like the
     /// ``open(_:using:)`` method, to open the box.
     @frozen
-    #if !CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-    #else // CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-    #endif
     public struct SealedBox: AEADSealedBox, Sendable {
         /// A combined element composed of the tag, the nonce, and the
         /// ciphertext.
@@ -272,4 +243,4 @@ extension ChaChaPoly {
         }
     }
 }
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

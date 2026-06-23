@@ -11,18 +11,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
-#else
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-public import SwiftSystem
-#elseif CRYPTOKIT_NO_IMPORT_FOUNDATION
 #else
 #if canImport(FoundationEssentials)
 public import FoundationEssentials
 #else
 public import Foundation
-#endif
 #endif
 // MARK: - Generated file, do NOT edit
 // any edits of this file WILL be overwritten and thus discarded
@@ -32,22 +28,12 @@ public import Foundation
 
 
 // MARK: - AES.GCM + Nonce
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 extension AES.GCM {
     /// A value used once during a cryptographic operation and then discarded.
     ///
     /// Don’t reuse the same nonce for multiple calls to encryption APIs. It’s critical
     /// that nonces are unique per call to encryption APIs in order to protect the
     /// integrity of the encryption.
-    #if !CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-    #else // CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-    #endif
     public struct Nonce: ContiguousBytes, Sequence, Sendable {
         typealias Storage = ContiguousArray<UInt8>
 
@@ -84,7 +70,6 @@ extension AES.GCM {
         /// - Parameters:
 ///   - bytes: The bytes that represent the nonce.
 ///     The initializer throws an error if the data has a length smaller than 12 bytes.
-        @available(iOS 27.0, macOS 27.0, watchOS 27.0, tvOS 27.0, macCatalyst 27.0, visionOS 27.0, *)
         public init(copying bytes: RawSpan) throws(CryptoKitMetaError) {
             if bytes.byteCount < AES.GCM.defaultNonceByteCount {
                 throw error(CryptoKitError.incorrectParameterSize)
@@ -167,22 +152,12 @@ extension AES.GCM {
 }
 
 // MARK: - ChaChaPoly + Nonce
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 extension ChaChaPoly {
     /// A value used once during a cryptographic operation and then discarded.
     ///
     /// Don’t reuse the same nonce for multiple calls to encryption APIs. It’s critical
     /// that nonces are unique per call to encryption APIs in order to protect the
     /// integrity of the encryption.
-    #if !CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-    #else // CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-    #endif
     public struct Nonce: ContiguousBytes, Sequence, Sendable {
         typealias Storage = [12 of UInt8]
 
@@ -219,7 +194,6 @@ extension ChaChaPoly {
         /// - Parameters:
 ///   - bytes: The bytes that represent the nonce.
 ///     The initializer throws an error if the data isn't 12 bytes long.
-        @available(iOS 27.0, macOS 27.0, watchOS 27.0, tvOS 27.0, macCatalyst 27.0, visionOS 27.0, *)
         public init(copying bytes: RawSpan) throws(CryptoKitMetaError) {
             if bytes.byteCount != ChaChaPoly.nonceByteCount {
                 throw error(CryptoKitError.incorrectParameterSize)
@@ -299,4 +273,4 @@ extension ChaChaPoly {
         }
     }
 }
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

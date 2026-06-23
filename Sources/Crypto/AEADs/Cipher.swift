@@ -11,19 +11,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-import SwiftSystem
-#elseif CRYPTOKIT_NO_IMPORT_FOUNDATION
-#else
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import Foundation
-#endif
 #endif
 
 
@@ -46,11 +42,6 @@ protocol AEADSealedBox: Sendable {
 }
 
 /// A type representing authenticated encryption with associated data.
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 protocol Cipher {
     associatedtype Key
     associatedtype SealedBox: AEADSealedBox

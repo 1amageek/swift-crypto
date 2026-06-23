@@ -11,36 +11,19 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
-#else
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-import SwiftSystem
-#elseif CRYPTOKIT_NO_IMPORT_FOUNDATION
 #else
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import Foundation
 #endif
-#endif
 
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 protocol MACAlgorithm {
     associatedtype Key
-    #if (!CRYPTO_IN_SWIFTPM_FORCE_BUILD_API) || CRYPTOKIT_NO_ACCESS_TO_FOUNDATION || CRYPTOKIT_NO_IMPORT_FOUNDATION
-    #if CRYPTOKIT_STATIC_LIBRARY
-    associatedtype MAC: CryptoKit_Static.MessageAuthenticationCode
-    #else
-    associatedtype MAC: CryptoKit.MessageAuthenticationCode
-    #endif
-    #else
     associatedtype MAC: Crypto.MessageAuthenticationCode
-    #endif
 
     /// Initializes the MAC Algorithm
     ///
@@ -58,11 +41,6 @@ protocol MACAlgorithm {
     func finalize() -> MAC
 }
 
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 extension MACAlgorithm {
     /// Computes a Message Authentication Code.
     ///
@@ -89,4 +67,4 @@ extension MACAlgorithm {
         return mac == Self.authenticationCode(bufferPointer: bufferPointer, using: key)
     }
 }
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

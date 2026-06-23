@@ -115,11 +115,6 @@ add_library(Crypto
 target_compile_definitions(Crypto PRIVATE
   "$<$<COMPILE_LANGUAGE:Swift>:CRYPTO_IN_SWIFTPM>")
 
-if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  target_compile_definitions(Crypto PRIVATE
-    "$<$<COMPILE_LANGUAGE:Swift>:CRYPTO_IN_SWIFTPM_FORCE_BUILD_API>")
-endif()
-
 target_include_directories(Crypto PRIVATE
   $<TARGET_PROPERTY:CCryptoBoringSSL,INCLUDE_DIRECTORIES>
   $<TARGET_PROPERTY:CCryptoBoringSSLShims,INCLUDE_DIRECTORIES>

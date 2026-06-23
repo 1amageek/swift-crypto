@@ -11,28 +11,20 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-import SwiftSystem
-#else
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import Foundation
 #endif
-#endif
-
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 17.0, macOS 14.0, watchOS 10.0, tvOS 17.0, macCatalyst 17.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 16.0, macOS 10.13, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 1.0, *)
-#endif
 
 extension HPKE {
     /// The authenticated encryption with associated data (AEAD) algorithms to use in HPKE.
+    @nonexhaustive
     public enum AEAD: CaseIterable, Hashable, Sendable {
 		/// An Advanced Encryption Standard cipher in Galois/Counter Mode with a key length of 128 bits.
         case AES_GCM_128
@@ -129,4 +121,4 @@ extension HPKE {
     }
 }
 
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

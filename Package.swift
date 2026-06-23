@@ -26,54 +26,22 @@ import PackageDescription
 
 import class Foundation.ProcessInfo
 
-// To develop this on Apple platforms, set this to true
-let development = false
+// NOTE: To develop the the non-Darwin Crypto target on macOS, use a Dev Container.
+let nonDarwinPlatforms: [Platform] = [
+    .linux,
+    .android,
+    .windows,
+    .wasi,
+    .openbsd,
+    // The SwiftPM Platform symbol is not yet public but the underlying platform name is set.
+    // -- https://github.com/swiftlang/swift-package-manager/blob/swift-6.2.3-RELEASE/Sources/PackageDescription/SupportedPlatforms.swift#L75
+    .custom("freebsd"),
+]
 
-// Ideally, we should use `.when(platforms:)` to set `swiftSettings` and
-// `dependencies` like on other platforms. However, `Platform.freebsd` is not
-// yet available, and therefore we guard the settings behind this boolean.
-#if os(FreeBSD)
-let isFreeBSD = true
-#else
-let isFreeBSD = false
-#endif
-
-let swiftSettings: [SwiftSetting]
-let dependencies: [Target.Dependency]
-if development || isFreeBSD {
-    swiftSettings = [
-        .define("CRYPTO_IN_SWIFTPM"),
-        .define("CRYPTO_IN_SWIFTPM_FORCE_BUILD_API"),
-        .enableExperimentalFeature("Lifetimes"),
-    ]
-    dependencies = [
-        "CCryptoBoringSSL",
-        "CCryptoBoringSSLShims",
-        "CryptoBoringWrapper",
-        "CXKCP",
-        "CXKCPShims",
-    ]
-} else {
-    let platforms: [Platform] = [
-        Platform.linux,
-        Platform.android,
-        Platform.windows,
-        Platform.wasi,
-        Platform.openbsd,
-    ]
-    swiftSettings = [
-        .define("CRYPTO_IN_SWIFTPM"),
-        .define("CRYPTO_IN_SWIFTPM_FORCE_BUILD_API", .when(platforms: platforms)),
-        .enableExperimentalFeature("Lifetimes"),
-    ]
-    dependencies = [
-        .target(name: "CCryptoBoringSSL", condition: .when(platforms: platforms)),
-        .target(name: "CCryptoBoringSSLShims", condition: .when(platforms: platforms)),
-        .target(name: "CryptoBoringWrapper", condition: .when(platforms: platforms)),
-        .target(name: "CXKCP", condition: .when(platforms: platforms)),
-        .target(name: "CXKCPShims", condition: .when(platforms: platforms)),
-    ]
-}
+let swiftSettings: [SwiftSetting] = [
+    .define("CRYPTO_IN_SWIFTPM"),
+    .enableExperimentalFeature("Lifetimes"),
+]
 
 // This doesn't work when cross-compiling: the privacy manifest will be included in the Bundle and
 // Foundation will be linked. This is, however, strictly better than unconditionally adding the
@@ -165,16 +133,16 @@ let package = Package(
         ),
         .target(
             name: "Crypto",
-            dependencies: dependencies,
+            dependencies: [
+                .target(name: "CCryptoBoringSSL", condition: .when(platforms: nonDarwinPlatforms)),
+                .target(name: "CCryptoBoringSSLShims", condition: .when(platforms: nonDarwinPlatforms)),
+                .target(name: "CryptoBoringWrapper", condition: .when(platforms: nonDarwinPlatforms)),
+                .target(name: "CXKCP", condition: .when(platforms: nonDarwinPlatforms)),
+                .target(name: "CXKCPShims", condition: .when(platforms: nonDarwinPlatforms)),
+            ],
             exclude: privacyManifestExclude + [
                 "CMakeLists.txt",
-                "AEADs/Nonces.swift.gyb",
-                "Digests/Digests.swift.gyb",
-                "Key Agreement/ECDH.swift.gyb",
-                "Signatures/ECDSA.swift.gyb",
-                "Signatures/MLDSA.swift.gyb",
                 "Signatures/BoringSSL/MLDSA_boring.swift.gyb",
-                "KEM/MLKEM.swift.gyb",
                 "KEM/BoringSSL/MLKEM_boring.swift.gyb",
             ],
             resources: privacyManifestResource,

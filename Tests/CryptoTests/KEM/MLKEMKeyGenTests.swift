@@ -11,24 +11,16 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
+
 import XCTest
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+#if canImport(CryptoKit)
 // Skip tests that require @testable imports of CryptoKit.
 #else
-#if !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-@testable import CryptoKit
-#else
 @testable import Crypto
-#endif
 
-@available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, macCatalyst 26.0, visionOS 26.0, *)
 final class MLKEMKeyGenTests: XCTestCase {
     func processKeyGenKATFile(filename: String) throws -> [MLKEMKeyGenKAT] {
-        #if CRYPTO_IN_SWIFTPM
         let bundle = Bundle.module
-        #else
-        let bundle = Bundle(for: type(of: self))
-        #endif
         let fileURL = bundle.url(forResource: filename, withExtension: "json")
         let json = try Data(contentsOf: fileURL!)
         let stringInput = String(data: json, encoding: .ascii)!
@@ -99,4 +91,4 @@ struct MLKEMKeyGenKAT {
     }
 }
 
-#endif // CRYPTO_IN_SWIFTPM
+#endif // canImport(CryptoKit)

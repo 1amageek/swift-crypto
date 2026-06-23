@@ -11,25 +11,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-import SwiftSystem
-#elseif CRYPTOKIT_NO_IMPORT_FOUNDATION
-#else
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import Foundation
 #endif
-#endif
 
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
-#if (!CRYPTO_IN_SWIFTPM_FORCE_BUILD_API) || CRYPTOKIT_NO_ACCESS_TO_FOUNDATION || CRYPTOKIT_NO_IMPORT_FOUNDATION
-typealias SupportedCurveDetailsImpl = CorecryptoSupportedNISTCurve
-#else
 typealias SupportedCurveDetailsImpl = OpenSSLSupportedNISTCurve
-#endif
 
 protocol ECPublicKey {
     init <Bytes: ContiguousBytes>(rawRepresentation: Bytes) throws(CryptoKitMetaError)
@@ -56,26 +48,14 @@ protocol NISTECPrivateKey: ECPrivateKey where PK: NISTECPublicKey {
 }
 
 /// An elliptic curve that enables NIST P-256 signatures and key agreement.
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
+@nonexhaustive
 public enum P256: Sendable { }
 
 /// An elliptic curve that enables NIST P-384 signatures and key agreement.
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
+@nonexhaustive
 public enum P384: Sendable { }
 
 /// An elliptic curve that enables NIST P-521 signatures and key agreement.
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
+@nonexhaustive
 public enum P521: Sendable { }
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

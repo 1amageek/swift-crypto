@@ -11,18 +11,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-import SwiftSystem
-#elseif CRYPTOKIT_NO_IMPORT_FOUNDATION
-#else
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import Foundation
-#endif
 #endif
 
 extension Data {
@@ -50,8 +46,6 @@ extension Data {
     }
 }
 
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, macCatalyst 26.0, visionOS 26.0, *)
 extension InlineArray where Element == UInt8 {
     init<D: DataProtocol>(copying data: D) {
         self.init { outputSpan in
@@ -63,24 +57,5 @@ extension InlineArray where Element == UInt8 {
         }
     }
 }
-#endif
 
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-// Note: Should be provided by SwiftSystem's version of Data. We provide
-extension Data {
-    var bytes: RawSpan {
-        get {
-            let buffer = withUnsafeBytes { $0 }
-            return _overrideLifetime(buffer.bytes, borrowing: self)
-        }
-    }
-
-    var mutableBytes: MutableRawSpan {
-        mutating get {
-            let buffer = withUnsafeMutableBytes { $0 }
-            return _overrideLifetime(buffer.mutableBytes, mutating: &self)
-        }
-    }
-}
 #endif
-#endif // Linux or !SwiftPM

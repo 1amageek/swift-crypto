@@ -85,10 +85,6 @@ add_library(CryptoExtras
 
 target_compile_options(CryptoExtras PRIVATE -DCRYPTO_IN_SWIFTPM)
 
-if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  target_compile_options(CryptoExtras PRIVATE -DCRYPTO_IN_SWIFTPM_FORCE_BUILD_API)
-endif()
-
 target_include_directories(CryptoExtras PRIVATE
   $<TARGET_PROPERTY:CCryptoBoringSSL,INCLUDE_DIRECTORIES>
   $<TARGET_PROPERTY:CCryptoBoringSSLShims,INCLUDE_DIRECTORIES>)

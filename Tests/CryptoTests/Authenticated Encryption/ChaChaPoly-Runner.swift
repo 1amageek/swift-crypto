@@ -11,25 +11,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 import XCTest
 
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-// Skip tests that use @available annotations on tests unless running on Linux.
+#if canImport(CryptoKit)
+// Skip tests that require @testable imports of CryptoKit.
 #else
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-import Crypto
-#elseif !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-import CryptoKit
-#else
-import Crypto
-#endif
+@testable import Crypto
 
-@available(iOS 17.4, macOS 14.4, watchOS 10.4, tvOS 17.4, macCatalyst 17.4, *)
 class ChaChaPolyTests: XCTestCase {
     func testIncorrectKeySize() throws {
         let plaintext: Data = "Some Super Secret Message".data(using: String.Encoding.utf8)!
@@ -71,12 +59,9 @@ class ChaChaPolyTests: XCTestCase {
 
         XCTAssertEqual(recoveredPlaintext, plaintext)
 
-        // Some applications assume that the startIndex of the returned plaintext is zero.
-        // While that is an incorrect assumption, it was true of prior implementations, so
         XCTAssertEqual(recoveredPlaintext.startIndex, 0)
     }
 
-    @available(macOS 27, iOS 27, tvOS 27, watchOS 27, visionOS 27, *)
     func testEncryptDecryptSpans() throws {
         let plaintext: [UInt8] = Array("Some Super Secret Message".utf8)
 
@@ -259,4 +244,5 @@ class ChaChaPolyTests: XCTestCase {
         }
     }
 }
-#endif // CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#endif

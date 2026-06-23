@@ -11,7 +11,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 // MARK: - Generated file, do NOT edit
@@ -22,11 +23,6 @@
 
 // MARK: - SHA256Digest + DigestPrivate
 /// The output of a Secure Hashing Algorithm 2 (SHA-2) hash with a 256-bit digest.
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 public struct SHA256Digest: DigestPrivate {
     let bytes: (UInt64, UInt64, UInt64, UInt64)
     
@@ -110,11 +106,6 @@ public struct SHA256Digest: DigestPrivate {
 
 // MARK: - SHA384Digest + DigestPrivate
 /// The output of a Secure Hashing Algorithm 2 (SHA-2) hash with a 384-bit digest.
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 public struct SHA384Digest: DigestPrivate {
     let bytes: (UInt64, UInt64, UInt64, UInt64, UInt64, UInt64)
     
@@ -200,11 +191,6 @@ public struct SHA384Digest: DigestPrivate {
 
 // MARK: - SHA512Digest + DigestPrivate
 /// The output of a Secure Hashing Algorithm 2 (SHA-2) hash with a 512-bit digest.
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 public struct SHA512Digest: DigestPrivate {
     let bytes: (UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64)
     
@@ -289,19 +275,9 @@ public struct SHA512Digest: DigestPrivate {
     }
 }
 
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 extension Insecure {
 // MARK: - SHA1Digest + DigestPrivate
 /// The output of a SHA1 hash.
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 public struct SHA1Digest: DigestPrivate {
     let bytes: (UInt64, UInt64, UInt64)
     
@@ -381,19 +357,9 @@ public struct SHA1Digest: DigestPrivate {
     }
 }
 }
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 extension Insecure {
 // MARK: - MD5Digest + DigestPrivate
 /// The output of a MD5 hash.
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 public struct MD5Digest: DigestPrivate {
     let bytes: (UInt64, UInt64)
     
@@ -478,7 +444,6 @@ public struct MD5Digest: DigestPrivate {
 
 // MARK: - SHA3_256Digest + DigestPrivate
 /// The output of a Secure Hashing Algorithm 3 (SHA-2) hash with a 256-bit digest.
-@available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, macCatalyst 26.0, visionOS 26.0, *)
 public struct SHA3_256Digest: DigestPrivate {
     let bytes: (UInt64, UInt64, UInt64, UInt64)
 
@@ -560,7 +525,6 @@ public struct SHA3_256Digest: DigestPrivate {
 }
 // MARK: - SHA3_384Digest + DigestPrivate
 /// The output of a Secure Hashing Algorithm 3 (SHA-2) hash with a 384-bit digest.
-@available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, macCatalyst 26.0, visionOS 26.0, *)
 public struct SHA3_384Digest: DigestPrivate {
     let bytes: (UInt64, UInt64, UInt64, UInt64, UInt64, UInt64)
 
@@ -644,7 +608,6 @@ public struct SHA3_384Digest: DigestPrivate {
 }
 // MARK: - SHA3_512Digest + DigestPrivate
 /// The output of a Secure Hashing Algorithm 3 (SHA-2) hash with a 512-bit digest.
-@available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, macCatalyst 26.0, visionOS 26.0, *)
 public struct SHA3_512Digest: DigestPrivate {
     let bytes: (UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64)
 
@@ -729,4 +692,4 @@ public struct SHA3_512Digest: DigestPrivate {
     }
 }
 #endif // !CRYPTOKIT_IN_SEP
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

@@ -12,7 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 @_implementationOnly import CCryptoBoringSSL
@@ -289,4 +289,4 @@ struct OpenSSLMLKEMPrivateKeyImpl<Parameters: BoringSSLBackedMLKEMParameters>: B
     }
 }
 
-#endif  // CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+#endif  // canImport(CryptoKit)

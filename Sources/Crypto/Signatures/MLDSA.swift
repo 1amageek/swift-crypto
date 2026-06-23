@@ -11,7 +11,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 #if canImport(FoundationEssentials)
@@ -20,21 +21,14 @@ public import FoundationEssentials
 public import Foundation
 #endif
 
-#if (!CRYPTO_IN_SWIFTPM_FORCE_BUILD_API) || CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-@available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, macCatalyst 26.0, visionOS 26.0, *)
-typealias MLDSAPublicKeyImpl = CorecryptoMLDSAPublicKeyImpl
-typealias MLDSAPrivateKeyImpl = CorecryptoMLDSAPrivateKeyImpl
-#else
 typealias MLDSAPublicKeyImpl = OpenSSLMLDSAPublicKeyImpl
 typealias MLDSAPrivateKeyImpl = OpenSSLMLDSAPrivateKeyImpl
-#endif
 
 
 /// The MLDSA65 Digital Signature Algorithm
-@available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, macCatalyst 26.0, visionOS 26.0, *)
+@nonexhaustive
 public enum MLDSA65: Sendable {}
 
-@available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, macCatalyst 26.0, visionOS 26.0, *)
 extension MLDSA65 {
     /// The public key for MLDSA65.
     public struct PublicKey: Sendable {
@@ -187,10 +181,9 @@ extension MLDSA65 {
 
 
 /// The MLDSA87 Digital Signature Algorithm
-@available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, macCatalyst 26.0, visionOS 26.0, *)
+@nonexhaustive
 public enum MLDSA87: Sendable {}
 
-@available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, macCatalyst 26.0, visionOS 26.0, *)
 extension MLDSA87 {
     /// The public key for MLDSA87.
     public struct PublicKey: Sendable {
@@ -342,4 +335,4 @@ extension MLDSA87 {
 }
 
 
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

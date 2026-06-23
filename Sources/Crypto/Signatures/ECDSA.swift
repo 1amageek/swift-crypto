@@ -11,19 +11,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-public import SwiftSystem
-#elseif CRYPTOKIT_NO_IMPORT_FOUNDATION
-#else
 #if canImport(FoundationEssentials)
 public import FoundationEssentials
 #else
 public import Foundation
-#endif
 #endif
 
 // MARK: - Generated file, do NOT edit
@@ -37,7 +33,6 @@ protocol NISTECDSASignature {
     var rawRepresentation: Data { get }
 }
 
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
 protocol NISTSigning {
     associatedtype PublicKey: NISTECPublicKey & DataValidator & DigestValidator
     associatedtype PrivateKey: NISTECPrivateKey & Signer
@@ -45,7 +40,6 @@ protocol NISTSigning {
 }
 
 // MARK: - P256 + Signing
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
 extension P256.Signing {
 
     /// A P-256 elliptic curve digital signature algorithm (ECDSA) signature.
@@ -146,11 +140,9 @@ extension P256.Signing {
     }
 }
 
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
 extension P256.Signing: NISTSigning {}
 
 // MARK: - P256 + PrivateKey
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
 extension P256.Signing.PrivateKey: DigestSigner {
     /// Generates an Elliptic Curve Digital Signature Algorithm (ECDSA)
     /// signature of the digest you provide over the P-256 elliptic curve.
@@ -161,15 +153,10 @@ extension P256.Signing.PrivateKey: DigestSigner {
     /// algorithm employs randomization to generate a different signature on
     /// every call, even for the same data and key.
     public func signature<D: Digest>(for digest: D) throws(CryptoKitMetaError) -> P256.Signing.ECDSASignature {
-        #if (!CRYPTO_IN_SWIFTPM_FORCE_BUILD_API) || CRYPTOKIT_NO_ACCESS_TO_FOUNDATION || CRYPTOKIT_NO_IMPORT_FOUNDATION
-        return try self.coreCryptoSignature(for: digest)
-        #else
         return try self.openSSLSignature(for: digest)
-        #endif
     }
  }
 
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
 extension P256.Signing.PrivateKey: Signer {
     /// Generates an Elliptic Curve Digital Signature Algorithm (ECDSA)
     /// signature of the data you provide over the P-256 elliptic curve,
@@ -185,7 +172,6 @@ extension P256.Signing.PrivateKey: Signer {
     }
 }
 
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
 extension P256.Signing.PublicKey: DigestValidator {
     /// Verifies an elliptic curve digital signature algorithm (ECDSA)
     /// signature on a digest over the P-256 elliptic curve.
@@ -196,15 +182,10 @@ extension P256.Signing.PublicKey: DigestValidator {
     /// - Returns: A Boolean value that’s `true` if the signature is valid for
     /// the given digest; otherwise, `false`.
     public func isValidSignature<D: Digest>(_ signature: P256.Signing.ECDSASignature, for digest: D) -> Bool {
-        #if (!CRYPTO_IN_SWIFTPM_FORCE_BUILD_API) || CRYPTOKIT_NO_ACCESS_TO_FOUNDATION || CRYPTOKIT_NO_IMPORT_FOUNDATION
-        return self.coreCryptoIsValidSignature(signature, for: digest)
-        #else
         return self.openSSLIsValidSignature(signature, for: digest)
-        #endif
     }
 }
 
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
 extension P256.Signing.PublicKey: DataValidator {
     /// Verifies an elliptic curve digital signature algorithm (ECDSA)
     /// signature on a block of data over the P-256 elliptic curve.
@@ -220,7 +201,6 @@ extension P256.Signing.PublicKey: DataValidator {
  }
 
 // MARK: - P384 + Signing
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
 extension P384.Signing {
 
     /// A P-384 elliptic curve digital signature algorithm (ECDSA) signature.
@@ -321,11 +301,9 @@ extension P384.Signing {
     }
 }
 
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
 extension P384.Signing: NISTSigning {}
 
 // MARK: - P384 + PrivateKey
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
 extension P384.Signing.PrivateKey: DigestSigner {
     /// Generates an Elliptic Curve Digital Signature Algorithm (ECDSA)
     /// signature of the digest you provide over the P-384 elliptic curve.
@@ -336,15 +314,10 @@ extension P384.Signing.PrivateKey: DigestSigner {
     /// algorithm employs randomization to generate a different signature on
     /// every call, even for the same data and key.
     public func signature<D: Digest>(for digest: D) throws(CryptoKitMetaError) -> P384.Signing.ECDSASignature {
-        #if (!CRYPTO_IN_SWIFTPM_FORCE_BUILD_API) || CRYPTOKIT_NO_ACCESS_TO_FOUNDATION || CRYPTOKIT_NO_IMPORT_FOUNDATION
-        return try self.coreCryptoSignature(for: digest)
-        #else
         return try self.openSSLSignature(for: digest)
-        #endif
     }
  }
 
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
 extension P384.Signing.PrivateKey: Signer {
     /// Generates an Elliptic Curve Digital Signature Algorithm (ECDSA)
     /// signature of the data you provide over the P-384 elliptic curve,
@@ -360,7 +333,6 @@ extension P384.Signing.PrivateKey: Signer {
     }
 }
 
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
 extension P384.Signing.PublicKey: DigestValidator {
     /// Verifies an elliptic curve digital signature algorithm (ECDSA)
     /// signature on a digest over the P-384 elliptic curve.
@@ -371,15 +343,10 @@ extension P384.Signing.PublicKey: DigestValidator {
     /// - Returns: A Boolean value that’s `true` if the signature is valid for
     /// the given digest; otherwise, `false`.
     public func isValidSignature<D: Digest>(_ signature: P384.Signing.ECDSASignature, for digest: D) -> Bool {
-        #if (!CRYPTO_IN_SWIFTPM_FORCE_BUILD_API) || CRYPTOKIT_NO_ACCESS_TO_FOUNDATION || CRYPTOKIT_NO_IMPORT_FOUNDATION
-        return self.coreCryptoIsValidSignature(signature, for: digest)
-        #else
         return self.openSSLIsValidSignature(signature, for: digest)
-        #endif
     }
 }
 
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
 extension P384.Signing.PublicKey: DataValidator {
     /// Verifies an elliptic curve digital signature algorithm (ECDSA)
     /// signature on a block of data over the P-384 elliptic curve.
@@ -395,7 +362,6 @@ extension P384.Signing.PublicKey: DataValidator {
  }
 
 // MARK: - P521 + Signing
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
 extension P521.Signing {
 
     /// A P-521 elliptic curve digital signature algorithm (ECDSA) signature.
@@ -496,11 +462,9 @@ extension P521.Signing {
     }
 }
 
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
 extension P521.Signing: NISTSigning {}
 
 // MARK: - P521 + PrivateKey
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
 extension P521.Signing.PrivateKey: DigestSigner {
     /// Generates an Elliptic Curve Digital Signature Algorithm (ECDSA)
     /// signature of the digest you provide over the P-521 elliptic curve.
@@ -511,15 +475,10 @@ extension P521.Signing.PrivateKey: DigestSigner {
     /// algorithm employs randomization to generate a different signature on
     /// every call, even for the same data and key.
     public func signature<D: Digest>(for digest: D) throws(CryptoKitMetaError) -> P521.Signing.ECDSASignature {
-        #if (!CRYPTO_IN_SWIFTPM_FORCE_BUILD_API) || CRYPTOKIT_NO_ACCESS_TO_FOUNDATION || CRYPTOKIT_NO_IMPORT_FOUNDATION
-        return try self.coreCryptoSignature(for: digest)
-        #else
         return try self.openSSLSignature(for: digest)
-        #endif
     }
  }
 
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
 extension P521.Signing.PrivateKey: Signer {
     /// Generates an Elliptic Curve Digital Signature Algorithm (ECDSA)
     /// signature of the data you provide over the P-521 elliptic curve,
@@ -535,7 +494,6 @@ extension P521.Signing.PrivateKey: Signer {
     }
 }
 
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
 extension P521.Signing.PublicKey: DigestValidator {
     /// Verifies an elliptic curve digital signature algorithm (ECDSA)
     /// signature on a digest over the P-521 elliptic curve.
@@ -546,15 +504,10 @@ extension P521.Signing.PublicKey: DigestValidator {
     /// - Returns: A Boolean value that’s `true` if the signature is valid for
     /// the given digest; otherwise, `false`.
     public func isValidSignature<D: Digest>(_ signature: P521.Signing.ECDSASignature, for digest: D) -> Bool {
-        #if (!CRYPTO_IN_SWIFTPM_FORCE_BUILD_API) || CRYPTOKIT_NO_ACCESS_TO_FOUNDATION || CRYPTOKIT_NO_IMPORT_FOUNDATION
-        return self.coreCryptoIsValidSignature(signature, for: digest)
-        #else
         return self.openSSLIsValidSignature(signature, for: digest)
-        #endif
     }
 }
 
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
 extension P521.Signing.PublicKey: DataValidator {
     /// Verifies an elliptic curve digital signature algorithm (ECDSA)
     /// signature on a block of data over the P-521 elliptic curve.
@@ -570,4 +523,4 @@ extension P521.Signing.PublicKey: DataValidator {
  }
 
 
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

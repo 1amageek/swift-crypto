@@ -11,34 +11,22 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
-#else
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-import SwiftSystem
 #else
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import Foundation
 #endif
-#endif
 
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 17.0, macOS 14.0, watchOS 10.0, tvOS 17.0, macCatalyst 17.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 16.0, macOS 10.13, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 1.0, *)
-#endif
 extension HPKE {
 	/// The key encapsulation mechanisms to use in HPKE.
     ///
     /// The module-lattice key encapsulation mechanism (ML-KEM) is designed to offer increased security in situations
     /// where an adversary uses a quantum computer.
-    #if !CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 17.0, macOS 14.0, watchOS 10.0, tvOS 17.0, macCatalyst 17.0, *)
-    #else // CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 16.0, macOS 10.13, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 1.0, *)
-    #endif
+    @nonexhaustive
     public enum KEM: CaseIterable, Hashable, Sendable {
         public static var allCases: [HPKE.KEM] {
             var cases = [KEM.P256_HKDF_SHA256, KEM.P384_HKDF_SHA384, KEM.P521_HKDF_SHA512, KEM.Curve25519_HKDF_SHA256]
@@ -62,7 +50,6 @@ extension HPKE {
         case Curve25519_HKDF_SHA256
         /// A key encapsulation mechanism using the X-Wing (ML-KEM-768 with X25519) key encapsulation mechanism
         /// and SHA-2 hashing with a 256-bit digest.
-        @available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, macCatalyst 26.0, visionOS 26.0, *)
         case XWingMLKEM768X25519
 
         /// Return the KEM algorithm identifier as defined in section 7.1 of [RFC 9180](https://www.ietf.org/rfc/rfc9180.pdf).
@@ -113,4 +100,4 @@ extension HPKE {
     }
 }
 
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

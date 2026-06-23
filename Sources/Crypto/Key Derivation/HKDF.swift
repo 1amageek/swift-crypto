@@ -11,19 +11,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-public import SwiftSystem
-#elseif CRYPTOKIT_NO_IMPORT_FOUNDATION
-#else
 #if canImport(FoundationEssentials)
 public import FoundationEssentials
 #else
 public import Foundation
-#endif
 #endif
 
 /// A standards-based implementation of an HMAC-based Key Derivation Function
@@ -41,11 +37,6 @@ public import Foundation
 /// material in the form of a hashed authentication code, then call
 /// ``expand(pseudoRandomKey:info:outputByteCount:)`` using that key material to
 /// generate a symmetric key of the length you specify.
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 14.0, macOS 11.0, watchOS 7.0, tvOS 14.0, macCatalyst 14.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 14.0, macOS 10.13, watchOS 7.0, tvOS 14.0, macCatalyst 14.0, visionOS 1.0, *)
-#endif
 public struct HKDF<H: HashFunction>: Sendable {
     /// Derives a symmetric encryption key from a main key or passcode using
     /// HKDF key derivation with information and salt you specify.
@@ -57,11 +48,6 @@ public struct HKDF<H: HashFunction>: Sendable {
     ///   - info: The shared information to use for key derivation.
     ///   - outputKey: An output span that will be populated with the derived
     ///   symmetric key.
-#if !CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 27.0, macOS 27.0, watchOS 27.0, tvOS 27.0, macCatalyst 27.0, visionOS 27.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 14.0, macOS 10.13, watchOS 7.0, tvOS 14.0, macCatalyst 14.0, visionOS 1.0, *)
-#endif
     #if swift(<6.3)
     @_lifetime(outputKey: copy outputKey)
     #endif
@@ -90,11 +76,6 @@ public struct HKDF<H: HashFunction>: Sendable {
     ///   - outputByteCount: The length in bytes of the resulting symmetric key.
     ///
     /// - Returns: The derived symmetric key.
-    #if !CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 14.0, macOS 11.0, watchOS 7.0, tvOS 14.0, macCatalyst 14.0, *)
-    #else // CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 14.0, macOS 10.13, watchOS 7.0, tvOS 14.0, macCatalyst 14.0, visionOS 1.0, *)
-    #endif
     public static func deriveKey<Salt: DataProtocol, Info: DataProtocol>(
         inputKeyMaterial: SymmetricKey,
         salt: Salt,
@@ -139,11 +120,6 @@ public struct HKDF<H: HashFunction>: Sendable {
     ///   - outputByteCount: The length in bytes of the resulting symmetric key.
     ///
     /// - Returns: The derived symmetric key.
-    #if !CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 14.0, macOS 11.0, watchOS 7.0, tvOS 14.0, macCatalyst 14.0, *)
-    #else // CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 14.0, macOS 10.13, watchOS 7.0, tvOS 14.0, macCatalyst 14.0, visionOS 1.0, *)
-    #endif
     public static func deriveKey<Info: DataProtocol>(inputKeyMaterial: SymmetricKey,
                                                      info: Info,
                                                      outputByteCount: Int) -> SymmetricKey {
@@ -160,11 +136,6 @@ public struct HKDF<H: HashFunction>: Sendable {
     ///   - outputByteCount: The length in bytes of the resulting symmetric key.
     ///
     /// - Returns: The derived symmetric key.
-    #if !CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 14.0, macOS 11.0, watchOS 7.0, tvOS 14.0, macCatalyst 14.0, *)
-    #else // CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 14.0, macOS 10.13, watchOS 7.0, tvOS 14.0, macCatalyst 14.0, visionOS 1.0, *)
-    #endif
     public static func deriveKey<Salt: DataProtocol>(inputKeyMaterial: SymmetricKey,
                                                      salt: Salt,
                                                      outputByteCount: Int) -> SymmetricKey {
@@ -180,11 +151,6 @@ public struct HKDF<H: HashFunction>: Sendable {
     ///   - outputByteCount: The length in bytes of the resulting symmetric key.
     ///
     /// - Returns: The derived symmetric key.
-    #if !CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 14.0, macOS 11.0, watchOS 7.0, tvOS 14.0, macCatalyst 14.0, *)
-    #else // CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 14.0, macOS 10.13, watchOS 7.0, tvOS 14.0, macCatalyst 14.0, visionOS 1.0, *)
-    #endif
     public static func deriveKey(inputKeyMaterial: SymmetricKey,
                                  outputByteCount: Int) -> SymmetricKey {
         return deriveKey(inputKeyMaterial: inputKeyMaterial, salt: [UInt8](), info: [UInt8](), outputByteCount: outputByteCount)
@@ -204,11 +170,6 @@ public struct HKDF<H: HashFunction>: Sendable {
     ///
     /// - Returns: A pseudorandom, cryptographically strong key in the form of a
     /// hashed authentication code.
-    #if !CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 14.0, macOS 11.0, watchOS 7.0, tvOS 14.0, macCatalyst 14.0, *)
-    #else // CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 14.0, macOS 10.13, watchOS 7.0, tvOS 14.0, macCatalyst 14.0, visionOS 1.0, *)
-    #endif
     public static func extract<Salt: DataProtocol>(inputKeyMaterial: SymmetricKey, salt: Salt?) -> HashedAuthenticationCode<H> {
         let key: SymmetricKey
         if let salt {
@@ -239,11 +200,6 @@ public struct HKDF<H: HashFunction>: Sendable {
     ///
     /// - Returns: A pseudorandom, cryptographically strong key in the form of a
     /// hashed authentication code.
-#if !CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 27.0, macOS 27.0, watchOS 27.0, tvOS 27.0, macCatalyst 27.0, visionOS 27.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 14.0, macOS 10.13, watchOS 7.0, tvOS 14.0, macCatalyst 14.0, visionOS 1.0, *)
-#endif
     public static func extract(inputKeyMaterial: SymmetricKey, salt: RawSpan?) -> HashedAuthenticationCode<H> {
         let key = if let salt {
             SymmetricKey(bytes: salt)
@@ -267,11 +223,6 @@ public struct HKDF<H: HashFunction>: Sendable {
     ///   - outputByteCount: The length in bytes of the resulting symmetric key.
     ///
     /// - Returns: The derived symmetric key.
-    #if !CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 14.0, macOS 11.0, watchOS 7.0, tvOS 14.0, macCatalyst 14.0, *)
-    #else // CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 14.0, macOS 10.13, watchOS 7.0, tvOS 14.0, macCatalyst 14.0, visionOS 1.0, *)
-    #endif
     public static func expand<PRK: ContiguousBytes, Info: DataProtocol>(pseudoRandomKey prk: PRK, info: Info?, outputByteCount: Int) -> SymmetricKey {
         SymmetricKey(capacity: outputByteCount) { output in
             prk.withUnsafeBytes { prkBuffer in
@@ -307,11 +258,6 @@ public struct HKDF<H: HashFunction>: Sendable {
     ///   - outputByteCount: The length in bytes of the resulting symmetric key.
     ///
     /// - Returns: The derived symmetric key.
-#if !CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 27.0, macOS 27.0, watchOS 27.0, tvOS 27.0, macCatalyst 27.0, visionOS 27.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-    @available(iOS 14.0, macOS 10.13, watchOS 7.0, tvOS 14.0, macCatalyst 14.0, visionOS 1.0, *)
-#endif
     #if swift(<6.3)
     @_lifetime(output: copy output)
     #endif
@@ -327,7 +273,6 @@ public struct HKDF<H: HashFunction>: Sendable {
                 hmac.update(bytes: info)
             }
 
-            // hmac.update(bytes: CollectionOfOne(i).span.bytes)
             var buf = i
             withUnsafeBytes(of: &buf) { rawBuffer in
                 let span = RawSpan(_unsafeBytes: rawBuffer)
@@ -341,4 +286,4 @@ public struct HKDF<H: HashFunction>: Sendable {
         }
     }
 }
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

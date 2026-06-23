@@ -11,18 +11,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
-#else
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-public import SwiftSystem
-#elseif CRYPTOKIT_NO_IMPORT_FOUNDATION
 #else
 #if canImport(FoundationEssentials)
 public import FoundationEssentials
 #else
 public import Foundation
-#endif
 #endif
 
 extension Curve25519.KeyAgreement {
@@ -31,29 +27,15 @@ extension Curve25519.KeyAgreement {
     }
 }
 
-#if !CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-#else // CRYPTOKIT_STATIC_LIBRARY
-@available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-#endif
 extension Curve25519 {
     /// A mechanism used to create a shared secret between two users by
     /// performing X25519 key agreement.
+    @nonexhaustive
     public enum KeyAgreement: Sendable {
-#if (!CRYPTO_IN_SWIFTPM_FORCE_BUILD_API) || CRYPTOKIT_NO_ACCESS_TO_FOUNDATION || CRYPTOKIT_NO_IMPORT_FOUNDATION
-        typealias Curve25519PrivateKeyImpl = Curve25519.KeyAgreement.CoreCryptoCurve25519PrivateKeyImpl
-        typealias Curve25519PublicKeyImpl = Curve25519.KeyAgreement.CoreCryptoCurve25519PublicKeyImpl
-        #else
         typealias Curve25519PrivateKeyImpl = Curve25519.KeyAgreement.OpenSSLCurve25519PrivateKeyImpl
         typealias Curve25519PublicKeyImpl = Curve25519.KeyAgreement.OpenSSLCurve25519PublicKeyImpl
-        #endif
 
         /// A Curve25519 public key used for key agreement.
-        #if !CRYPTOKIT_STATIC_LIBRARY
-        @available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-        #else // CRYPTOKIT_STATIC_LIBRARY
-        @available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-        #endif
         public struct PublicKey: ECPublicKey, Sendable {
             fileprivate var baseKey: Curve25519PublicKeyImpl
 
@@ -93,11 +75,6 @@ extension Curve25519 {
         }
 
         /// A Curve25519 private key used for key agreement.
-        #if !CRYPTOKIT_STATIC_LIBRARY
-        @available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
-        #else // CRYPTOKIT_STATIC_LIBRARY
-        @available(iOS 13.0, macOS 10.13, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, visionOS 1.0, *)
-        #endif
         public struct PrivateKey: DiffieHellmanKeyAgreement, Sendable {
             fileprivate var baseKey: Curve25519PrivateKeyImpl
 
@@ -146,4 +123,4 @@ extension Curve25519 {
         }
     }
 }
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)
