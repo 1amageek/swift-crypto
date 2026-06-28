@@ -24,7 +24,20 @@
 
 import PackageDescription
 
-import class Foundation.ProcessInfo
+import Foundation
+
+let manifestDirectoryURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+
+func localOrForkDependency(_ repository: String, localPath: String) -> Package.Dependency {
+    let resolvedLocalPath = URL(fileURLWithPath: localPath, relativeTo: manifestDirectoryURL)
+        .standardizedFileURL
+        .path
+    if FileManager.default.fileExists(atPath: resolvedLocalPath) {
+        return .package(path: resolvedLocalPath)
+    }
+
+    return .package(url: "https://github.com/1amageek/\(repository).git", branch: "main")
+}
 
 // To develop this on Apple platforms, set this to true
 let development = false
@@ -245,16 +258,9 @@ let package = Package(
     cxxLanguageStandard: .cxx17
 )
 
-// Switch between local and remote dependencies depending on an environment variable
-if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
-    package.dependencies += [
-        .package(url: "https://github.com/apple/swift-asn1.git", from: "1.2.0")
-    ]
-} else {
-    package.dependencies += [
-        .package(path: "../swift-asn1")
-    ]
-}
+package.dependencies += [
+    localOrForkDependency("swift-asn1", localPath: "../swift-asn1")
+]
 
 // ---    STANDARD CROSS-REPO SETTINGS DO NOT EDIT   --- //
 for target in package.targets {
