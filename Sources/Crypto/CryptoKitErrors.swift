@@ -11,11 +11,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
+import CryptoBoringWrapper
+
 /// General cryptography errors used by CryptoKit.
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+@nonexhaustive
 public enum CryptoKitError: Error {
     /// The key size is incorrect.
     case incorrectKeySize
@@ -34,11 +38,10 @@ public enum CryptoKitError: Error {
     case invalidParameter
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension CryptoKitError: Equatable, Hashable {}
 
 /// Errors from decoding ASN.1 content.
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+@nonexhaustive
 public enum CryptoKitASN1Error: Equatable, Error, Hashable {
     /// The ASN.1 tag for this field is invalid or unsupported.
     case invalidFieldIdentifier
@@ -67,7 +70,6 @@ public enum CryptoKitASN1Error: Equatable, Error, Hashable {
     case invalidPEMDocument
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 enum RSAPSSSPKIErrors: Error {
     case invalidPSSOID
     case missingParameters
@@ -79,46 +81,121 @@ enum RSAPSSSPKIErrors: Error {
 }
 
 #if hasFeature(Embedded)
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 public struct RSAPSSSPKIError: Error {
     internal var error: RSAPSSSPKIErrors
 }
 #else
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 struct RSAPSSSPKIError: Error {
     internal var error: RSAPSSSPKIErrors
 }
 #endif
 
 #if hasFeature(Embedded)
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+@nonexhaustive
 public enum CryptoKitMetaError: Error {
     case cryptoKitError(underlyingError: CryptoKitError)
     case asn1Error(underlyingError: CryptoKitASN1Error)
+    case hpkeError(underlyingError: HPKE.Errors)
+    case kemError(underlyingError: KEM.Errors)
     case rsapssspkiError(underlyingError: RSAPSSSPKIError)
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+@usableFromInline
 internal func error(_ error: CryptoKitError) -> CryptoKitMetaError {
     .cryptoKitError(underlyingError: error)
 }
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 internal func error(_ error: CryptoKitASN1Error) -> CryptoKitMetaError {
     .asn1Error(underlyingError: error)
 }
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+internal func error(_ error: HPKE.Errors) -> CryptoKitMetaError {
+    .hpkeError(underlyingError: error)
+}
+internal func error(_ error: KEM.Errors) -> CryptoKitMetaError {
+    .kemError(underlyingError: error)
+}
 internal func error(_ error: RSAPSSSPKIErrors) -> CryptoKitMetaError {
     .rsapssspkiError(underlyingError: RSAPSSSPKIError(error: error))
 }
-#else /* !hasFeature(Embedded) */
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+internal func error(_ error: CryptoBoringWrapperError) -> CryptoKitMetaError {
+    switch error {
+    case .incorrectKeySize:
+        return .cryptoKitError(underlyingError: .incorrectKeySize)
+    case .incorrectParameterSize:
+        return .cryptoKitError(underlyingError: .incorrectParameterSize)
+    case .authenticationFailure:
+        return .cryptoKitError(underlyingError: .authenticationFailure)
+    case .underlyingCoreCryptoError(let errorCode):
+        return .cryptoKitError(underlyingError: .underlyingCoreCryptoError(error: errorCode))
+    case .wrapFailure:
+        return .cryptoKitError(underlyingError: .wrapFailure)
+    case .unwrapFailure:
+        return .cryptoKitError(underlyingError: .unwrapFailure)
+    case .invalidParameter:
+        return .cryptoKitError(underlyingError: .invalidParameter)
+    }
+}
+
+internal func withCryptoKitMetaError<T>(
+    _ body: () throws(CryptoKitMetaError) -> T
+) throws(CryptoKitMetaError) -> T {
+    try body()
+}
+
+internal func withCryptoKitMetaError<T>(
+    _ body: () throws(CryptoKitError) -> T
+) throws(CryptoKitMetaError) -> T {
+    try withCryptoKitError(body)
+}
+
+internal func withCryptoKitMetaError<T>(
+    _ body: () throws(CryptoBoringWrapperError) -> T
+) throws(CryptoKitMetaError) -> T {
+    try withCryptoBoringWrapperError(body)
+}
+
+internal func withCryptoKitError<T>(
+    _ body: () throws(CryptoKitError) -> T
+) throws(CryptoKitMetaError) -> T {
+    do {
+        return try body()
+    } catch let cryptoKitError {
+        throw error(cryptoKitError)
+    }
+}
+
+internal func withCryptoBoringWrapperError<T>(
+    _ body: () throws(CryptoBoringWrapperError) -> T
+) throws(CryptoKitMetaError) -> T {
+    do {
+        return try body()
+    } catch let wrapperError {
+        throw error(wrapperError)
+    }
+}
+#else
 public typealias CryptoKitMetaError = any Error
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+@usableFromInline
 internal func error(_ error: CryptoKitError) -> CryptoKitError { error }
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 internal func error(_ error: CryptoKitASN1Error) -> CryptoKitASN1Error { error }
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+internal func error(_ error: HPKE.Errors) -> HPKE.Errors { error }
+internal func error(_ error: KEM.Errors) -> KEM.Errors { error }
 internal func error(_ error: RSAPSSSPKIErrors) -> RSAPSSSPKIErrors { error }
+internal func error(_ error: CryptoBoringWrapperError) -> CryptoBoringWrapperError { error }
+internal func withCryptoKitMetaError<T>(_ body: () throws -> T) throws -> T {
+    try body()
+}
+
+internal func withCryptoKitError<T>(
+    _ body: () throws(CryptoKitError) -> T
+) throws -> T {
+    try body()
+}
+
+internal func withCryptoBoringWrapperError<T>(
+    _ body: () throws(CryptoBoringWrapperError) -> T
+) throws -> T {
+    try body()
+}
 #endif
 
 #endif

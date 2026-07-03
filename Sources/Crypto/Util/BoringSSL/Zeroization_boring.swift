@@ -11,8 +11,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
+
 #if !canImport(Darwin)
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
+#else
 @_implementationOnly import CCryptoBoringSSL
+#endif
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 typealias errno_t = CInt

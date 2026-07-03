@@ -11,10 +11,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension Insecure {
     /// An implementation of SHA1 hashing.
     ///
@@ -32,7 +33,6 @@ extension Insecure {
     /// secure, but is provided for backward compatibility with older services
     /// that require it. For new services, prefer one of the secure hashes, like
     /// ``SHA512``.
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     public struct SHA1: HashFunctionImplementationDetails, Sendable {
         /// The number of bytes that represents the hash function’s internal
         /// state.
@@ -113,7 +113,6 @@ extension Insecure {
     /// secure, but is provided for backward compatibility with older services
     /// that require it. For new services, prefer one of the secure hashes, like
     /// ``SHA512``.
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     public struct MD5: HashFunctionImplementationDetails, Sendable {
         /// The number of bytes that represents the hash function’s internal
         /// state.
@@ -177,4 +176,4 @@ extension Insecure {
         }
     }
 }
-#endif  // Linux or !SwiftPM
+#endif  // canImport(CryptoKit)

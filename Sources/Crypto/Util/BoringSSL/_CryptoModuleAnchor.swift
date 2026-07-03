@@ -12,6 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+
 // On Apple platforms the Crypto module re-exports CryptoKit and produces no
 // symbols of its own. When Xcode 26+ builds SPM packages as dynamic
 // frameworks (e.g. for test-target dependencies), an empty module generates a
@@ -22,4 +23,5 @@
 // See: https://github.com/apple/swift-crypto/issues/435
 
 @usableFromInline
+@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 internal func _cryptoModuleAnchor() {}

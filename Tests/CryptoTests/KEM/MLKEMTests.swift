@@ -11,15 +11,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
+
 import XCTest
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+#if canImport(CryptoKit)
 // Skip tests that require @testable imports of CryptoKit.
 #else
-#if !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-@testable import CryptoKit
-#else
 @testable import Crypto
-#endif
 
 final class MLKEMTests: XCTestCase {
     func testMLKEM768() throws {
@@ -56,12 +53,23 @@ final class MLKEMTests: XCTestCase {
         XCTAssert(er.sharedSecret == ss)
     }
 
+    func testOneTimeKeys() throws {
+        let privateKey = try MLKEM1024.OneTimePrivateKey.generate()
+        let publicKey = privateKey.publicKey
+
+        // Test encapsulation and decapsulation
+        let er = try publicKey.encapsulate()
+        let ss = try privateKey.decapsulate(er.encapsulated)
+        XCTAssert(er.sharedSecret == ss)
+
+        // The following would (and should) produce a compile-time error
+        // let er2 = try publicKey.encapsulate()
+        // let ss2 = try privateKey.decapsulate(er.encapsulated)
+        // XCTAssert(er2.sharedSecret == ss2)
+    }
+
     func processKATFile(filename: String) throws -> [MLKEMKAT] {
-        #if CRYPTO_IN_SWIFTPM
         let bundle = Bundle.module
-        #else
-        let bundle = Bundle(for: type(of: self))
-        #endif
         let fileURL = bundle.url(forResource: filename, withExtension: "json")
         let json = try Data(contentsOf: fileURL!)
         let stringInput = String(data: json, encoding: .ascii)!
@@ -70,65 +78,13 @@ final class MLKEMTests: XCTestCase {
     }
 
     func test768KAT() throws {
-        #if CRYPTO_IN_SWIFTPM
         // No support for encapsulateWithSeed in BoringSSL.
         throw XCTSkip()
-        #else
-        let katTests = try processKATFile(filename:"MLKEM768KAT")
-        for katTest in katTests {
-            let rndGen = try Drbg(katTest.rngSeed)
-
-            var keyGenSeed = Data(count: 64)
-            try keyGenSeed.withUnsafeMutableBytes { buffer in
-                try buffer.initializeWithRandomBytes(count: buffer.count, rngState: rndGen)
-            }
-            var encapSeed = Data(count: 32)
-            try encapSeed.withUnsafeMutableBytes { buffer in
-                try buffer.initializeWithRandomBytes(count: buffer.count, rngState: rndGen)
-            }
-
-            let privateKey = try MLKEM768.PrivateKey.generateWithSeed(keyGenSeed) // 2 * 32 bytes
-            XCTAssert(privateKey.publicKey.rawRepresentation == katTest.pk)
-
-            let encapsulatedKey = try privateKey.publicKey.encapsulateWithSeed(encapSeed: encapSeed) // 32 bytes
-            XCTAssert(encapsulatedKey.encapsulated == katTest.ek)
-            XCTAssert(encapsulatedKey.sharedSecret == katTest.k)
-
-            let retrievedSharedSecret = try privateKey.decapsulate(encapsulatedKey.encapsulated)
-            XCTAssert(retrievedSharedSecret.dataRepresentation == katTest.k)
-        }
-        #endif
     }
 
     func test1024KAT() throws {
-        #if CRYPTO_IN_SWIFTPM
         // No support for encapsulateWithSeed in BoringSSL.
         throw XCTSkip()
-        #else
-        let katTests = try processKATFile(filename:"MLKEM1024KAT")
-        for katTest in katTests {
-            let rndGen = try Drbg(katTest.rngSeed)
-
-            var keyGenSeed = Data(count: 64)
-            try keyGenSeed.withUnsafeMutableBytes { buffer in
-                try buffer.initializeWithRandomBytes(count: buffer.count, rngState: rndGen)
-            }
-            var encapSeed = Data(count: 32)
-            try encapSeed.withUnsafeMutableBytes { buffer in
-                try buffer.initializeWithRandomBytes(count: buffer.count, rngState: rndGen)
-            }
-
-            let privateKey = try MLKEM1024.PrivateKey.generateWithSeed(keyGenSeed)
-            XCTAssert(privateKey.publicKey.rawRepresentation == katTest.pk)
-
-            let encapsulatedKey = try privateKey.publicKey.encapsulateWithSeed(encapSeed: encapSeed)
-            XCTAssert(encapsulatedKey.encapsulated == katTest.ek)
-            XCTAssert(encapsulatedKey.sharedSecret == katTest.k)
-
-            let retrievedSharedSecret = try privateKey.decapsulate(encapsulatedKey.encapsulated)
-            XCTAssert(retrievedSharedSecret.dataRepresentation == katTest.k)
-        }
-        #endif
     }
 }
 
@@ -157,4 +113,4 @@ struct MLKEMKAT {
     }
 }
 
-#endif // CRYPTO_IN_SWIFTPM
+#endif // canImport(CryptoKit)

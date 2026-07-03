@@ -11,15 +11,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
+
 import XCTest
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+#if canImport(CryptoKit)
 // Skip tests that require @testable imports of CryptoKit.
 #else
-#if !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-@testable import CryptoKit
-#else
 @testable import Crypto
-#endif
 
 final class XWingTests: XCTestCase {
     func testKEM() throws {
@@ -38,12 +35,22 @@ final class XWingTests: XCTestCase {
         XCTAssert(er.sharedSecret == ss)
     }
 
+      func testOneTimeKeys() throws {
+          let privateKey = try XWingMLKEM768X25519.OneTimePrivateKey.generate()
+          let publicKey = privateKey.publicKey
+
+          let er = try publicKey.encapsulate()
+          let ss = try privateKey.decapsulate(er.encapsulated)
+          XCTAssert(er.sharedSecret == ss)
+
+          // The following would (and should) produce a compile-time error
+          // let er2 = try publicKey.encapsulate()
+          // let ss2 = try privateKey.decapsulate(er.encapsulated)
+          // XCTAssert(er2.sharedSecret == ss2)
+      }
+
     func processKATFile(filename: String) throws -> [XWingKAT] {
-        #if CRYPTO_IN_SWIFTPM
         let bundle = Bundle.module
-        #else
-        let bundle = Bundle(for: type(of: self))
-        #endif
         let fileURL = bundle.url(forResource: filename, withExtension: "json")
         let json = try Data(contentsOf: fileURL!)
         let stringInput = String(data: json, encoding: .ascii)!
@@ -84,39 +91,6 @@ final class XWingTests: XCTestCase {
         let importedKey = try XWingMLKEM768X25519.PrivateKey.init(integrityCheckedRepresentation: exportedFormat)
         XCTAssertEqual(importedKey.seedRepresentation, privateKey.seedRepresentation)
     }
-
-    func testDecapsulateInputValidation() throws {
-        let ciphersuite = HPKE.Ciphersuite.XWingMLKEM768X25519_SHA256_AES_GCM_256
-        let skR = try XWingMLKEM768X25519.PrivateKey.generate()
-
-        // Dummy key with the correct size fails with an error from the underlying implementation.
-        let corretlySizedKey = Data(repeating: 0x00, count: 1120)
-        XCTAssertThrowsError(
-            try HPKE.Recipient(
-                privateKey: skR,
-                ciphersuite: ciphersuite,
-                info: Data(),
-                encapsulatedKey: corretlySizedKey
-            ),
-            error: CryptoKitError.underlyingCoreCryptoError(error: 0)
-        )
-
-        // Keys with the wrong size fail input validation.
-        let keySizesToTest = [0, 1, 1119, 1221, 2000]
-        for keySize in keySizesToTest {
-            let wronglySizedKey = Data(repeating: 0x00, count: keySize)
-            XCTAssertThrowsError(
-                try HPKE.Recipient(
-                    privateKey: skR,
-                    ciphersuite: ciphersuite,
-                    info: Data(),
-                    encapsulatedKey: wronglySizedKey
-                ),
-                error: CryptoKitError.incorrectParameterSize,
-                "Unexpectedly returned from malformed decapsulation path for keySize \(keySize)"
-            )
-        }
-    }
 }
 
 // Struct to parse KAT file
@@ -147,4 +121,4 @@ struct XWingKAT {
     }
 }
 
-#endif // CRYPTO_IN_SWIFTPM
+#endif // canImport(CryptoKit)

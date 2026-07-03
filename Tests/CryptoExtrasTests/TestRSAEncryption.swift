@@ -98,18 +98,21 @@ final class TestRSAEncryption: XCTestCase {
             )
         }
         /// Also check that we can provide each argument as a different `ContiguousBytes` type.
-        /// NOTE: these calls use `try?` because they are guaranteed to fail; we're just checking these calls compile.
         let bytesValues: [any ContiguousBytes] = [Data(), [UInt8]()]
-        _ = try? _RSA.Encryption.PrivateKey(
-            n: bytesValues.randomElement()!,
-            e: bytesValues.randomElement()!,
-            d: bytesValues.randomElement()!,
-            p: bytesValues.randomElement()!,
-            q: bytesValues.randomElement()!
+        XCTAssertThrowsError(
+            try _RSA.Encryption.PrivateKey(
+                n: bytesValues.randomElement()!,
+                e: bytesValues.randomElement()!,
+                d: bytesValues.randomElement()!,
+                p: bytesValues.randomElement()!,
+                q: bytesValues.randomElement()!
+            )
         )
-        _ = try? _RSA.Encryption.PublicKey(
-            n: bytesValues.randomElement()!,
-            e: bytesValues.randomElement()!
+        XCTAssertThrowsError(
+            try _RSA.Encryption.PublicKey(
+                n: bytesValues.randomElement()!,
+                e: bytesValues.randomElement()!
+            )
         )
     }
 

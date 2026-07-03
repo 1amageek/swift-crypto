@@ -11,36 +11,32 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-@_exported import CryptoKit
-#else
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
-#if (!CRYPTO_IN_SWIFTPM_FORCE_BUILD_API) || CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-typealias XWingPublicKeyImpl = CoreCryptoXWingPublicKeyImpl
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-typealias XWingPrivateKeyImpl = CoreCryptoXWingPrivateKeyImpl
+
+#if canImport(CryptoKit)
+@_exported import CryptoKit
 #else
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+
+#if canImport(CryptoKit)
+@_exported import CryptoKit
+#else
+
+
 typealias XWingPublicKeyImpl = OpenSSLXWingPublicKeyImpl
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 typealias XWingPrivateKeyImpl = OpenSSLXWingPrivateKeyImpl
-#endif
 
 /// The X-Wing (ML-KEM768 with X25519) Key Encapsulation Mechanism, defined in
 /// https://datatracker.ietf.org/doc/html/draft-connolly-cfrg-xwing-kem-06
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+@nonexhaustive
 public enum XWingMLKEM768X25519: Sendable {}
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension XWingMLKEM768X25519 {
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     public struct PublicKey: KEMPublicKey {
         var impl: XWingPublicKeyImpl
 
@@ -48,7 +44,7 @@ extension XWingMLKEM768X25519 {
             self.impl = impl
         }
 
-        public init<D: ContiguousBytes>(rawRepresentation: D) throws {
+        public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
             self.impl = try .init(rawRepresentation: rawRepresentation)
         }
 
@@ -58,12 +54,11 @@ extension XWingMLKEM768X25519 {
             }
         }
 
-        public func encapsulate() throws -> KEM.EncapsulationResult {
+        public func encapsulate() throws(CryptoKitMetaError) -> KEM.EncapsulationResult {
             return try self.impl.encapsulate()
         }
     }
 
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     public struct PrivateKey: KEMPrivateKey {
         private var impl: XWingPrivateKeyImpl
 
@@ -83,15 +78,15 @@ extension XWingMLKEM768X25519 {
             self.impl = impl
         }
 
-        internal init<D: DataProtocol>(seedRepresentation: D, publicKeyHash: SHA3_256Digest?) throws {
+        internal init<D: DataProtocol>(seedRepresentation: D, publicKeyHash: SHA3_256Digest?) throws(CryptoKitMetaError) {
             self.impl = try .init(seedRepresentation: seedRepresentation, publicKeyHash: publicKeyHash)
         }
 
-        public static func generate() throws -> XWingMLKEM768X25519.PrivateKey {
+        public static func generate() throws(CryptoKitMetaError) -> XWingMLKEM768X25519.PrivateKey {
             return try Self(impl: XWingPrivateKeyImpl.generate())
         }
 
-        public func decapsulate(_ encapsulated: Data) throws -> SymmetricKey {
+        public func decapsulate(_ encapsulated: Data) throws(CryptoKitMetaError) -> SymmetricKey {
             try self.impl.decapsulate(encapsulated)
         }
 
@@ -101,15 +96,48 @@ extension XWingMLKEM768X25519 {
             }
         }
     }
+
+    /// A one-time-use private key to decapsulate a shared secret with the X-Wing key encapsulation mechanism.
+    ///
+    /// The associated decapsulation function can be multiple times faster than the one implemented for PrivateKey,
+    /// but this private key can only be used to decapsulate a shared secret once.
+    public struct OneTimePrivateKey: KEMOneTimePrivateKey, ~Copyable {
+        private var impl: XWingPrivateKeyImpl
+
+        internal init(impl: XWingPrivateKeyImpl) {
+            self.impl = impl
+        }
+
+        /// Generates a new, random one-time-use private key.
+        public static func generate() throws(CryptoKitMetaError) -> XWingMLKEM768X25519.OneTimePrivateKey {
+            let impl = try XWingPrivateKeyImpl.generate()
+            return OneTimePrivateKey(impl: impl)
+        }
+
+        /// Decapsulate a shared secret.
+        ///
+        /// - Parameters:
+        ///   - encapsulated: An encapsulated shared secret, that you get by calling ``XWingMLKEM768X25519/PublicKey/encapsulate()`` on the corresponding public key.
+        /// - Returns: The shared secret.
+        public consuming func decapsulate(_ encapsulated: Data) throws(CryptoKitMetaError) -> SymmetricKey {
+            return try impl.decapsulate(encapsulated)
+        }
+
+        /// The corresponding public key.
+        public var publicKey: XWingMLKEM768X25519.PublicKey {
+            get {
+                XWingMLKEM768X25519.PublicKey(impl: self.impl.publicKey)
+            }
+        }
+    }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension XWingMLKEM768X25519.PrivateKey: HPKEKEMPrivateKeyGeneration {
-    public init() throws {
+    public init() throws(CryptoKitMetaError) {
         self = try Self.generate()
     }
 
-    public init<D: DataProtocol>(seedRepresentation: D, publicKey: XWingMLKEM768X25519.PublicKey?) throws {
+    public init<D: DataProtocol>(seedRepresentation: D, publicKey: XWingMLKEM768X25519.PublicKey?) throws(CryptoKitMetaError) {
         var publicKeyHash: SHA3_256Digest? = nil
         if publicKey != nil {
             publicKeyHash = SHA3_256.hash(data: publicKey!.rawRepresentation)
@@ -118,25 +146,30 @@ extension XWingMLKEM768X25519.PrivateKey: HPKEKEMPrivateKeyGeneration {
         self = try XWingMLKEM768X25519.PrivateKey.init(seedRepresentation: seedRepresentation, publicKeyHash: publicKeyHash)
     }
 
-    public init<D: DataProtocol>(integrityCheckedRepresentation: D) throws {
-        let seed = integrityCheckedRepresentation.dropLast(32) // sizeof(SHA3-256 digest)
-        let publicKeyHashBytes = integrityCheckedRepresentation.dropFirst(32)
-        let publicKeyHash = SHA3_256Digest(bytes: [UInt8](publicKeyHashBytes))
+    public init<D: DataProtocol>(integrityCheckedRepresentation: D) throws(CryptoKitMetaError) {
+        let seed = Data(integrityCheckedRepresentation.dropLast(32)) // sizeof(SHA3-256 digest)
+        let publicKeyHashBytes = Data(integrityCheckedRepresentation.dropFirst(32))
+        let publicKeyHash = SHA3_256Digest { output in
+            for region in publicKeyHashBytes.regions {
+                region.withUnsafeBytes {
+                    output.append(contentsOf: $0.bytes)
+                }
+            }
+        }
 
         self = try XWingMLKEM768X25519.PrivateKey.init(seedRepresentation: seed, publicKeyHash: publicKeyHash)
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension XWingMLKEM768X25519.PublicKey: HPKEKEMPublicKey {
     /// The type of the ephemeral private key associated with this public key.
     public typealias EphemeralPrivateKey = XWingMLKEM768X25519.PrivateKey
 
-    static func validateCiphersuite(_ kem: HPKE.KEM) throws {
+    static func validateCiphersuite(_ kem: HPKE.KEM) throws(CryptoKitMetaError) {
         switch kem {
             case .XWingMLKEM768X25519: do {}
             default: do {
-                throw HPKE.Errors.inconsistentCiphersuiteAndKey
+                throw error(HPKE.Errors.inconsistentCiphersuiteAndKey)
             }
         }
     }
@@ -148,7 +181,7 @@ extension XWingMLKEM768X25519.PublicKey: HPKEKEMPublicKey {
     ///  - kem: The key encapsulation mechanism to use with the public key.
     ///
     /// - Throws: ``CryptoKit/HPKE/Errors/inconsistentCiphersuiteAndKey`` if the key encapsulation mechanism requested is incompatible with this public key.
-    public init<D>(_ serialization: D, kem: HPKE.KEM) throws where D: ContiguousBytes {
+    public init<D>(_ serialization: D, kem: HPKE.KEM) throws(CryptoKitMetaError) where D: ContiguousBytes {
         try Self.validateCiphersuite(kem)
         try self.init(rawRepresentation: serialization)
     }
@@ -161,7 +194,7 @@ extension XWingMLKEM768X25519.PublicKey: HPKEKEMPublicKey {
     /// - Throws: ``CryptoKit/HPKE/Errors/inconsistentCiphersuiteAndKey`` if the key encapsulation mechanism requested is incompatible with this public key.
     ///
     /// - Returns: The serialized representation of the public key.
-    public func hpkeRepresentation(kem: HPKE.KEM) throws -> Data {
+    public func hpkeRepresentation(kem: HPKE.KEM) throws(CryptoKitMetaError) -> Data {
         try Self.validateCiphersuite(kem)
         return self.rawRepresentation
     }
@@ -169,4 +202,5 @@ extension XWingMLKEM768X25519.PublicKey: HPKEKEMPublicKey {
     /// The type of the ephemeral private key associated with this public key.
     public typealias HPKEEphemeralPrivateKey = XWingMLKEM768X25519.PrivateKey
 }
-#endif // Linux or !SwiftPM
+#endif
+#endif // canImport(CryptoKit)

@@ -11,15 +11,25 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-@_exported import CryptoKit
-#else
-@_implementationOnly import CCryptoBoringSSL
-@_implementationOnly import CCryptoBoringSSLShims
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
+#endif
+
+#if canImport(CryptoKit)
+@_exported import CryptoKit
+#else
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
+#else
+@_implementationOnly import CCryptoBoringSSL
+#endif
+#if hasFeature(Embedded)
+import CCryptoBoringSSLShims
+#else
+@_implementationOnly import CCryptoBoringSSLShims
 #endif
 
 // For signing and verifying, we use BoringSSL's Ed25519, not the X25519 stuff.
@@ -61,15 +71,16 @@ extension Curve25519.Signing {
             self._privateKey
         }
 
-        init<D: ContiguousBytes>(rawRepresentation data: D) throws {
+        init<D: ContiguousBytes>(rawRepresentation data: D) throws(CryptoKitError) {
             // What this calls "rawRepresentation" BoringSSL calls the "seed". Otherwise, this is
             // the same as the above initializer.
-            var publicKey = Array(repeating: UInt8(0), count: 32)
-            let privateKey: SecureBytes = try data.withUnsafeBytes { seedPtr in
-                guard seedPtr.count == 32 else {
-                    throw CryptoKitError.incorrectKeySize
-                }
+            let seed = data.withUnsafeBytes { Array($0) }
+            guard seed.count == 32 else {
+                throw CryptoKitError.incorrectKeySize
+            }
 
+            var publicKey = Array(repeating: UInt8(0), count: 32)
+            let privateKey: SecureBytes = seed.withUnsafeBytes { seedPtr in
                 let privateKey = SecureBytes(unsafeUninitializedCapacity: 64) {
                     privateKeyPtr,
                     privateKeyBytes in
@@ -104,13 +115,12 @@ extension Curve25519.Signing {
         var keyBytes: [UInt8]
 
         @inlinable
-        init<D: ContiguousBytes>(rawRepresentation: D) throws {
-            self.keyBytes = try rawRepresentation.withUnsafeBytes { keyBytesPtr in
-                guard keyBytesPtr.count == 32 else {
-                    throw CryptoKitError.incorrectKeySize
-                }
-                return Array(keyBytesPtr)
+        init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitError) {
+            let keyBytes = rawRepresentation.withUnsafeBytes { Array($0) }
+            guard keyBytes.count == 32 else {
+                throw CryptoKitError.incorrectKeySize
             }
+            self.keyBytes = keyBytes
         }
 
         init(_ keyBytes: [UInt8]) {
@@ -123,4 +133,4 @@ extension Curve25519.Signing {
         }
     }
 }
-#endif  // CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+#endif  // canImport(CryptoKit)

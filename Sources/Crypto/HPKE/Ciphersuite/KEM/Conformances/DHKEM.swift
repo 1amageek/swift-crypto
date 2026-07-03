@@ -11,42 +11,39 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-import SwiftSystem
-#else
-#if canImport(FoundationEssentials)
-public import FoundationEssentials
-#else
-public import Foundation
-#endif
-#endif
 
 /// A type that ``HPKE`` uses to encode the public key.
 @preconcurrency
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 public protocol HPKEPublicKeySerialization: Sendable {
 	/// Creates a public key from an encoded representation.
 	///
 	/// - Parameters:
 	///  - serialization: The serialized key data.
 	///  - kem: The key encapsulation mechanism that the sender used to encapsulate the key.
-    init<D: ContiguousBytes>(_ serialization: D, kem: HPKE.KEM) throws
+    init<D: ContiguousBytes>(_ serialization: D, kem: HPKE.KEM) throws(CryptoKitMetaError)
 	/// Creates an encoded representation of the public key.
 	///
 	/// - Parameters:
 	///  - kem: The key encapsulation mechanism for encapsulating the key.
     ///  
 	/// - Returns: The encoded key data.
-    func hpkeRepresentation(kem: HPKE.KEM) throws -> Data
+    func hpkeRepresentation(kem: HPKE.KEM) throws(CryptoKitMetaError) -> Data
 }
 
 /// A type that represents the public key in a Diffie-Hellman key exchange.
 @preconcurrency
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 public protocol HPKEDiffieHellmanPublicKey: HPKEPublicKeySerialization, Sendable where EphemeralPrivateKey.PublicKey == Self {
 	/// The type of the ephemeral private key.
     associatedtype EphemeralPrivateKey: HPKEDiffieHellmanPrivateKeyGeneration
@@ -54,7 +51,6 @@ public protocol HPKEDiffieHellmanPublicKey: HPKEPublicKeySerialization, Sendable
 
 /// A type that represents the public key in HPKE
 @preconcurrency
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 public protocol HPKEKEMPublicKey: KEMPublicKey, HPKEPublicKeySerialization where EphemeralPrivateKey.PublicKey == Self {
     /// The type of the ephemeral private key.
     associatedtype EphemeralPrivateKey: HPKEKEMPrivateKeyGeneration
@@ -62,17 +58,14 @@ public protocol HPKEKEMPublicKey: KEMPublicKey, HPKEPublicKeySerialization where
 
 /// A type that represents the private key in a Diffie-Hellman key exchange.
 @preconcurrency
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 public protocol HPKEDiffieHellmanPrivateKey: Sendable, DiffieHellmanKeyAgreement where PublicKey: HPKEDiffieHellmanPublicKey {}
 
 /// A type that represents the private key in HPKE.
 @preconcurrency
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 public protocol HPKEKEMPrivateKey: Sendable, KEMPrivateKey where PublicKey: HPKEKEMPublicKey {}
 
 /// A type that represents the generation of private keys in a Diffie-Hellman key exchange.
 @preconcurrency
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 public protocol HPKEDiffieHellmanPrivateKeyGeneration: HPKEDiffieHellmanPrivateKey, Sendable {
 	/// Creates a private key generator.
     init()
@@ -80,36 +73,29 @@ public protocol HPKEDiffieHellmanPrivateKeyGeneration: HPKEDiffieHellmanPrivateK
 
 /// A type that represents the generation of private keys in HPKE
 @preconcurrency
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 public protocol HPKEKEMPrivateKeyGeneration: HPKEKEMPrivateKey, Sendable {
     /// Creates a private key generator.
-    init() throws
+    init() throws(CryptoKitMetaError)
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension HPKE {
 	/// A container for Diffie-Hellman key encapsulation mechanisms (KEMs).
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+    @nonexhaustive
     public enum DHKEM: Sendable {
-        @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
         struct PublicKey<DHPK: HPKEDiffieHellmanPublicKey>: KEMPublicKey where DHPK == DHPK.EphemeralPrivateKey.PublicKey {
             let kem: HPKE.KEM
             let key: DHPK
 
-            #if  !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-            typealias EncapsulationResult = CryptoKit.KEM.EncapsulationResult
-            #else
             typealias EncapsulationResult = Crypto.KEM.EncapsulationResult
-            #endif
 
-            init(_ publicKey: DHPK, kem: HPKE.KEM) throws {
+            init(_ publicKey: DHPK, kem: HPKE.KEM) throws(CryptoKitMetaError) {
                 // TODO: Validate Ciphersuite Mismatches
                 _ = try publicKey.hpkeRepresentation(kem: kem)
                 self.key = publicKey
                 self.kem = kem
             }
             
-            func encapsulate() throws -> EncapsulationResult {
+            func encapsulate() throws(CryptoKitMetaError) -> EncapsulationResult {
                 let ephemeralKeys = DHPK.EphemeralPrivateKey()
                 let dh =
                 try ephemeralKeys.sharedSecretFromKeyAgreement(with: key)
@@ -124,23 +110,22 @@ extension HPKE {
             }
         }
         
-        @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
         struct PrivateKey<DHSK: HPKEDiffieHellmanPrivateKey>: KEMPrivateKey {
             let kem: HPKE.KEM
             let key: DHSK
             
-            init(_ privateKey: DHSK, kem: HPKE.KEM) throws {
+            init(_ privateKey: DHSK, kem: HPKE.KEM) throws(CryptoKitMetaError) {
                 // TODO: Validate Ciphersuite Mismatches
                 _ = try privateKey.publicKey.hpkeRepresentation(kem: kem)
                 self.key = privateKey
                 self.kem = kem
             }
             
-            static func generate() throws -> Self {
+            static func generate() throws(CryptoKitMetaError) -> Self {
                 fatalError("generate() is not available on HPKE.DHKEM.PrivateKey, use generate(kem:) instead.")
             }
             
-            public func decapsulate(_ encapsulated: Data) throws -> SymmetricKey {
+            public func decapsulate(_ encapsulated: Data) throws(CryptoKitMetaError) -> SymmetricKey {
                 let pkE = try DHSK.PublicKey(encapsulated, kem: kem)
                 let dh = try key.sharedSecretFromKeyAgreement(with: pkE)
                 
@@ -150,7 +135,7 @@ extension HPKE {
                                                       kem: kem, kdf: kem.kdf)
             }
             
-            func decapsulate(_ encapsulated: Data, authenticating pkS: DHSK.PublicKey) throws -> SymmetricKey {
+            func decapsulate(_ encapsulated: Data, authenticating pkS: DHSK.PublicKey) throws(CryptoKitMetaError) -> SymmetricKey {
                 let pkE = try DHSK.PublicKey(encapsulated, kem: kem)
                 
                 var dh = try Data(unsafeFromContiguousBytes: key.sharedSecretFromKeyAgreement(with: pkE))
@@ -164,7 +149,7 @@ extension HPKE {
                                                       kdf: kem.kdf)
             }
             
-            func authenticateAndEncapsulateTo(_ publicKey: Self.PublicKey) throws -> (sharedSecret: SymmetricKey, encapsulated: Data) {
+            func authenticateAndEncapsulateTo(_ publicKey: Self.PublicKey) throws(CryptoKitMetaError) -> (sharedSecret: SymmetricKey, encapsulated: Data) {
                 let ephemeralKeys = DHSK.PublicKey.EphemeralPrivateKey()
                 
                 var dh = try Data(unsafeFromContiguousBytes: ephemeralKeys.sharedSecretFromKeyAgreement(with: publicKey.key))
@@ -185,4 +170,4 @@ extension HPKE {
     }
 }
 
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

@@ -11,23 +11,21 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-public import SwiftSystem
-#else
-#if canImport(FoundationEssentials)
-public import FoundationEssentials
-#else
-public import Foundation
-#endif
-#endif
 
 /// A Diffie-Hellman Key Agreement Key
 @preconcurrency
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 public protocol DiffieHellmanKeyAgreement: Sendable {
     /// The public key share type to perform the DH Key Agreement
     associatedtype PublicKey: Sendable
@@ -58,7 +56,6 @@ public protocol DiffieHellmanKeyAgreement: Sendable {
 /// symmetric key suitable for creating a message authentication code like
 /// ``HMAC``, or for opening and closing a sealed box with a cipher like
 /// ``ChaChaPoly`` or ``AES``.
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 public struct SharedSecret: ContiguousBytes, Sendable {
     var ss: SecureBytes
     
@@ -119,7 +116,6 @@ public struct SharedSecret: ContiguousBytes, Sendable {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension SharedSecret: Hashable {
     public func hash(into hasher: inout Hasher) {
         ss.withUnsafeBytes { hasher.combine(bytes: $0) }
@@ -127,7 +123,6 @@ extension SharedSecret: Hashable {
 }
 
 // We want to implement constant-time comparison for digests.
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension SharedSecret: Equatable {
     public static func == (lhs: Self, rhs: Self) -> Bool {
         return safeCompare(lhs, rhs)
@@ -153,7 +148,6 @@ extension SharedSecret: Equatable {
 }
 
 #if !hasFeature(Embedded)
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension SharedSecret: CustomStringConvertible {
     public var description: String {
         return "\(Self.self): \(ss.hexString)"
@@ -161,7 +155,6 @@ extension SharedSecret: CustomStringConvertible {
 }
 #endif
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension HashFunction {
     // A wrapper function to keep the unsafe code in one place.
     mutating func update(_ secret: SharedSecret) {
@@ -176,4 +169,4 @@ extension HashFunction {
     }
 }
 
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

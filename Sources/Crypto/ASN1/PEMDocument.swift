@@ -11,24 +11,21 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-import SwiftSystem
-#else
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
-#endif
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension ASN1 {
     /// A PEM document is some data, and a discriminator type that is used to advertise the content.
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     struct PEMDocument {
         private static let lineLength = 64
 
@@ -36,7 +33,7 @@ extension ASN1 {
 
         var derBytes: Data
 
-        init(pemString: String) throws {
+        init(pemString: String) throws(CryptoKitASN1Error) {
             // A PEM document looks like this:
             //
             // -----BEGIN <SOME DISCRIMINATOR>-----
@@ -97,7 +94,6 @@ extension ASN1 {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension Substring {
     fileprivate var pemStartDiscriminator: String? {
         return self.pemDiscriminator(expectedPrefix: "-----BEGIN ", expectedSuffix: "-----")
@@ -127,4 +123,4 @@ extension Substring {
     }
 }
 
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

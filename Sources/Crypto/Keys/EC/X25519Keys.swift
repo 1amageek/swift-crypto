@@ -11,42 +11,33 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-@_exported import CryptoKit
-#else
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-public import SwiftSystem
-#else
+
 #if canImport(FoundationEssentials)
-public import FoundationEssentials
-#else
-public import Foundation
-#endif
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
 #endif
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+
+#if canImport(CryptoKit)
+@_exported import CryptoKit
+#else
+
 extension Curve25519.KeyAgreement {
     static var keyByteCount: Int {
         return 32
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension Curve25519 {
     /// A mechanism used to create a shared secret between two users by
     /// performing X25519 key agreement.
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+    @nonexhaustive
     public enum KeyAgreement: Sendable {
-        #if (!CRYPTO_IN_SWIFTPM_FORCE_BUILD_API) || CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-        typealias Curve25519PrivateKeyImpl = Curve25519.KeyAgreement.CoreCryptoCurve25519PrivateKeyImpl
-        typealias Curve25519PublicKeyImpl = Curve25519.KeyAgreement.CoreCryptoCurve25519PublicKeyImpl
-        #else
         typealias Curve25519PrivateKeyImpl = Curve25519.KeyAgreement.OpenSSLCurve25519PrivateKeyImpl
         typealias Curve25519PublicKeyImpl = Curve25519.KeyAgreement.OpenSSLCurve25519PublicKeyImpl
-        #endif
 
         /// A Curve25519 public key used for key agreement.
-        @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
         public struct PublicKey: ECPublicKey, Sendable {
             fileprivate var baseKey: Curve25519PublicKeyImpl
 
@@ -57,7 +48,11 @@ extension Curve25519 {
             /// - rawRepresentation: A raw representation of the key as a
             /// collection of contiguous bytes.
             public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
-                self.baseKey = try Curve25519PublicKeyImpl(rawRepresentation: rawRepresentation)
+                do {
+                    self.baseKey = try Curve25519PublicKeyImpl(rawRepresentation: rawRepresentation)
+                } catch let cryptoKitError {
+                    throw error(cryptoKitError)
+                }
             }
 
             fileprivate init(baseKey: Curve25519PublicKeyImpl) {
@@ -86,7 +81,6 @@ extension Curve25519 {
         }
 
         /// A Curve25519 private key used for key agreement.
-        @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
         public struct PrivateKey: DiffieHellmanKeyAgreement, Sendable {
             fileprivate var baseKey: Curve25519PrivateKeyImpl
 
@@ -107,7 +101,11 @@ extension Curve25519 {
             ///   - rawRepresentation: A raw representation of the key as a
             /// collection of contiguous bytes.
             public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
-                self.baseKey = try Curve25519PrivateKeyImpl(rawRepresentation: rawRepresentation)
+                do {
+                    self.baseKey = try Curve25519PrivateKeyImpl(rawRepresentation: rawRepresentation)
+                } catch let cryptoKitError {
+                    throw error(cryptoKitError)
+                }
             }
 
             /// Computes a shared secret with the provided public key from
@@ -120,7 +118,11 @@ extension Curve25519 {
             ///
             /// - Returns: The computed shared secret.
             public func sharedSecretFromKeyAgreement(with publicKeyShare: Curve25519.KeyAgreement.PublicKey) throws(CryptoKitMetaError) -> SharedSecret {
-                return try self.baseKey.sharedSecretFromKeyAgreement(with: publicKeyShare.baseKey)
+                do {
+                    return try self.baseKey.sharedSecretFromKeyAgreement(with: publicKeyShare.baseKey)
+                } catch let cryptoKitError {
+                    throw error(cryptoKitError)
+                }
             }
             
             /// The raw representation of the key as a collection of contiguous
@@ -135,4 +137,4 @@ extension Curve25519 {
         }
     }
 }
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

@@ -11,16 +11,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
+
 import XCTest
 
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+#if canImport(CryptoKit)
 // Skip tests that require @testable imports of CryptoKit.
 #else
-#if !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-@testable import CryptoKit
-#else
 @testable import Crypto
-#endif
 
 final class GeneralizedTimeTests: XCTestCase {
     private func assertRoundTrips<ASN1Object: ASN1Parseable & ASN1Serializable & Equatable>(_ value: ASN1Object) throws {
@@ -95,11 +92,15 @@ final class GeneralizedTimeTests: XCTestCase {
             serialized.append(UInt8(stringRepresentation.utf8.count))
             serialized.append(contentsOf: stringRepresentation.utf8)
 
-            let result = try? ASN1.GeneralizedTime(asn1Encoded: serialized)
-            XCTAssertEqual(result, expectedResult)
+            do {
+                let result = try ASN1.GeneralizedTime(asn1Encoded: serialized)
+                XCTAssertEqual(result, expectedResult)
 
-            if let expectedResult {
-                try self.assertRoundTrips(expectedResult)
+                if let expectedResult {
+                    try self.assertRoundTrips(expectedResult)
+                }
+            } catch {
+                XCTAssertNil(expectedResult)
             }
         }
     }

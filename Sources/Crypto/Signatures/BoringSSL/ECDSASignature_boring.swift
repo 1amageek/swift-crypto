@@ -11,56 +11,66 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-@_exported import CryptoKit
-#else
-@_implementationOnly import CCryptoBoringSSL
-@_implementationOnly import CCryptoBoringSSLShims
-import CryptoBoringWrapper
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
+#if canImport(CryptoKit)
+@_exported import CryptoKit
+#else
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
+#else
+@_implementationOnly import CCryptoBoringSSL
+#endif
+#if hasFeature(Embedded)
+import CCryptoBoringSSLShims
+#else
+@_implementationOnly import CCryptoBoringSSLShims
+#endif
+import CryptoBoringWrapper
+
 /// A wrapper around BoringSSL's ECDSA_SIG with some lifetime management.
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-class ECDSASignature {
+final class ECDSASignature {
     private var _baseSig: UnsafeMutablePointer<ECDSA_SIG>
 
-    init<ContiguousBuffer: ContiguousBytes>(contiguousDERBytes derBytes: ContiguousBuffer) throws {
-        self._baseSig = try derBytes.withUnsafeBytes { bytesPtr in
+    init(contiguousDERBytes derBytes: Data) throws(CryptoBoringWrapperError) {
+        self._baseSig = try withCryptoUnsafeBytes(derBytes) { (bytesPtr) throws(CryptoBoringWrapperError) in
             guard
                 let sig = CCryptoBoringSSLShims_ECDSA_SIG_from_bytes(bytesPtr.baseAddress, bytesPtr.count)
             else {
-                throw CryptoKitError.internalBoringSSLError()
+                throw CryptoBoringWrapperError.internalBoringSSLError()
             }
             return sig
         }
     }
 
     @usableFromInline
-    init(rawRepresentation: Data) throws {
+    init(rawRepresentation: Data) throws(CryptoBoringWrapperError) {
         let half = rawRepresentation.count / 2
-        let r = try ArbitraryPrecisionInteger(bytes: rawRepresentation.prefix(half))
-        let s = try ArbitraryPrecisionInteger(bytes: rawRepresentation.suffix(half))
+        let r = try ArbitraryPrecisionInteger(bytes: Data(rawRepresentation.prefix(half)))
+        let s = try ArbitraryPrecisionInteger(bytes: Data(rawRepresentation.suffix(half)))
         guard let sig = CCryptoBoringSSL_ECDSA_SIG_new() else {
-            throw CryptoKitError.internalBoringSSLError()
+            throw CryptoBoringWrapperError.internalBoringSSLError()
         }
 
         self._baseSig = sig
 
-        try r.withUnsafeBignumPointer { rPtr in
-            try s.withUnsafeBignumPointer { sPtr in
+        try r.withUnsafeBignumPointer { (rPtr) throws(CryptoBoringWrapperError) in
+            try s.withUnsafeBignumPointer { (sPtr) throws(CryptoBoringWrapperError) in
                 // This call is awkward: on success it _takes ownership_ of both values, on failure it doesn't.
                 // This means we need to dup the pointers (to get something the ECDSA_SIG can own) and then
                 // on error we have to free them. This makes lifetime management pretty rough here!
                 guard let rCopy = CCryptoBoringSSL_BN_dup(rPtr) else {
-                    throw CryptoKitError.internalBoringSSLError()
+                    throw CryptoBoringWrapperError.internalBoringSSLError()
                 }
                 guard let sCopy = CCryptoBoringSSL_BN_dup(sPtr) else {
                     CCryptoBoringSSL_BN_free(rCopy)
-                    throw CryptoKitError.internalBoringSSLError()
+                    throw CryptoBoringWrapperError.internalBoringSSLError()
                 }
 
                 let rc = CCryptoBoringSSL_ECDSA_SIG_set0(self._baseSig, rCopy, sCopy)
@@ -111,12 +121,12 @@ class ECDSASignature {
         return Data(UnsafeBufferPointer(start: dataPtr, count: length))
     }
 
-    func withUnsafeSignaturePointer<T>(
-        _ body: (UnsafeMutablePointer<ECDSA_SIG>) throws -> T
+    func withUnsafeSignaturePointer<T, E: Error>(
+        _ body: (UnsafeMutablePointer<ECDSA_SIG>) throws(E) -> T
     )
-        rethrows -> T
+        throws(E) -> T
     {
         try body(self._baseSig)
     }
 }
-#endif  // CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+#endif  // canImport(CryptoKit)

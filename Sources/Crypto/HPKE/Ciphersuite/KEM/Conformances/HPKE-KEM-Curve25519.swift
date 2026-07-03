@@ -11,35 +11,30 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-public import SwiftSystem
-#else
-#if canImport(FoundationEssentials)
-public import FoundationEssentials
-#else
-public import Foundation
-#endif
-#endif
 
-
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension Curve25519.KeyAgreement.PrivateKey: HPKEDiffieHellmanPrivateKeyGeneration {}
 
-
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension Curve25519.KeyAgreement.PublicKey: HPKEDiffieHellmanPublicKey {
 	/// The type of the ephemeral private key associated with this public key.
     public typealias EphemeralPrivateKey = Curve25519.KeyAgreement.PrivateKey
     
-    static func validateCiphersuite(_ kem: HPKE.KEM) throws {
+    static func validateCiphersuite(_ kem: HPKE.KEM) throws(CryptoKitMetaError) {
         switch kem {
         case .Curve25519_HKDF_SHA256: do {}
         default: do {
-            throw HPKE.Errors.inconsistentCiphersuiteAndKey
+            throw error(HPKE.Errors.inconsistentCiphersuiteAndKey)
         }
         }
     }
@@ -51,7 +46,7 @@ extension Curve25519.KeyAgreement.PublicKey: HPKEDiffieHellmanPublicKey {
 	///  - kem: The key encapsulation mechanism to use with the public key.
     ///
 	/// - Throws: ``CryptoKit/HPKE/Errors/inconsistentCiphersuiteAndKey`` if the key encapsulation mechanism requested is incompatible with this public key.
-    public init<D>(_ serialization: D, kem: HPKE.KEM) throws where D: ContiguousBytes {
+    public init<D>(_ serialization: D, kem: HPKE.KEM) throws(CryptoKitMetaError) where D: ContiguousBytes {
         try Self.validateCiphersuite(kem)
         try self.init(rawRepresentation: serialization)
     }
@@ -64,7 +59,7 @@ extension Curve25519.KeyAgreement.PublicKey: HPKEDiffieHellmanPublicKey {
     /// - Throws: ``CryptoKit/HPKE/Errors/inconsistentCiphersuiteAndKey`` if the key encapsulation mechanism requested is incompatible with this public key.
     /// 
     /// - Returns: The serialized representation of the public key.
-    public func hpkeRepresentation(kem: HPKE.KEM) throws -> Data {
+    public func hpkeRepresentation(kem: HPKE.KEM) throws(CryptoKitMetaError) -> Data {
         try Self.validateCiphersuite(kem)
         return self.rawRepresentation
     }
@@ -73,4 +68,4 @@ extension Curve25519.KeyAgreement.PublicKey: HPKEDiffieHellmanPublicKey {
     public typealias HPKEEphemeralPrivateKey = Curve25519.KeyAgreement.PrivateKey
 }
 
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

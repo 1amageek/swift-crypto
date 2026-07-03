@@ -11,16 +11,22 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-@_exported import CryptoKit
-#else
-@_implementationOnly import CCryptoBoringSSL
-import CryptoBoringWrapper
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
+
+#if canImport(CryptoKit)
+@_exported import CryptoKit
+#else
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
+#else
+@_implementationOnly import CCryptoBoringSSL
+#endif
+import CryptoBoringWrapper
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 enum OpenSSLAESGCMImpl {
@@ -30,22 +36,21 @@ enum OpenSSLAESGCMImpl {
         message: Plaintext,
         nonce: AES.GCM.Nonce?,
         authenticatedData: AuthenticatedData? = nil
-    ) throws -> AES.GCM.SealedBox {
+    ) throws(CryptoKitMetaError) -> AES.GCM.SealedBox {
         let nonce = nonce ?? AES.GCM.Nonce()
 
         let aead = try Self._backingAEAD(key: key)
 
-        let ciphertext: Data
-        let tag: Data
+        let combined: Data
         if let ad = authenticatedData {
-            (ciphertext, tag) = try aead.seal(
+            combined = try aead.seal(
                 message: message,
                 key: key,
                 nonce: nonce,
                 authenticatedData: ad
             )
         } else {
-            (ciphertext, tag) = try aead.seal(
+            combined = try aead.seal(
                 message: message,
                 key: key,
                 nonce: nonce,
@@ -53,7 +58,39 @@ enum OpenSSLAESGCMImpl {
             )
         }
 
-        return try AES.GCM.SealedBox(nonce: nonce, ciphertext: ciphertext, tag: tag)
+        return AES.GCM.SealedBox(combined: combined, nonceByteCount: nonce.count)
+    }
+
+    #if swift(<6.3)
+    @_lifetime(message: copy message)
+    #endif
+    @inlinable
+    static func seal(
+        key: SymmetricKey,
+        message: inout MutableRawSpan,
+        nonce: RawSpan,
+        authenticatedData: RawSpan?,
+        tag: inout OutputRawSpan
+    ) throws(CryptoKitMetaError) {
+        let aead = try Self._backingAEAD(key: key)
+
+        if let ad = authenticatedData {
+            try aead.seal(
+                message: &message,
+                key: key,
+                nonce: nonce,
+                authenticatedData: ad,
+                tag: &tag
+            )
+        } else {
+            try aead.seal(
+                message: &message,
+                key: key,
+                nonce: nonce,
+                authenticatedData: RawSpan(),
+                tag: &tag
+            )
+        }
     }
 
     @inlinable
@@ -61,7 +98,7 @@ enum OpenSSLAESGCMImpl {
         key: SymmetricKey,
         sealedBox: AES.GCM.SealedBox,
         authenticatedData: AuthenticatedData? = nil
-    ) throws -> Data {
+    ) throws(CryptoKitMetaError) -> Data {
         let aead = try Self._backingAEAD(key: key)
 
         if let ad = authenticatedData {
@@ -83,8 +120,40 @@ enum OpenSSLAESGCMImpl {
         }
     }
 
+    /// Open a given message in place.
+    #if swift(<6.3)
+    @_lifetime(message: copy message)
+    #endif
+    @inlinable
+    static func open(
+        key: SymmetricKey,
+        message: inout MutableRawSpan,
+        nonce: RawSpan,
+        authenticatedData: RawSpan?,
+        tag: RawSpan
+    ) throws(CryptoKitMetaError) {
+        let aead = try Self._backingAEAD(key: key)
+        if let authenticatedData {
+            return try aead.open(
+                message: &message,
+                key: key,
+                nonce: nonce,
+                tag: tag,
+                authenticatedData: authenticatedData
+            )
+        } else {
+            return try aead.open(
+                message: &message,
+                key: key,
+                nonce: nonce,
+                tag: tag,
+                authenticatedData: RawSpan()
+            )
+        }
+    }
+
     @usableFromInline
-    static func _backingAEAD(key: SymmetricKey) throws -> BoringSSLAEAD {
+    static func _backingAEAD(key: SymmetricKey) throws(CryptoKitMetaError) -> BoringSSLAEAD {
         switch key.bitCount {
         case 128:
             return .aes128gcm
@@ -93,8 +162,8 @@ enum OpenSSLAESGCMImpl {
         case 256:
             return .aes256gcm
         default:
-            throw CryptoKitError.incorrectKeySize
+            throw error(CryptoKitError.incorrectKeySize)
         }
     }
 }
-#endif  // CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+#endif  // canImport(CryptoKit)

@@ -11,27 +11,25 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-public import SwiftSystem
-#else
-#if canImport(FoundationEssentials)
-public import FoundationEssentials
-#else
-public import Foundation
-#endif
-#endif
 
 /// A key encapsulation mechanism.
 ///
 /// Use a key encapsulation mechanism (KEM) to protect a symmetric cryptographic key that you share with another party.
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+@nonexhaustive
 public enum KEM: Sendable {
     /// The result of a key encapsulation operation.
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     public struct EncapsulationResult: Sendable {
         /// The shared secret.
         public let sharedSecret: SymmetricKey
@@ -48,19 +46,17 @@ public enum KEM: Sendable {
 
 /// The public key for a key encapsulation mechanism.
 @preconcurrency
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 public protocol KEMPublicKey: Sendable {
     /// Generates and encapsulates a shared secret.
     ///
     /// Share the encapsulated secret with the person who has the ``KEMPrivateKey``.
     /// They use ``KEMPrivateKey/decapsulate(_:)`` to recover the shared secret.
     /// - Returns: The shared secret, and its encapsulated version.
-    func encapsulate() throws -> KEM.EncapsulationResult
+    func encapsulate() throws(CryptoKitMetaError) -> KEM.EncapsulationResult
 }
 
 /// The private key for a key encapsulation mechanism.
 @preconcurrency
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 public protocol KEMPrivateKey: Sendable {
     associatedtype PublicKey: KEMPublicKey
     
@@ -69,14 +65,35 @@ public protocol KEMPrivateKey: Sendable {
     ///
     /// Give the ``publicKey`` to another person so that they can encapsulate
     /// shared secrets that you recover by calling ``decapsulate(_:)``.
-    static func generate() throws -> Self
+    static func generate() throws(CryptoKitMetaError) -> Self
     
     /// Recovers a shared secret from an encapsulated representation.
     /// - Parameter encapsulated: The encapsulated shared secret that someone created using this key's ``publicKey``.
     /// - Returns: The decapsulated shared secret.
-    func decapsulate(_ encapsulated: Data) throws -> SymmetricKey
+    func decapsulate(_ encapsulated: Data) throws(CryptoKitMetaError) -> SymmetricKey
     
     /// The associated public key.
     var publicKey: PublicKey { get }
 }
-#endif // Linux or !SwiftPM
+
+/// A one-time private key for a key encapsulation mechanism, which can only decapsulate once but it does so faster.
+@preconcurrency
+public protocol KEMOneTimePrivateKey: ~Copyable, Sendable {
+    associatedtype PublicKey: KEMPublicKey
+
+    /// Generates a new random private key.
+    /// - Returns: The generated private key.
+    ///
+    /// Give the ``publicKey`` to another person so that they can encapsulate
+    /// shared secrets that you recover by calling ``decapsulate(_:)``.
+    static func generate() throws(CryptoKitMetaError) -> Self
+
+    /// Recovers a shared secret from an encapsulated representation.
+    /// - Parameter encapsulated: The encapsulated shared secret that someone created using this key's ``publicKey``.
+    /// - Returns: The decapsulated shared secret.
+    consuming func decapsulate(_ encapsulated: Data) throws(CryptoKitMetaError) -> SymmetricKey
+
+    /// The associated public key.
+    var publicKey: PublicKey { get }
+}
+#endif // canImport(CryptoKit)

@@ -11,23 +11,29 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-@_exported import CryptoKit
-#else
-@_implementationOnly import CCryptoBoringSSL
-import CryptoBoringWrapper
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
+
+#if canImport(CryptoKit)
+@_exported import CryptoKit
+#else
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
+#else
+@_implementationOnly import CCryptoBoringSSL
+#endif
+import CryptoBoringWrapper
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension Data {
     init<D: DataProtocol, Curve: OpenSSLSupportedNISTCurve>(
         derSignature derBytes: D,
         over: Curve.Type = Curve.self
-    ) throws {
+    ) throws(CryptoBoringWrapperError) {
         // BoringSSL requires a contiguous buffer of memory, so if we don't have one we need to create one.
         if derBytes.regions.count == 1 {
             self = try Data(contiguousDERBytes: derBytes.regions.first!, over: Curve.self)
@@ -40,15 +46,15 @@ extension Data {
     init<ContiguousBuffer: ContiguousBytes, Curve: OpenSSLSupportedNISTCurve>(
         contiguousDERBytes derBytes: ContiguousBuffer,
         over curve: Curve.Type = Curve.self
-    ) throws {
-        let sig = try ECDSASignature(contiguousDERBytes: derBytes)
+    ) throws(CryptoBoringWrapperError) {
+        let sig = try ECDSASignature(contiguousDERBytes: cryptoData(derBytes))
         self = try Data(rawSignature: sig, over: curve)
     }
 
     init<Curve: OpenSSLSupportedNISTCurve>(
         rawSignature signature: ECDSASignature,
         over curve: Curve.Type = Curve.self
-    ) throws {
+    ) throws(CryptoBoringWrapperError) {
         // We need to bring this into the raw representation, which is r || s as defined in https://tools.ietf.org/html/rfc4754.
         let (r, s) = signature.components
         let curveByteCount = Curve.coordinateByteCount
@@ -65,8 +71,10 @@ extension Data {
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P256.Signing.ECDSASignature {
-    init<D: DataProtocol>(openSSLDERSignature derRepresentation: D) throws {
-        self.rawRepresentation = try Data(derSignature: derRepresentation, over: P256.self)
+    init<D: DataProtocol>(openSSLDERSignature derRepresentation: D) throws(CryptoKitMetaError) {
+        self.rawRepresentation = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in
+            try Data(derSignature: derRepresentation, over: P256.self)
+        }
     }
 
     var openSSLDERRepresentation: Data {
@@ -76,9 +84,14 @@ extension P256.Signing.ECDSASignature {
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P256.Signing.PrivateKey {
-    func openSSLSignature<D: Digest>(for digest: D) throws -> P256.Signing.ECDSASignature {
-        let baseSignature = try self.impl.key.sign(digest: digest)
-        return try .init(rawRepresentation: Data(rawSignature: baseSignature, over: P256.self))
+    func openSSLSignature<D: Digest>(for digest: D) throws(CryptoKitMetaError) -> P256.Signing.ECDSASignature {
+        let baseSignature = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in
+            try self.impl.key.sign(digest: digest)
+        }
+        let rawSignature = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in
+            try Data(rawSignature: baseSignature, over: P256.self)
+        }
+        return try .init(rawRepresentation: rawSignature)
     }
 }
 
@@ -90,8 +103,10 @@ extension P256.Signing.PublicKey {
     )
         -> Bool
     {
-        guard let baseSignature = try? ECDSASignature(rawRepresentation: signature.rawRepresentation)
-        else {
+        let baseSignature: ECDSASignature
+        do {
+            baseSignature = try ECDSASignature(rawRepresentation: signature.rawRepresentation)
+        } catch {
             // If we can't create a signature, it's not valid.
             return false
         }
@@ -102,8 +117,10 @@ extension P256.Signing.PublicKey {
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P384.Signing.ECDSASignature {
-    init<D: DataProtocol>(openSSLDERSignature derRepresentation: D) throws {
-        self.rawRepresentation = try Data(derSignature: derRepresentation, over: P384.self)
+    init<D: DataProtocol>(openSSLDERSignature derRepresentation: D) throws(CryptoKitMetaError) {
+        self.rawRepresentation = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in
+            try Data(derSignature: derRepresentation, over: P384.self)
+        }
     }
 
     var openSSLDERRepresentation: Data {
@@ -113,9 +130,14 @@ extension P384.Signing.ECDSASignature {
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P384.Signing.PrivateKey {
-    func openSSLSignature<D: Digest>(for digest: D) throws -> P384.Signing.ECDSASignature {
-        let baseSignature = try self.impl.key.sign(digest: digest)
-        return try .init(rawRepresentation: Data(rawSignature: baseSignature, over: P384.self))
+    func openSSLSignature<D: Digest>(for digest: D) throws(CryptoKitMetaError) -> P384.Signing.ECDSASignature {
+        let baseSignature = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in
+            try self.impl.key.sign(digest: digest)
+        }
+        let rawSignature = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in
+            try Data(rawSignature: baseSignature, over: P384.self)
+        }
+        return try .init(rawRepresentation: rawSignature)
     }
 }
 
@@ -127,8 +149,10 @@ extension P384.Signing.PublicKey {
     )
         -> Bool
     {
-        guard let baseSignature = try? ECDSASignature(rawRepresentation: signature.rawRepresentation)
-        else {
+        let baseSignature: ECDSASignature
+        do {
+            baseSignature = try ECDSASignature(rawRepresentation: signature.rawRepresentation)
+        } catch {
             // If we can't create a signature, it's not valid.
             return false
         }
@@ -139,8 +163,10 @@ extension P384.Signing.PublicKey {
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P521.Signing.ECDSASignature {
-    init<D: DataProtocol>(openSSLDERSignature derRepresentation: D) throws {
-        self.rawRepresentation = try Data(derSignature: derRepresentation, over: P521.self)
+    init<D: DataProtocol>(openSSLDERSignature derRepresentation: D) throws(CryptoKitMetaError) {
+        self.rawRepresentation = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in
+            try Data(derSignature: derRepresentation, over: P521.self)
+        }
     }
 
     var openSSLDERRepresentation: Data {
@@ -150,9 +176,14 @@ extension P521.Signing.ECDSASignature {
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P521.Signing.PrivateKey {
-    func openSSLSignature<D: Digest>(for digest: D) throws -> P521.Signing.ECDSASignature {
-        let baseSignature = try self.impl.key.sign(digest: digest)
-        return try .init(rawRepresentation: Data(rawSignature: baseSignature, over: P521.self))
+    func openSSLSignature<D: Digest>(for digest: D) throws(CryptoKitMetaError) -> P521.Signing.ECDSASignature {
+        let baseSignature = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in
+            try self.impl.key.sign(digest: digest)
+        }
+        let rawSignature = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in
+            try Data(rawSignature: baseSignature, over: P521.self)
+        }
+        return try .init(rawRepresentation: rawSignature)
     }
 }
 
@@ -164,8 +195,10 @@ extension P521.Signing.PublicKey {
     )
         -> Bool
     {
-        guard let baseSignature = try? ECDSASignature(rawRepresentation: signature.rawRepresentation)
-        else {
+        let baseSignature: ECDSASignature
+        do {
+            baseSignature = try ECDSASignature(rawRepresentation: signature.rawRepresentation)
+        } catch {
             // If we can't create a signature, it's not valid.
             return false
         }
@@ -173,4 +206,4 @@ extension P521.Signing.PublicKey {
         return self.impl.key.isValidSignature(baseSignature, for: digest)
     }
 }
-#endif  // CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+#endif  // canImport(CryptoKit)

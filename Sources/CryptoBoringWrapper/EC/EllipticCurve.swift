@@ -11,7 +11,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
+
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
+#else
 @_implementationOnly import CCryptoBoringSSL
+#endif
 
 /// A wrapper around BoringSSL's EC_GROUP object that handles reference counting and
 /// liveness.
@@ -25,7 +30,7 @@ package final class BoringSSLEllipticCurveGroup: @unchecked Sendable {
     @usableFromInline package let generator: EllipticCurvePoint
 
     @usableFromInline
-    package init(_ curve: CurveName) throws {
+    package init(_ curve: CurveName) throws(CryptoBoringWrapperError) {
         guard let group = CCryptoBoringSSL_EC_GROUP_new_by_curve_name(curve.baseNID) else {
             throw CryptoBoringWrapperError.internalBoringSSLError()
         }
@@ -53,7 +58,7 @@ extension BoringSSLEllipticCurveGroup {
     }
 
     @usableFromInline
-    package func makeUnsafeOwnedECKey() throws -> OpaquePointer {
+    package func makeUnsafeOwnedECKey() throws(CryptoBoringWrapperError) -> OpaquePointer {
         guard let key = CCryptoBoringSSL_EC_KEY_new(),
             CCryptoBoringSSL_EC_KEY_set_group(key, self._group) == 1
         else {
@@ -64,7 +69,7 @@ extension BoringSSLEllipticCurveGroup {
     }
 
     @usableFromInline
-    package func makeUnsafeOwnedECPoint() throws -> OpaquePointer {
+    package func makeUnsafeOwnedECPoint() throws(CryptoBoringWrapperError) -> OpaquePointer {
         guard let point = CCryptoBoringSSL_EC_POINT_new(self._group) else {
             throw CryptoBoringWrapperError.internalBoringSSLError()
         }
@@ -73,7 +78,14 @@ extension BoringSSLEllipticCurveGroup {
     }
 
     @inlinable
-    package func withUnsafeGroupPointer<T>(_ body: (OpaquePointer) throws -> T) rethrows -> T {
+    package func withUnsafeGroupPointer<T>(_ body: (OpaquePointer) -> T) -> T {
+        body(self._group)
+    }
+
+    @inlinable
+    package func withUnsafeGroupPointer<T, E: Error>(
+        _ body: (OpaquePointer) throws(E) -> T
+    ) throws(E) -> T {
         try body(self._group)
     }
 

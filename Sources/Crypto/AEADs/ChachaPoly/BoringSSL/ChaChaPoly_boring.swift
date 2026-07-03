@@ -11,36 +11,116 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-@_exported import CryptoKit
-#else
-@_implementationOnly import CCryptoBoringSSL
-@_implementationOnly import CCryptoBoringSSLShims
-import CryptoBoringWrapper
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
+#if canImport(CryptoKit)
+@_exported import CryptoKit
+#else
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
+#else
+@_implementationOnly import CCryptoBoringSSL
+#endif
+#if hasFeature(Embedded)
+import CCryptoBoringSSLShims
+#else
+@_implementationOnly import CCryptoBoringSSLShims
+#endif
+import CryptoBoringWrapper
+
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension BoringSSLAEAD {
+    private func convert(_ wrapperError: CryptoBoringWrapperError) -> CryptoKitMetaError {
+        switch wrapperError {
+        case .incorrectKeySize:
+            return error(CryptoKitError.incorrectKeySize)
+        case .incorrectParameterSize:
+            return error(CryptoKitError.incorrectParameterSize)
+        case .authenticationFailure:
+            return error(CryptoKitError.authenticationFailure)
+        case .underlyingCoreCryptoError(let errorCode):
+            return error(CryptoKitError.underlyingCoreCryptoError(error: errorCode))
+        case .wrapFailure:
+            return error(CryptoKitError.wrapFailure)
+        case .unwrapFailure:
+            return error(CryptoKitError.unwrapFailure)
+        case .invalidParameter:
+            return error(CryptoKitError.invalidParameter)
+        }
+    }
+
     /// Seal a given message.
     func seal<Plaintext: DataProtocol, Nonce: ContiguousBytes, AuthenticatedData: DataProtocol>(
         message: Plaintext,
         key: SymmetricKey,
         nonce: Nonce,
         authenticatedData: AuthenticatedData
-    ) throws -> (ciphertext: Data, tag: Data) {
+    ) throws(CryptoKitMetaError) -> Data {
+        #if hasFeature(Embedded)
+        var nonceData = Data()
+        nonce.withUnsafeBytes { nonceData.append(contentsOf: $0) }
+        let authenticatedDataData = Data(authenticatedData)
+        var combined = nonceData
+        combined.append(contentsOf: message)
+        let plaintextOffset = nonceData.count
+        let tagOffset = plaintextOffset + message.count
+        combined.append(contentsOf: repeatElement(UInt8(0), count: ChaChaPoly.tagByteCount))
+
+        try combined.withUnsafeMutableBytes { (combinedBuffer) throws(CryptoKitMetaError) in
+            let messageBuffer = UnsafeMutableRawBufferPointer(rebasing: combinedBuffer[plaintextOffset..<tagOffset])
+            let tagBuffer = UnsafeMutableRawBufferPointer(rebasing: combinedBuffer[tagOffset..<combinedBuffer.count])
+            var messageSpan = messageBuffer.mutableBytes
+            var tagSpan = OutputRawSpan(buffer: tagBuffer, initializedCount: 0)
+            try self.seal(
+                message: &messageSpan,
+                key: key,
+                nonce: nonceData.bytes,
+                authenticatedData: authenticatedDataData.bytes,
+                tag: &tagSpan
+            )
+        }
+
+        return combined
+        #else
         do {
-            let context = try AEADContext(cipher: self, key: key)
+            let context = try AEADContext(cipher: self, key: key.bytes)
             return try context.seal(
                 message: message,
                 nonce: nonce,
                 authenticatedData: authenticatedData
             )
         } catch CryptoBoringWrapperError.underlyingCoreCryptoError(let errorCode) {
-            throw CryptoKitError.underlyingCoreCryptoError(error: errorCode)
+            throw error(CryptoKitError.underlyingCoreCryptoError(error: errorCode))
+        }
+        #endif
+    }
+
+    /// Seal a given message in place
+    #if swift(<6.3)
+    @_lifetime(message: copy message)
+    #endif
+    func seal(
+        message: inout MutableRawSpan,
+        key: SymmetricKey,
+        nonce: RawSpan,
+        authenticatedData: RawSpan,
+        tag: inout OutputRawSpan
+    ) throws(CryptoKitMetaError) {
+        do {
+            let context = try AEADContext(cipher: self, key: key.bytes)
+            return try context.seal(
+                message: &message,
+                nonce: nonce,
+                authenticatedData: authenticatedData,
+                tag: &tag,
+            )
+        } catch {
+            throw self.convert(error)
         }
     }
 
@@ -51,9 +131,28 @@ extension BoringSSLAEAD {
         nonce: Nonce,
         tag: Data,
         authenticatedData: AuthenticatedData
-    ) throws -> Data {
+    ) throws(CryptoKitMetaError) -> Data {
+        #if hasFeature(Embedded)
+        var output = Data(ciphertext)
+        var nonceData = Data()
+        nonce.withUnsafeBytes { nonceData.append(contentsOf: $0) }
+        let authenticatedDataData = Data(authenticatedData)
+
+        try output.withUnsafeMutableBytes { (outputBuffer) throws(CryptoKitMetaError) in
+            var messageSpan = outputBuffer.mutableBytes
+            try self.open(
+                message: &messageSpan,
+                key: key,
+                nonce: nonceData.bytes,
+                tag: tag.bytes,
+                authenticatedData: authenticatedDataData.bytes
+            )
+        }
+
+        return output
+        #else
         do {
-            let context = try AEADContext(cipher: self, key: key)
+            let context = try AEADContext(cipher: self, key: key.bytes)
             return try context.open(
                 ciphertext: ciphertext,
                 nonce: nonce,
@@ -61,7 +160,32 @@ extension BoringSSLAEAD {
                 authenticatedData: authenticatedData
             )
         } catch CryptoBoringWrapperError.underlyingCoreCryptoError(let errorCode) {
-            throw CryptoKitError.underlyingCoreCryptoError(error: errorCode)
+            throw error(CryptoKitError.underlyingCoreCryptoError(error: errorCode))
+        }
+        #endif
+    }
+
+    /// Open a given message in place.
+    #if swift(<6.3)
+    @_lifetime(message: copy message)
+    #endif
+    public func open(
+        message: inout MutableRawSpan,
+        key: SymmetricKey,
+        nonce: RawSpan,
+        tag: RawSpan,
+        authenticatedData: RawSpan
+    ) throws(CryptoKitMetaError) {
+        do {
+            let context = try AEADContext(cipher: self, key: key.bytes)
+            return try context.open(
+                message: &message,
+                nonce: nonce,
+                tag: tag,
+                authenticatedData: authenticatedData
+            )
+        } catch {
+            throw self.convert(error)
         }
     }
 }
@@ -73,23 +197,22 @@ enum OpenSSLChaChaPolyImpl {
         message: M,
         nonce: ChaChaPoly.Nonce?,
         authenticatedData: AD?
-    ) throws -> ChaChaPoly.SealedBox {
+    ) throws(CryptoKitMetaError) -> ChaChaPoly.SealedBox {
         guard key.bitCount == ChaChaPoly.keyBitsCount else {
-            throw CryptoKitError.incorrectKeySize
+            throw error(CryptoKitError.incorrectKeySize)
         }
         let nonce = nonce ?? ChaChaPoly.Nonce()
 
-        let ciphertext: Data
-        let tag: Data
+        let combined: Data
         if let ad = authenticatedData {
-            (ciphertext, tag) = try BoringSSLAEAD.chacha20.seal(
+            combined = try BoringSSLAEAD.chacha20.seal(
                 message: message,
                 key: key,
                 nonce: nonce,
                 authenticatedData: ad
             )
         } else {
-            (ciphertext, tag) = try BoringSSLAEAD.chacha20.seal(
+            combined = try BoringSSLAEAD.chacha20.seal(
                 message: message,
                 key: key,
                 nonce: nonce,
@@ -97,16 +220,49 @@ enum OpenSSLChaChaPolyImpl {
             )
         }
 
-        return try ChaChaPoly.SealedBox(nonce: nonce, ciphertext: ciphertext, tag: tag)
+        return ChaChaPoly.SealedBox(combined: combined, nonceByteCount: nonce.count)
+    }
+
+    #if swift(<6.3)
+    @_lifetime(message: copy message)
+    #endif
+    static func encrypt(
+        key: SymmetricKey,
+        inPlace message: inout MutableRawSpan,
+        nonce: RawSpan,
+        authenticatedData: RawSpan?,
+        tag: inout OutputRawSpan
+    ) throws(CryptoKitMetaError) {
+        guard key.bitCount == ChaChaPoly.keyBitsCount else {
+            throw error(CryptoKitError.incorrectKeySize)
+        }
+
+        if let ad = authenticatedData {
+            try BoringSSLAEAD.chacha20.seal(
+                message: &message,
+                key: key,
+                nonce: nonce,
+                authenticatedData: ad,
+                tag: &tag
+            )
+        } else {
+            try BoringSSLAEAD.chacha20.seal(
+                message: &message,
+                key: key,
+                nonce: nonce,
+                authenticatedData: RawSpan(),
+                tag: &tag
+            )
+        }
     }
 
     static func decrypt<AD: DataProtocol>(
         key: SymmetricKey,
         ciphertext: ChaChaPoly.SealedBox,
         authenticatedData: AD?
-    ) throws -> Data {
+    ) throws(CryptoKitMetaError) -> Data {
         guard key.bitCount == ChaChaPoly.keyBitsCount else {
-            throw CryptoKitError.incorrectKeySize
+            throw error(CryptoKitError.incorrectKeySize)
         }
 
         if let ad = authenticatedData {
@@ -127,5 +283,39 @@ enum OpenSSLChaChaPolyImpl {
             )
         }
     }
+
+    #if swift(<6.3)
+    @_lifetime(message: copy message)
+    #endif
+    static func decrypt(
+        key: SymmetricKey,
+        inPlace message: inout MutableRawSpan,
+        nonce: RawSpan,
+        tag: RawSpan,
+        authenticatedData: RawSpan?
+    ) throws(CryptoKitMetaError) {
+        guard key.bitCount == ChaChaPoly.keyBitsCount else {
+            throw error(CryptoKitError.incorrectKeySize)
+        }
+
+        if let authenticatedData {
+            try BoringSSLAEAD.chacha20.open(
+                message: &message,
+                key: key,
+                nonce: nonce,
+                tag: tag,
+                authenticatedData: authenticatedData
+            )
+        } else {
+            try BoringSSLAEAD.chacha20.open(
+                message: &message,
+                key: key,
+                nonce: nonce,
+                tag: tag,
+                authenticatedData: RawSpan()
+            )
+        }
+
+    }
 }
-#endif  // CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+#endif  // canImport(CryptoKit)

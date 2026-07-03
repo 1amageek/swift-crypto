@@ -12,27 +12,32 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-@_exported import CryptoKit
-#else
-@_implementationOnly import CCryptoBoringSSL
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
+#endif
+
+#if canImport(CryptoKit)
+@_exported import CryptoKit
+#else
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
+#else
+@_implementationOnly import CCryptoBoringSSL
 #endif
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 protocol BoringSSLBackedMLDSAPrivateKey: Sendable {
     associatedtype AssociatedPublicKey: BoringSSLBackedMLDSAPublicKey
 
-    init() throws
+    init() throws(CryptoKitError)
 
-    init<D: DataProtocol>(seedRepresentation: D) throws
+    init<D: DataProtocol>(seedRepresentation: D) throws(CryptoKitError)
 
-    func signature<D: DataProtocol>(for data: D) throws -> Data
+    func signature<D: DataProtocol>(for data: D) throws(CryptoKitError) -> Data
 
-    func signature<D: DataProtocol, C: DataProtocol>(for data: D, context: C) throws -> Data
+    func signature<D: DataProtocol, C: DataProtocol>(for data: D, context: C) throws(CryptoKitError) -> Data
 
     var publicKey: AssociatedPublicKey { get }
 
@@ -41,7 +46,7 @@ protocol BoringSSLBackedMLDSAPrivateKey: Sendable {
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 protocol BoringSSLBackedMLDSAPublicKey: Sendable {
-    init<D: DataProtocol>(rawRepresentation: D) throws
+    init<D: DataProtocol>(rawRepresentation: D) throws(CryptoKitError)
 
     func isValidSignature<S: DataProtocol, D: DataProtocol>(_: S, for data: D) -> Bool
 
@@ -86,35 +91,43 @@ struct OpenSSLMLDSAPrivateKeyImpl<Parameters: BoringSSLBackedMLDSAParameters> {
     private var backing: Parameters.BackingPrivateKey
     private let publicKeyHash: SHA3_256Digest
 
-    init() throws {
-        self.backing = try .init()
+    init() throws(CryptoKitMetaError) {
+        self.backing = try withCryptoKitError { () throws(CryptoKitError) in
+            try .init()
+        }
         self.publicKeyHash = SHA3_256.hash(data: self.backing.publicKey.rawRepresentation)
     }
 
-    init<D: DataProtocol>(seedRepresentation: D, publicKeyRawRepresentation: Data?) throws {
+    init<D: DataProtocol>(seedRepresentation: D, publicKeyRawRepresentation: Data?) throws(CryptoKitMetaError) {
         let publicKeyHash = publicKeyRawRepresentation.map {
             SHA3_256.hash(data: $0)
         }
         self = try Self(seedRepresentation: seedRepresentation, publicKeyHash: publicKeyHash)
     }
 
-    init<D: DataProtocol>(seedRepresentation: D, publicKeyHash: SHA3_256Digest?) throws {
-        self.backing = try .init(seedRepresentation: seedRepresentation)
+    init<D: DataProtocol>(seedRepresentation: D, publicKeyHash: SHA3_256Digest?) throws(CryptoKitMetaError) {
+        self.backing = try withCryptoKitError { () throws(CryptoKitError) in
+            try .init(seedRepresentation: seedRepresentation)
+        }
         let generatedHash = SHA3_256.hash(data: self.backing.publicKey.rawRepresentation)
 
         if let publicKeyHash, generatedHash != publicKeyHash {
-            throw CryptoKitError.unwrapFailure
+            throw error(CryptoKitError.unwrapFailure)
         }
 
         self.publicKeyHash = generatedHash
     }
 
-    func signature<D: DataProtocol>(for data: D) throws -> Data {
-        try self.backing.signature(for: data)
+    func signature<D: DataProtocol>(for data: D) throws(CryptoKitMetaError) -> Data {
+        try withCryptoKitError { () throws(CryptoKitError) in
+            try self.backing.signature(for: data)
+        }
     }
 
-    func signature<D: DataProtocol, C: DataProtocol>(for data: D, context: C) throws -> Data {
-        try self.backing.signature(for: data, context: context)
+    func signature<D: DataProtocol, C: DataProtocol>(for data: D, context: C) throws(CryptoKitMetaError) -> Data {
+        try withCryptoKitError { () throws(CryptoKitError) in
+            try self.backing.signature(for: data, context: context)
+        }
     }
 
     var publicKey: OpenSSLMLDSAPublicKeyImpl<Parameters> {
@@ -147,8 +160,10 @@ struct OpenSSLMLDSAPublicKeyImpl<Parameters: BoringSSLBackedMLDSAParameters> {
         self.backing = backing
     }
 
-    init<D: DataProtocol>(rawRepresentation: D) throws {
-        self.backing = try .init(rawRepresentation: rawRepresentation)
+    init<D: DataProtocol>(rawRepresentation: D) throws(CryptoKitMetaError) {
+        self.backing = try withCryptoKitError { () throws(CryptoKitError) in
+            try .init(rawRepresentation: rawRepresentation)
+        }
     }
 
     func isValidSignature<S: DataProtocol, D: DataProtocol>(
@@ -171,4 +186,4 @@ struct OpenSSLMLDSAPublicKeyImpl<Parameters: BoringSSLBackedMLDSAParameters> {
     }
 }
 
-#endif  // CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+#endif  // canImport(CryptoKit)

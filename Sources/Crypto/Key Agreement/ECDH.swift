@@ -11,46 +11,36 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-@_exported import CryptoKit
-#else
-#if (!CRYPTO_IN_SWIFTPM_FORCE_BUILD_API) || CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-typealias NISTCurvePublicKeyImpl = CoreCryptoNISTCurvePublicKeyImpl
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-typealias NISTCurvePrivateKeyImpl = CoreCryptoNISTCurvePrivateKeyImpl
-#else
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-typealias NISTCurvePublicKeyImpl = OpenSSLNISTCurvePublicKeyImpl
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-typealias NISTCurvePrivateKeyImpl = OpenSSLNISTCurvePrivateKeyImpl
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
 #endif
 
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-public import SwiftSystem
+
+#if canImport(CryptoKit)
+@_exported import CryptoKit
 #else
-#if canImport(FoundationEssentials)
-public import FoundationEssentials
-#else
-public import Foundation
-#endif
-#endif
+import CryptoBoringWrapper
+
+typealias NISTCurvePublicKeyImpl = OpenSSLNISTCurvePublicKeyImpl
+typealias NISTCurvePrivateKeyImpl = OpenSSLNISTCurvePrivateKeyImpl
+
 
 // MARK: - Generated file, do NOT edit
 // any edits of this file WILL be overwritten and thus discarded
 // see section `gyb` in `README` for details.
 
 // MARK: - P256 + Signing
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P256 {
     
     /// A mechanism used to create or verify a cryptographic signature using
     /// the NIST P-256 elliptic curve digital signature algorithm (ECDSA).
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+    @nonexhaustive
     public enum Signing: Sendable {
 
         /// A P-256 public key used to verify cryptographic signatures.
-        @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
         public struct PublicKey: NISTECPublicKey, Sendable {
             var impl: NISTCurvePublicKeyImpl<P256>
 
@@ -60,7 +50,7 @@ extension P256 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
             }
 
             /// Creates a P-256 public key for signing from a compact
@@ -70,7 +60,7 @@ extension P256 {
             ///   - compactRepresentation: A compact representation of the key
             /// as a collection of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compactRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
             }
 
             /// Creates a P-256 public key for signing from an ANSI x9.63
@@ -79,7 +69,7 @@ extension P256 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(x963Representation: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
             }
             
             /// Creates a P-256 public key for signing from a compressed representation of
@@ -89,7 +79,7 @@ extension P256 {
             ///   - compressedRepresentation: A compressed representation of the key as a collection
             /// of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compressedRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -154,7 +144,6 @@ extension P256 {
         }
 
         /// A P-256 private key used to create cryptographic signatures.
-        @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
         public struct PrivateKey: NISTECPrivateKey, Sendable {
             let impl: NISTCurvePrivateKeyImpl<P256>
 
@@ -177,7 +166,7 @@ extension P256 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(x963: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
             }
 
             /// Creates a P-256 private key for signing from a collection of bytes.
@@ -186,7 +175,7 @@ extension P256 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<Bytes: ContiguousBytes>(rawRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(data: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -267,17 +256,15 @@ extension P256 {
     }
 }
 // MARK: - P256 + KeyAgreement
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P256 {
     
     /// A mechanism used to create a shared secret between two users by
     /// performing NIST P-256 elliptic curve Diffie Hellman (ECDH) key
     /// exchange.
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+    @nonexhaustive
     public enum KeyAgreement: Sendable {
 
         /// A P-256 public key used for key agreement.
-        @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
         public struct PublicKey: NISTECPublicKey, Sendable {
             var impl: NISTCurvePublicKeyImpl<P256>
 
@@ -287,7 +274,7 @@ extension P256 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
             }
 
             /// Creates a P-256 public key for key agreement from a compact
@@ -297,7 +284,7 @@ extension P256 {
             ///   - compactRepresentation: A compact representation of the key
             /// as a collection of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compactRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
             }
 
             /// Creates a P-256 public key for key agreement from an ANSI x9.63
@@ -306,7 +293,7 @@ extension P256 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(x963Representation: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
             }
             
             /// Creates a P-256 public key for key agreement from a compressed representation of
@@ -316,7 +303,7 @@ extension P256 {
             ///   - compressedRepresentation: A compressed representation of the key as a collection
             /// of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compressedRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -381,7 +368,6 @@ extension P256 {
         }
 
         /// A P-256 private key used for key agreement.
-        @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
         public struct PrivateKey: NISTECPrivateKey, Sendable {
             let impl: NISTCurvePrivateKeyImpl<P256>
 
@@ -404,7 +390,7 @@ extension P256 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(x963: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
             }
 
             /// Creates a P-256 private key for key agreement from a collection of bytes.
@@ -413,7 +399,7 @@ extension P256 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<Bytes: ContiguousBytes>(rawRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(data: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -494,16 +480,14 @@ extension P256 {
     }
 }
 // MARK: - P384 + Signing
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P384 {
     
     /// A mechanism used to create or verify a cryptographic signature using
     /// the NIST P-384 elliptic curve digital signature algorithm (ECDSA).
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+    @nonexhaustive
     public enum Signing: Sendable {
 
         /// A P-384 public key used to verify cryptographic signatures.
-        @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
         public struct PublicKey: NISTECPublicKey, Sendable {
             var impl: NISTCurvePublicKeyImpl<P384>
 
@@ -513,7 +497,7 @@ extension P384 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
             }
 
             /// Creates a P-384 public key for signing from a compact
@@ -523,7 +507,7 @@ extension P384 {
             ///   - compactRepresentation: A compact representation of the key
             /// as a collection of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compactRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
             }
 
             /// Creates a P-384 public key for signing from an ANSI x9.63
@@ -532,7 +516,7 @@ extension P384 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(x963Representation: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
             }
             
             /// Creates a P-384 public key for signing from a compressed representation of
@@ -542,7 +526,7 @@ extension P384 {
             ///   - compressedRepresentation: A compressed representation of the key as a collection
             /// of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compressedRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -607,7 +591,6 @@ extension P384 {
         }
 
         /// A P-384 private key used to create cryptographic signatures.
-        @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
         public struct PrivateKey: NISTECPrivateKey, Sendable {
             let impl: NISTCurvePrivateKeyImpl<P384>
 
@@ -630,7 +613,7 @@ extension P384 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(x963: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
             }
 
             /// Creates a P-384 private key for signing from a collection of bytes.
@@ -639,7 +622,7 @@ extension P384 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<Bytes: ContiguousBytes>(rawRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(data: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -720,17 +703,15 @@ extension P384 {
     }
 }
 // MARK: - P384 + KeyAgreement
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P384 {
     
     /// A mechanism used to create a shared secret between two users by
     /// performing NIST P-384 elliptic curve Diffie Hellman (ECDH) key
     /// exchange.
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+    @nonexhaustive
     public enum KeyAgreement: Sendable {
 
         /// A P-384 public key used for key agreement.
-        @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
         public struct PublicKey: NISTECPublicKey, Sendable {
             var impl: NISTCurvePublicKeyImpl<P384>
 
@@ -740,7 +721,7 @@ extension P384 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
             }
 
             /// Creates a P-384 public key for key agreement from a compact
@@ -750,7 +731,7 @@ extension P384 {
             ///   - compactRepresentation: A compact representation of the key
             /// as a collection of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compactRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
             }
 
             /// Creates a P-384 public key for key agreement from an ANSI x9.63
@@ -759,7 +740,7 @@ extension P384 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(x963Representation: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
             }
             
             /// Creates a P-384 public key for key agreement from a compressed representation of
@@ -769,7 +750,7 @@ extension P384 {
             ///   - compressedRepresentation: A compressed representation of the key as a collection
             /// of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compressedRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -834,7 +815,6 @@ extension P384 {
         }
 
         /// A P-384 private key used for key agreement.
-        @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
         public struct PrivateKey: NISTECPrivateKey, Sendable {
             let impl: NISTCurvePrivateKeyImpl<P384>
 
@@ -857,7 +837,7 @@ extension P384 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(x963: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
             }
 
             /// Creates a P-384 private key for key agreement from a collection of bytes.
@@ -866,7 +846,7 @@ extension P384 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<Bytes: ContiguousBytes>(rawRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(data: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -947,16 +927,14 @@ extension P384 {
     }
 }
 // MARK: - P521 + Signing
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P521 {
     
     /// A mechanism used to create or verify a cryptographic signature using
     /// the NIST P-521 elliptic curve digital signature algorithm (ECDSA).
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+    @nonexhaustive
     public enum Signing: Sendable {
 
         /// A P-521 public key used to verify cryptographic signatures.
-        @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
         public struct PublicKey: NISTECPublicKey, Sendable {
             var impl: NISTCurvePublicKeyImpl<P521>
 
@@ -966,7 +944,7 @@ extension P521 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
             }
 
             /// Creates a P-521 public key for signing from a compact
@@ -976,7 +954,7 @@ extension P521 {
             ///   - compactRepresentation: A compact representation of the key
             /// as a collection of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compactRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
             }
 
             /// Creates a P-521 public key for signing from an ANSI x9.63
@@ -985,7 +963,7 @@ extension P521 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(x963Representation: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
             }
             
             /// Creates a P-521 public key for signing from a compressed representation of
@@ -995,7 +973,7 @@ extension P521 {
             ///   - compressedRepresentation: A compressed representation of the key as a collection
             /// of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compressedRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -1060,7 +1038,6 @@ extension P521 {
         }
 
         /// A P-521 private key used to create cryptographic signatures.
-        @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
         public struct PrivateKey: NISTECPrivateKey, Sendable {
             let impl: NISTCurvePrivateKeyImpl<P521>
 
@@ -1083,7 +1060,7 @@ extension P521 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(x963: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
             }
 
             /// Creates a P-521 private key for signing from a collection of bytes.
@@ -1092,7 +1069,7 @@ extension P521 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<Bytes: ContiguousBytes>(rawRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(data: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -1173,17 +1150,15 @@ extension P521 {
     }
 }
 // MARK: - P521 + KeyAgreement
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P521 {
     
     /// A mechanism used to create a shared secret between two users by
     /// performing NIST P-521 elliptic curve Diffie Hellman (ECDH) key
     /// exchange.
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+    @nonexhaustive
     public enum KeyAgreement: Sendable {
 
         /// A P-521 public key used for key agreement.
-        @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
         public struct PublicKey: NISTECPublicKey, Sendable {
             var impl: NISTCurvePublicKeyImpl<P521>
 
@@ -1193,7 +1168,7 @@ extension P521 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
             }
 
             /// Creates a P-521 public key for key agreement from a compact
@@ -1203,7 +1178,7 @@ extension P521 {
             ///   - compactRepresentation: A compact representation of the key
             /// as a collection of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compactRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
             }
 
             /// Creates a P-521 public key for key agreement from an ANSI x9.63
@@ -1212,7 +1187,7 @@ extension P521 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(x963Representation: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
             }
             
             /// Creates a P-521 public key for key agreement from a compressed representation of
@@ -1222,7 +1197,7 @@ extension P521 {
             ///   - compressedRepresentation: A compressed representation of the key as a collection
             /// of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compressedRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -1287,7 +1262,6 @@ extension P521 {
         }
 
         /// A P-521 private key used for key agreement.
-        @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
         public struct PrivateKey: NISTECPrivateKey, Sendable {
             let impl: NISTCurvePrivateKeyImpl<P521>
 
@@ -1310,7 +1284,7 @@ extension P521 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(x963: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
             }
 
             /// Creates a P-521 private key for key agreement from a collection of bytes.
@@ -1319,7 +1293,7 @@ extension P521 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<Bytes: ContiguousBytes>(rawRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(data: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -1401,7 +1375,6 @@ extension P521 {
 }
 
 // MARK: - P256 + DH
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P256.KeyAgreement.PrivateKey: DiffieHellmanKeyAgreement {
     /// Computes a shared secret with the provided public key from another party.
     ///
@@ -1410,15 +1383,10 @@ extension P256.KeyAgreement.PrivateKey: DiffieHellmanKeyAgreement {
     /// key from this user to create the shared secret.
     /// - Returns: The computed shared secret.
     public func sharedSecretFromKeyAgreement(with publicKeyShare: P256.KeyAgreement.PublicKey) throws(CryptoKitMetaError) -> SharedSecret {
-        #if (!CRYPTO_IN_SWIFTPM_FORCE_BUILD_API) || CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-        return try self.coreCryptoSharedSecretFromKeyAgreement(with: publicKeyShare)
-        #else
-        return try self.openSSLSharedSecretFromKeyAgreement(with: publicKeyShare)
-        #endif
+        return try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try self.openSSLSharedSecretFromKeyAgreement(with: publicKeyShare) }
     }
 }
 // MARK: - P384 + DH
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P384.KeyAgreement.PrivateKey: DiffieHellmanKeyAgreement {
     /// Computes a shared secret with the provided public key from another party.
     ///
@@ -1427,15 +1395,10 @@ extension P384.KeyAgreement.PrivateKey: DiffieHellmanKeyAgreement {
     /// key from this user to create the shared secret.
     /// - Returns: The computed shared secret.
     public func sharedSecretFromKeyAgreement(with publicKeyShare: P384.KeyAgreement.PublicKey) throws(CryptoKitMetaError) -> SharedSecret {
-        #if (!CRYPTO_IN_SWIFTPM_FORCE_BUILD_API) || CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-        return try self.coreCryptoSharedSecretFromKeyAgreement(with: publicKeyShare)
-        #else
-        return try self.openSSLSharedSecretFromKeyAgreement(with: publicKeyShare)
-        #endif
+        return try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try self.openSSLSharedSecretFromKeyAgreement(with: publicKeyShare) }
     }
 }
 // MARK: - P521 + DH
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P521.KeyAgreement.PrivateKey: DiffieHellmanKeyAgreement {
     /// Computes a shared secret with the provided public key from another party.
     ///
@@ -1444,11 +1407,7 @@ extension P521.KeyAgreement.PrivateKey: DiffieHellmanKeyAgreement {
     /// key from this user to create the shared secret.
     /// - Returns: The computed shared secret.
     public func sharedSecretFromKeyAgreement(with publicKeyShare: P521.KeyAgreement.PublicKey) throws(CryptoKitMetaError) -> SharedSecret {
-        #if (!CRYPTO_IN_SWIFTPM_FORCE_BUILD_API) || CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-        return try self.coreCryptoSharedSecretFromKeyAgreement(with: publicKeyShare)
-        #else
-        return try self.openSSLSharedSecretFromKeyAgreement(with: publicKeyShare)
-        #endif
+        return try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try self.openSSLSharedSecretFromKeyAgreement(with: publicKeyShare) }
     }
 }
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

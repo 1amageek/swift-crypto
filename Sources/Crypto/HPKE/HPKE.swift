@@ -11,18 +11,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-import SwiftSystem
-#else
-#if canImport(FoundationEssentials)
-public import FoundationEssentials
-#else
-public import Foundation
-#endif
-#endif
 
 /// A container for hybrid public key encryption (HPKE) operations.
 ///
@@ -53,10 +52,9 @@ public import Foundation
 ///
 /// ### Handling errors
 ///  - ``Errors``
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+@nonexhaustive
 public enum HPKE: Sendable {}
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension HPKE {
     /// Static constant used to store the fixed-string label for the HPKE export API
     /// See: https://datatracker.ietf.org/doc/html/rfc9180#name-secret-export
@@ -70,7 +68,6 @@ extension HPKE {
     /// in turn to retrieve its ciphertext. The recipient of the messages needs to process them in the
     /// same order as the `Sender`, using the same encryption mode, cipher suite, and key schedule information
     ///  (`info`), as well as the `Sender`'s ``encapsulatedKey``.
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     public struct Sender: Sendable {
         private var context: Context
         /// The encapsulated symmetric key that the recipient uses to decrypt messages.
@@ -86,7 +83,7 @@ extension HPKE {
         ///   - context: Application-specific information providing context on the use of this key.
         ///   - outputByteCount: The desired length of the exported secret.
         /// - Returns: The exported secret.
-        public func exportSecret<Context: DataProtocol>(context: Context, outputByteCount: Int) throws -> SymmetricKey {
+        public func exportSecret<Context: DataProtocol>(context: Context, outputByteCount: Int) throws(CryptoKitMetaError) -> SymmetricKey {
             precondition(outputByteCount > 0);
             return LabeledExpand(prk: self.exporterSecret,
                                  label: exportLabel,
@@ -108,7 +105,7 @@ extension HPKE {
         ///   - ciphersuite: The cipher suite that defines the cryptographic algorithms to use.
         ///   - info: Data that the key derivation function uses to compute the symmetric key material. The sender and the recipient need to use the same `info` data.
         /// - Note: The system throws errors from ``CryptoKit/HPKE/Errors`` when it encounters them.
-        public init<PK: HPKEDiffieHellmanPublicKey>(recipientKey: PK, ciphersuite: Ciphersuite, info: Data) throws {
+        public init<PK: HPKEDiffieHellmanPublicKey>(recipientKey: PK, ciphersuite: Ciphersuite, info: Data) throws(CryptoKitMetaError) {
             self.context = try Context(senderRoleWithCiphersuite: ciphersuite, mode: .base, psk: nil, pskID: nil, pkR: recipientKey, info: info)
             self.encapsulatedKey = context.encapsulated
         }
@@ -125,7 +122,7 @@ extension HPKE {
         ///   - ciphersuite: The cipher suite that defines the cryptographic algorithms to use.
         ///   - info: Data that the key derivation function uses to compute the symmetric key material. The sender and the recipient need to use the same `info` data.
         /// - Note: The system throws errors from ``CryptoKit/HPKE/Errors`` when it encounters them.
-        public init<PK: HPKEKEMPublicKey>(recipientKey: PK, ciphersuite: Ciphersuite, info: Data) throws {
+        public init<PK: HPKEKEMPublicKey>(recipientKey: PK, ciphersuite: Ciphersuite, info: Data) throws(CryptoKitMetaError) {
             self.context = try Context(senderRoleWithCiphersuite: ciphersuite, mode: .base, psk: nil, pskID: nil, pkR: recipientKey, info: info)
             self.encapsulatedKey = context.encapsulated
         }
@@ -144,7 +141,7 @@ extension HPKE {
         ///   - psk: A preshared key (PSK) that the sender and the recipient both hold.
         ///   - pskID: An identifier for the PSK.
         /// - Note: The system throws errors from ``CryptoKit/HPKE/Errors`` when it encounters them.
-        public init<PK: HPKEDiffieHellmanPublicKey>(recipientKey: PK, ciphersuite: Ciphersuite, info: Data, presharedKey psk: SymmetricKey, presharedKeyIdentifier pskID: Data) throws {
+        public init<PK: HPKEDiffieHellmanPublicKey>(recipientKey: PK, ciphersuite: Ciphersuite, info: Data, presharedKey psk: SymmetricKey, presharedKeyIdentifier pskID: Data) throws(CryptoKitMetaError) {
             self.context = try Context(senderRoleWithCiphersuite: ciphersuite, mode: .psk, psk: psk, pskID: pskID, pkR: recipientKey, info: info)
             self.encapsulatedKey = context.encapsulated
         }
@@ -160,7 +157,7 @@ extension HPKE {
         ///   - info: Data that the key derivation function uses to compute the symmetric key material. The sender and the recipient need to use the same `info` data.
         ///   - authenticationKey: The sender's private key for generating the HMAC.
         /// - Note: The system throws errors from ``CryptoKit/HPKE/Errors`` when it encounters them.
-        public init<SK: HPKEDiffieHellmanPrivateKey>(recipientKey: SK.PublicKey, ciphersuite: Ciphersuite, info: Data, authenticatedBy authenticationKey: SK) throws {
+        public init<SK: HPKEDiffieHellmanPrivateKey>(recipientKey: SK.PublicKey, ciphersuite: Ciphersuite, info: Data, authenticatedBy authenticationKey: SK) throws(CryptoKitMetaError) {
             self.context = try Context(senderRoleWithCiphersuite: ciphersuite, mode: .auth, psk: nil, pskID: nil, pkR: recipientKey, info: info, skS: authenticationKey)
             self.encapsulatedKey = context.encapsulated
         }
@@ -180,7 +177,7 @@ extension HPKE {
         ///   - psk: A preshared key (PSK) that the sender and the recipient both hold.
         ///   - pskID: An identifier for the PSK.
         /// - Note: The system throws errors from ``CryptoKit/HPKE/Errors`` when it encounters them.
-        public init<SK: HPKEDiffieHellmanPrivateKey>(recipientKey: SK.PublicKey, ciphersuite: Ciphersuite, info: Data, authenticatedBy authenticationKey: SK, presharedKey psk: SymmetricKey, presharedKeyIdentifier pskID: Data) throws {
+        public init<SK: HPKEDiffieHellmanPrivateKey>(recipientKey: SK.PublicKey, ciphersuite: Ciphersuite, info: Data, authenticatedBy authenticationKey: SK, presharedKey psk: SymmetricKey, presharedKeyIdentifier pskID: Data) throws(CryptoKitMetaError) {
             self.context = try Context(senderRoleWithCiphersuite: ciphersuite, mode: .auth_psk, psk: psk, pskID: pskID, pkR: recipientKey, info: info, skS: authenticationKey)
             self.encapsulatedKey = context.encapsulated
         }
@@ -196,7 +193,7 @@ extension HPKE {
         ///   - aad: Additional data that the `Sender` authenticates and adds to the message in cleartext.
         /// - Note: The system throws errors from ``CryptoKit/HPKE/Errors`` when it encounters them.
         /// - Returns: The ciphertext for the recipient to decrypt.
-        public mutating func seal<M: DataProtocol, AD: DataProtocol>(_ msg: M, authenticating aad: AD) throws -> Data {
+        public mutating func seal<M: DataProtocol, AD: DataProtocol>(_ msg: M, authenticating aad: AD) throws(CryptoKitMetaError) -> Data {
             return try context.keySchedule.seal(msg, authenticating: aad)
         }
         
@@ -210,7 +207,7 @@ extension HPKE {
         ///   - msg: The cleartext message to encrypt.
         /// - Note: The system throws errors from ``CryptoKit/HPKE/Errors`` when it encounters them.
         /// - Returns: The ciphertext for the recipient to decrypt.
-        public mutating func seal<M: DataProtocol>(_ msg: M) throws -> Data {
+        public mutating func seal<M: DataProtocol>(_ msg: M) throws(CryptoKitMetaError) -> Data {
             return try context.keySchedule.seal(msg, authenticating: Data())
         }
     }
@@ -225,7 +222,6 @@ extension HPKE {
     /// same order as the `Sender`, using the same cipher suite, encryption mode, and key schedule information
     /// (`info` data).
     /// Use a separate `Recipient` instance for each stream of messages.
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     public struct Recipient: Sendable {
         
         private var context: Context
@@ -240,7 +236,7 @@ extension HPKE {
         ///   - context: Application-specific information providing context on the use of this key.
         ///   - outputByteCount: The desired length of the exported secret.
         /// - Returns: The exported secret.
-        public func exportSecret<Context: DataProtocol>(context: Context, outputByteCount: Int) throws -> SymmetricKey {
+        public func exportSecret<Context: DataProtocol>(context: Context, outputByteCount: Int) throws(CryptoKitMetaError) -> SymmetricKey {
             precondition(outputByteCount > 0);
             return LabeledExpand(prk: self.exporterSecret,
                                  label: exportLabel,
@@ -260,7 +256,7 @@ extension HPKE {
         ///   - info: Data that the key derivation function uses to compute the symmetric key material. The sender and the recipient need to use the same `info` data.
         ///   - encapsulatedKey: The encapsulated symmetric key that the sender provides.
         /// - Note: The system throws errors from ``CryptoKit/HPKE/Errors`` when it encounters them.
-        public init<SK: HPKEDiffieHellmanPrivateKey>(privateKey: SK, ciphersuite: Ciphersuite, info: Data, encapsulatedKey: Data) throws {
+        public init<SK: HPKEDiffieHellmanPrivateKey>(privateKey: SK, ciphersuite: Ciphersuite, info: Data, encapsulatedKey: Data) throws(CryptoKitMetaError) {
             self.context = try Context(recipientRoleWithCiphersuite: ciphersuite, mode: .base, enc: encapsulatedKey, psk: nil, pskID: nil, skR: privateKey, info: info, pkS: nil)
         }
 
@@ -274,7 +270,7 @@ extension HPKE {
         ///   - info: Data that the key derivation function uses to compute the symmetric key material. The sender and the recipient need to use the same `info` data.
         ///   - encapsulatedKey: The encapsulated symmetric key that the sender provides.
         /// - Note: The system throws errors from ``CryptoKit/HPKE/Errors`` when it encounters them.
-        public init<SK: HPKEKEMPrivateKey>(privateKey: SK, ciphersuite: Ciphersuite, info: Data, encapsulatedKey: Data) throws {
+        public init<SK: HPKEKEMPrivateKey>(privateKey: SK, ciphersuite: Ciphersuite, info: Data, encapsulatedKey: Data) throws(CryptoKitMetaError) {
             self.context = try Context(recipientRoleWithCiphersuite: ciphersuite, mode: .base, enc: encapsulatedKey, psk: nil, pskID: nil, skR: privateKey, info: info, pkS: nil)
         }
 
@@ -291,7 +287,7 @@ extension HPKE {
         ///   - psk: A preshared key (PSK) that the sender and the recipient both hold.
         ///   - pskID: An identifier for the PSK.
         /// - Note: The system throws errors from ``CryptoKit/HPKE/Errors`` when it encounters them.
-        public init<SK: HPKEDiffieHellmanPrivateKey>(privateKey: SK, ciphersuite: Ciphersuite, info: Data, encapsulatedKey: Data, presharedKey psk: SymmetricKey, presharedKeyIdentifier pskID: Data) throws {
+        public init<SK: HPKEDiffieHellmanPrivateKey>(privateKey: SK, ciphersuite: Ciphersuite, info: Data, encapsulatedKey: Data, presharedKey psk: SymmetricKey, presharedKeyIdentifier pskID: Data) throws(CryptoKitMetaError) {
             self.context = try Context(recipientRoleWithCiphersuite: ciphersuite, mode: .psk, enc: encapsulatedKey, psk: psk, pskID: pskID, skR: privateKey, info: info, pkS: nil)
         }
         
@@ -307,7 +303,7 @@ extension HPKE {
         ///   - encapsulatedKey: The encapsulated symmetric key that the sender provides.
         ///   - authenticationKey: The sender's public key for authenticating the messages.
         /// - Note: The system throws errors from ``CryptoKit/HPKE/Errors`` when it encounters them.
-        public init<SK: HPKEDiffieHellmanPrivateKey>(privateKey: SK, ciphersuite: Ciphersuite, info: Data, encapsulatedKey: Data, authenticatedBy authenticationKey: SK.PublicKey) throws {
+        public init<SK: HPKEDiffieHellmanPrivateKey>(privateKey: SK, ciphersuite: Ciphersuite, info: Data, encapsulatedKey: Data, authenticatedBy authenticationKey: SK.PublicKey) throws(CryptoKitMetaError) {
             self.context = try Context(recipientRoleWithCiphersuite: ciphersuite, mode: .auth, enc: encapsulatedKey, psk: nil, pskID: nil, skR: privateKey, info: info, pkS: authenticationKey)
         }
         
@@ -327,7 +323,7 @@ extension HPKE {
         ///   - psk: A preshared key (PSK) that the sender and the recipient both hold.
         ///   - pskID: An identifier for the PSK.
         /// - Note: The system throws errors from ``CryptoKit/HPKE/Errors`` when it encounters them.
-        public init<SK: HPKEDiffieHellmanPrivateKey>(privateKey: SK, ciphersuite: Ciphersuite, info: Data, encapsulatedKey: Data, authenticatedBy  authenticationKey: SK.PublicKey, presharedKey psk: SymmetricKey, presharedKeyIdentifier pskID: Data) throws {
+        public init<SK: HPKEDiffieHellmanPrivateKey>(privateKey: SK, ciphersuite: Ciphersuite, info: Data, encapsulatedKey: Data, authenticatedBy  authenticationKey: SK.PublicKey, presharedKey psk: SymmetricKey, presharedKeyIdentifier pskID: Data) throws(CryptoKitMetaError) {
             self.context = try Context(recipientRoleWithCiphersuite: ciphersuite, mode: .auth_psk, enc: encapsulatedKey, psk: psk, pskID: pskID, skR: privateKey, info: info, pkS: authenticationKey)
         }
         
@@ -344,7 +340,7 @@ extension HPKE {
         ///   - aad: Additional cleartext data to authenticate.
         /// - Note: The system throws errors from ``CryptoKit/HPKE/Errors`` when it encounters them.
         /// - Returns: The resulting cleartext message if the message is authentic.
-        public mutating func open<C: DataProtocol, AD: DataProtocol>(_ ciphertext: C, authenticating aad: AD) throws -> Data {
+        public mutating func open<C: DataProtocol, AD: DataProtocol>(_ ciphertext: C, authenticating aad: AD) throws(CryptoKitMetaError) -> Data {
             return try context.keySchedule.open(ciphertext, authenticating: aad)
         }
         
@@ -358,10 +354,10 @@ extension HPKE {
         ///   - ciphertext: The ciphertext message to decrypt.
         /// - Note: The system throws errors from ``CryptoKit/HPKE/Errors`` when it encounters them.
         /// - Returns: The resulting cleartext message if the message is authentic.
-        public mutating func open<C: DataProtocol>(_ ciphertext: C) throws -> Data {
+        public mutating func open<C: DataProtocol>(_ ciphertext: C) throws(CryptoKitMetaError) -> Data {
             return try context.keySchedule.open(ciphertext, authenticating: Data())
         }
     }
 }
 
-#endif // Linux or !SwiftPM
+#endif // canImport(CryptoKit)

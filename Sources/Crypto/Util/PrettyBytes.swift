@@ -11,34 +11,26 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-import SwiftSystem
-#else
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
-#endif
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 enum ByteHexEncodingErrors: Error {
     case incorrectHexValue
     case incorrectString
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 let charA = UInt8(97 /* "a" */)
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 let char0 = UInt8(48 /* "0" */)
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 private func itoh(_ value: UInt8) -> UInt8 {
     return (value > 9) ? (charA + value - 10) : (char0 + value)
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-private func htoi(_ value: UInt8) throws -> UInt8 {
+private func htoi(_ value: UInt8) throws(ByteHexEncodingErrors) -> UInt8 {
     switch value {
     case char0...char0 + 9:
         return value - char0
@@ -50,7 +42,6 @@ private func htoi(_ value: UInt8) throws -> UInt8 {
 }
 
 #if !hasFeature(Embedded)
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension DataProtocol {
     var hexString: String {
         let hexLen = self.count * 2
@@ -70,52 +61,49 @@ extension DataProtocol {
 }
 #endif // !hasFeature(Embedded)
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension RangeReplaceableCollection where Element == UInt8 {
     mutating func appendByte(_ byte: UInt64) {
         withUnsafeBytes(of: byte.littleEndian, { self.append(contentsOf: $0) })
     }
 }
 
-#if !CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+#if canImport(FoundationEssentials) || canImport(Foundation)
 extension Data {
-    init(hexString: String) throws {
+    init(hexString: String) throws(ByteHexEncodingErrors) {
         self.init()
 
         if hexString.count % 2 != 0 || hexString.count == 0 {
             throw ByteHexEncodingErrors.incorrectString
         }
 
-        let stringBytes: [UInt8] = Array(hexString.lowercased().data(using: String.Encoding.utf8)!)
+        let stringBytes: [UInt8] = Array(hexString.lowercased().utf8)
 
         for i in stride(from: stringBytes.startIndex, to: stringBytes.endIndex - 1, by: 2) {
             let char1 = stringBytes[i]
             let char2 = stringBytes[i + 1]
 
-            try self.append(htoi(char1) << 4 + htoi(char2))
+            try self.append((htoi(char1) << 4) + htoi(char2))
         }
     }
 }
+#endif
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension Array where Element == UInt8 {
-    init(hexString: String) throws {
+    init(hexString: String) throws(ByteHexEncodingErrors) {
         self.init()
         
         guard hexString.count.isMultiple(of: 2), !hexString.isEmpty else {
             throw ByteHexEncodingErrors.incorrectString
         }
 
-        let stringBytes: [UInt8] = Array(hexString.data(using: String.Encoding.utf8)!)
+        let stringBytes: [UInt8] = Array(hexString.lowercased().utf8)
 
         for i in stride(from: stringBytes.startIndex, to: stringBytes.endIndex - 1, by: 2) {
             let char1 = stringBytes[i]
             let char2 = stringBytes[i + 1]
 
-            try self.append(htoi(char1) << 4 + htoi(char2))
+            try self.append((htoi(char1) << 4) + htoi(char2))
         }
     }
 
 }
-#endif

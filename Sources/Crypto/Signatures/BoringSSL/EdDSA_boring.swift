@@ -11,15 +11,25 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-@_exported import CryptoKit
-#else
-@_implementationOnly import CCryptoBoringSSL
-@_implementationOnly import CCryptoBoringSSLShims
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
+#endif
+
+#if canImport(CryptoKit)
+@_exported import CryptoKit
+#else
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
+#else
+@_implementationOnly import CCryptoBoringSSL
+#endif
+#if hasFeature(Embedded)
+import CCryptoBoringSSLShims
+#else
+@_implementationOnly import CCryptoBoringSSLShims
 #endif
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
@@ -104,7 +114,7 @@ extension Curve25519.Signing.PublicKey {
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension Curve25519.Signing.PrivateKey {
     @inlinable
-    func openSSLSignature<D: DataProtocol>(for data: D) throws -> Data {
+    func openSSLSignature<D: DataProtocol>(for data: D) throws(CryptoKitError) -> Data {
         if data.regions.count == 1 {
             return try self.openSSLSignature(forContiguousData: data.regions.first!)
         } else {
@@ -113,14 +123,27 @@ extension Curve25519.Signing.PrivateKey {
     }
 
     @inlinable
-    func openSSLSignature<C: ContiguousBytes>(forContiguousData data: C) throws -> Data {
-        try data.withUnsafeBytes {
-            try self.openSSLSignature(forDataPointer: $0)
+    func openSSLSignature<C: ContiguousBytes>(forContiguousData data: C) throws(CryptoKitError) -> Data {
+        let result = data.withUnsafeBytes {
+            self.openSSLSignatureResult(forDataPointer: $0)
         }
+        guard result.returnCode == 1 else {
+            throw CryptoKitError.internalBoringSSLError()
+        }
+        return result.signature
     }
 
     @usableFromInline
-    func openSSLSignature(forDataPointer dataPointer: UnsafeRawBufferPointer) throws -> Data {
+    func openSSLSignature(forDataPointer dataPointer: UnsafeRawBufferPointer) throws(CryptoKitError) -> Data {
+        let result = self.openSSLSignatureResult(forDataPointer: dataPointer)
+        guard result.returnCode == 1 else {
+            throw CryptoKitError.internalBoringSSLError()
+        }
+        return result.signature
+    }
+
+    @usableFromInline
+    func openSSLSignatureResult(forDataPointer dataPointer: UnsafeRawBufferPointer) -> (signature: Data, returnCode: CInt) {
         var signature = Data(repeating: 0, count: Curve25519.Signing.PublicKey.signatureByteCount)
 
         let rc: CInt = signature.withUnsafeMutableBytes { signaturePointer in
@@ -137,11 +160,7 @@ extension Curve25519.Signing.PrivateKey {
             }
         }
 
-        if rc != 1 {
-            throw CryptoKitError.internalBoringSSLError()
-        }
-
-        return signature
+        return (signature, rc)
     }
 }
-#endif  // CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+#endif  // canImport(CryptoKit)

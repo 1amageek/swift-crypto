@@ -186,20 +186,23 @@ final class TestRSABlindSigning: XCTestCase {
             )
         }
         /// Also check that we can provide each argument as a different `ContiguousBytes` type.
-        /// NOTE: these calls use `try?` because they are guaranteed to fail; we're just checking these calls compile.
         let bytesValues: [any ContiguousBytes] = [Data(), [UInt8]()]
-        _ = try? _RSA.BlindSigning.PrivateKey(
-            n: bytesValues.randomElement()!,
-            e: bytesValues.randomElement()!,
-            d: bytesValues.randomElement()!,
-            p: bytesValues.randomElement()!,
-            q: bytesValues.randomElement()!,
-            parameters: .RSABSSA_SHA384_PSS_Randomized
+        XCTAssertThrowsError(
+            try _RSA.BlindSigning.PrivateKey(
+                n: bytesValues.randomElement()!,
+                e: bytesValues.randomElement()!,
+                d: bytesValues.randomElement()!,
+                p: bytesValues.randomElement()!,
+                q: bytesValues.randomElement()!,
+                parameters: .RSABSSA_SHA384_PSS_Randomized
+            )
         )
-        _ = try? _RSA.BlindSigning.PublicKey(
-            n: bytesValues.randomElement()!,
-            e: bytesValues.randomElement()!,
-            parameters: .RSABSSA_SHA384_PSS_Randomized
+        XCTAssertThrowsError(
+            try _RSA.BlindSigning.PublicKey(
+                n: bytesValues.randomElement()!,
+                e: bytesValues.randomElement()!,
+                parameters: .RSABSSA_SHA384_PSS_Randomized
+            )
         )
     }
 

@@ -11,22 +11,18 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
+#if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if CRYPTOKIT_NO_ACCESS_TO_FOUNDATION
-import SwiftSystem
-#else
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
-#endif
-
-
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 protocol AEADSealedBox: Sendable {
     associatedtype Nonce: Sequence
     /// The authentication tag
@@ -42,11 +38,10 @@ protocol AEADSealedBox: Sendable {
     ///   - nonce: The nonce.
     ///   - tag: The authentication tag
     ///   - ciphertext: The ciphertext
-    init<C: DataProtocol, T: DataProtocol>(nonce: Nonce, ciphertext: C, tag: T) throws
+    init<C: DataProtocol, T: DataProtocol>(nonce: Nonce, ciphertext: C, tag: T) throws(CryptoKitMetaError)
 }
 
 /// A type representing authenticated encryption with associated data.
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 protocol Cipher {
     associatedtype Key
     associatedtype SealedBox: AEADSealedBox

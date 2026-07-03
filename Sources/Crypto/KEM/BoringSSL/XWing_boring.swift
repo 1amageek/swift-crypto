@@ -12,14 +12,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-@_exported import CryptoKit
-#else
-@_implementationOnly import CCryptoBoringSSL
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
+#endif
+
+
+#if canImport(CryptoKit)
+@_exported import CryptoKit
+#else
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
+#else
+@_implementationOnly import CCryptoBoringSSL
 #endif
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
@@ -30,32 +36,29 @@ struct OpenSSLXWingPublicKeyImpl: Sendable {
         self.publicKeyBytes = publicKeyBytes
     }
 
-    init<D: ContiguousBytes>(rawRepresentation: D) throws {
-        self.publicKeyBytes = try rawRepresentation.withUnsafeBytes {
-            guard $0.count == XWING_PUBLIC_KEY_BYTES else {
-                throw CryptoKitError.incorrectKeySize
-            }
-            return Data($0)
+    init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
+        let rawRepresentation = cryptoData(rawRepresentation)
+        guard rawRepresentation.count == XWING_PUBLIC_KEY_BYTES else {
+            throw error(CryptoKitError.incorrectKeySize)
         }
+        self.publicKeyBytes = rawRepresentation
     }
 
     var rawRepresentation: Data {
         self.publicKeyBytes
     }
 
-    func encapsulate() throws -> KEM.EncapsulationResult {
+    func encapsulate() throws(CryptoKitMetaError) -> KEM.EncapsulationResult {
         try self.encapsulateWithOptionalEntropy(entropy: nil)
     }
 
-    func encapsulateWithOptionalEntropy(entropy: [UInt8]?) throws -> KEM.EncapsulationResult {
-        let (sharedSecret, encapsulatedSecret) = try self.publicKeyBytes.withUnsafeBytes { publicKeyBuffer in
-            try withUnsafeTemporaryAllocation(byteCount: Int(XWING_CIPHERTEXT_BYTES), alignment: 1) {
+    func encapsulateWithOptionalEntropy(entropy: [UInt8]?) throws(CryptoKitMetaError) -> KEM.EncapsulationResult {
+        let (sharedSecretData, encapsulatedSecret, rc): (Data, Data, CInt) = self.publicKeyBytes.withUnsafeBytes { publicKeyBuffer in
+            withUnsafeTemporaryAllocation(byteCount: Int(XWING_CIPHERTEXT_BYTES), alignment: 1) {
                 ciphertextBuffer in
-                let sharedSecret = try SymmetricKey(unsafeUninitializedCapacity: Int(XWING_SHARED_SECRET_BYTES)) {
-                    sharedSecretBuffer,
-                    count in
+                withUnsafeTemporaryAllocation(byteCount: Int(XWING_SHARED_SECRET_BYTES), alignment: 1) {
+                    sharedSecretBuffer in
                     let rc: CInt
-
                     if let entropy {
                         rc = CCryptoBoringSSL_XWING_encap_external_entropy(
                             ciphertextBuffer.baseAddress,
@@ -70,17 +73,15 @@ struct OpenSSLXWingPublicKeyImpl: Sendable {
                             publicKeyBuffer.baseAddress
                         )
                     }
-                    guard rc == 1 else {
-                        throw CryptoKitError.internalBoringSSLError()
-                    }
-                    count = Int(XWING_SHARED_SECRET_BYTES)
+                    return (Data(sharedSecretBuffer), Data(ciphertextBuffer), rc)
                 }
-                let encapsulatedSecret = Data(ciphertextBuffer)
-                return (sharedSecret, encapsulatedSecret)
             }
         }
+        guard rc == 1 else {
+            throw error(CryptoKitError.internalBoringSSLError())
+        }
 
-        return .init(sharedSecret: sharedSecret, encapsulated: encapsulatedSecret)
+        return .init(sharedSecret: SymmetricKey(data: sharedSecretData), encapsulated: encapsulatedSecret)
     }
 }
 
@@ -96,12 +97,12 @@ struct OpenSSLXWingPrivateKeyImpl: Sendable {
         self.backing.integrityCheckedRepresentation
     }
 
-    init<D: ContiguousBytes>(bytes: D) throws {
-        self.backing = try .init(bytes: bytes)
+    init<D: ContiguousBytes>(bytes: D) throws(CryptoKitMetaError) {
+        self.backing = try .init(bytes: cryptoData(bytes))
     }
 
-    init<D: DataProtocol>(seedRepresentation: D, publicKeyHash: SHA3_256Digest?) throws {
-        self.backing = try .init(seedRepresentation: seedRepresentation, publicKeyHash: publicKeyHash)
+    init<D: DataProtocol>(seedRepresentation: D, publicKeyHash: SHA3_256Digest?) throws(CryptoKitMetaError) {
+        self.backing = try .init(seedRepresentation: Data(seedRepresentation), publicKeyHash: publicKeyHash)
     }
 
     private init(_ backing: Backing) {
@@ -112,11 +113,11 @@ struct OpenSSLXWingPrivateKeyImpl: Sendable {
         self.backing.dataRepresentation
     }
 
-    static func generate() throws -> Self {
+    static func generate() throws(CryptoKitMetaError) -> Self {
         try Self(.generate())
     }
 
-    func decapsulate(_ encapsulated: Data) throws -> SymmetricKey {
+    func decapsulate(_ encapsulated: Data) throws(CryptoKitMetaError) -> SymmetricKey {
         try self.backing.decapsulate(encapsulated)
     }
 
@@ -127,6 +128,7 @@ struct OpenSSLXWingPrivateKeyImpl: Sendable {
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension OpenSSLXWingPrivateKeyImpl {
+    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     final class Backing: @unchecked Sendable {
         private var privateKey: XWING_private_key
 
@@ -134,23 +136,24 @@ extension OpenSSLXWingPrivateKeyImpl {
             self.privateKey = privateKey
         }
 
-        init() throws {
+        init() throws(CryptoKitMetaError) {
             self.privateKey = .init()
-            try withUnsafeTemporaryAllocation(byteCount: Int(XWING_PUBLIC_KEY_BYTES), alignment: 1) {
+            let rc = withUnsafeTemporaryAllocation(byteCount: Int(XWING_PUBLIC_KEY_BYTES), alignment: 1) {
                 let rc = CCryptoBoringSSL_XWING_generate_key($0.baseAddress, &self.privateKey)
-                if rc != 1 {
-                    throw CryptoKitError.internalBoringSSLError()
-                }
+                return rc
+            }
+            if rc != 1 {
+                throw error(CryptoKitError.internalBoringSSLError())
             }
         }
 
-        init<D: ContiguousBytes>(bytes: D) throws {
+        init(bytes: Data) throws(CryptoKitMetaError) {
             self.privateKey = .init()
 
             // The first bytes are the private key (in "seed representation"), the latter bytes are the public key.
-            try bytes.withUnsafeBytes { ptr in
+            let parsed = bytes.withUnsafeBytes { ptr in
                 guard ptr.count == Int(XWING_PRIVATE_KEY_BYTES) + Int(XWING_PUBLIC_KEY_BYTES) else {
-                    throw CryptoKitError.incorrectKeySize
+                    return false
                 }
                 let privateKeyBytes = UnsafeRawBufferPointer(rebasing: ptr.prefix(Int(XWING_PRIVATE_KEY_BYTES)))
                 let publicKeyBytes = UnsafeRawBufferPointer(rebasing: ptr.suffix(Int(XWING_PUBLIC_KEY_BYTES)))
@@ -160,23 +163,23 @@ extension OpenSSLXWingPrivateKeyImpl {
 
                 let rc = CCryptoBoringSSL_XWING_parse_private_key(&self.privateKey, &cbs)
                 guard rc == 1 else {
-                    throw CryptoKitError.internalBoringSSLError()
+                    return false
                 }
 
                 // Matching CryptoKit, we only care that this _is_ a public key, not that it matches.
-                let _ = try OpenSSLXWingPublicKeyImpl(rawRepresentation: publicKeyBytes)
+                return publicKeyBytes.count == Int(XWING_PUBLIC_KEY_BYTES)
+            }
+            guard parsed else {
+                throw error(CryptoKitError.incorrectKeySize)
             }
         }
 
-        init<D: DataProtocol>(seedRepresentation: D, publicKeyHash: SHA3_256Digest?) throws {
+        init(seedRepresentation: Data, publicKeyHash: SHA3_256Digest?) throws(CryptoKitMetaError) {
             self.privateKey = .init()
 
-            let seedRepresentation: ContiguousBytes =
-                seedRepresentation.regions.count == 1 ? seedRepresentation.regions.first! : Array(seedRepresentation)
-
-            try seedRepresentation.withUnsafeBytes { privateKeyBytes in
+            let parsed = seedRepresentation.withUnsafeBytes { privateKeyBytes in
                 guard privateKeyBytes.count == Int(XWING_PRIVATE_KEY_BYTES) else {
-                    throw CryptoKitError.incorrectKeySize
+                    return false
                 }
 
                 var cbs = CBS()
@@ -184,12 +187,16 @@ extension OpenSSLXWingPrivateKeyImpl {
 
                 let rc = CCryptoBoringSSL_XWING_parse_private_key(&self.privateKey, &cbs)
                 guard rc == 1 else {
-                    throw CryptoKitError.internalBoringSSLError()
+                    return false
                 }
+                return true
+            }
+            guard parsed else {
+                throw error(CryptoKitError.incorrectKeySize)
             }
 
             if let publicKeyHash, publicKeyHash != self.publicKeyDigest {
-                throw KEM.Errors.publicKeyMismatchDuringInitialization
+                throw error(KEM.Errors.publicKeyMismatchDuringInitialization)
             }
         }
 
@@ -231,32 +238,32 @@ extension OpenSSLXWingPrivateKeyImpl {
             }
         }
 
-        static func generate() throws -> Self {
+        static func generate() throws(CryptoKitMetaError) -> Self {
             try Self()
         }
 
-        func decapsulate(_ encapsulated: Data) throws -> SymmetricKey {
+        func decapsulate(_ encapsulated: Data) throws(CryptoKitMetaError) -> SymmetricKey {
             guard encapsulated.count == Int(XWING_CIPHERTEXT_BYTES) else {
-                throw CryptoKitError.incorrectParameterSize
+                throw error(CryptoKitError.incorrectParameterSize)
             }
 
-            return try SymmetricKey(unsafeUninitializedCapacity: Int(XWING_SHARED_SECRET_BYTES)) {
-                sharedSecretBytes,
-                count in
-                try encapsulated.withUnsafeBytes { encapsulatedSecretBytes in
+            var sharedSecretData = Data(repeating: 0, count: Int(XWING_SHARED_SECRET_BYTES))
+            let rc = sharedSecretData.withUnsafeMutableBytes { sharedSecretBytes in
+                encapsulated.withUnsafeBytes { encapsulatedSecretBytes in
                     let rc = CCryptoBoringSSL_XWING_decap(
                         sharedSecretBytes.baseAddress,
                         encapsulatedSecretBytes.baseAddress,
                         &self.privateKey
                     )
-                    guard rc == 1 else {
-                        throw CryptoKitError.internalBoringSSLError()
-                    }
-                    count = Int(XWING_SHARED_SECRET_BYTES)
+                    return rc
                 }
             }
+            guard rc == 1 else {
+                throw error(CryptoKitError.internalBoringSSLError())
+            }
+            return SymmetricKey(data: sharedSecretData)
         }
     }
 }
 
-#endif  // CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+#endif  // canImport(CryptoKit)

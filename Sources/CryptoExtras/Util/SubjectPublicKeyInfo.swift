@@ -109,13 +109,19 @@ struct RFC5480AlgorithmIdentifier: DERImplicitlyTaggable, Hashable {
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension SubjectPublicKeyInfo {
     static func stripRsaPssParameters(derEncoded: [UInt8]) throws -> [UInt8] {
-        guard var spki = try? SubjectPublicKeyInfo(derEncoded: derEncoded),
-              spki.algorithmIdentifier.algorithm == .AlgorithmIdentifier.rsaPSS
-        else {
+        let parsedSPKI: SubjectPublicKeyInfo
+        do {
+            parsedSPKI = try SubjectPublicKeyInfo(derEncoded: derEncoded)
+        } catch {
             // If it's neither a SPKI nor a PSS key, we don't have to modify it.
             return derEncoded
         }
 
+        guard parsedSPKI.algorithmIdentifier.algorithm == .AlgorithmIdentifier.rsaPSS else {
+            return derEncoded
+        }
+
+        var spki = parsedSPKI
         spki.algorithmIdentifier.algorithm = .AlgorithmIdentifier.rsaEncryption
         spki.algorithmIdentifier.parameters = try ASN1Any(erasing: ASN1Null())
 

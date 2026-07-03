@@ -12,6 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension UnsafeMutableRawBufferPointer {
     @inlinable
@@ -42,6 +43,20 @@ extension UnsafeMutableRawBufferPointer {
         #else
         fatalError("No secure random number generator on this platform.")
         #endif
+    }
+}
+
+@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+extension OutputRawSpan {
+    #if swift(<6.3)
+    @_lifetime(self: copy self)
+    #endif
+    package mutating func appendingRandomBytes(count: Int) {
+        self.withUnsafeMutableBytes { buffer, initializedCount in
+            UnsafeMutableRawBufferPointer(rebasing: buffer[initializedCount..<initializedCount + count])
+                .initializeWithRandomBytes(count: count)
+            initializedCount += count
+        }
     }
 }
 

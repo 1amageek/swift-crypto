@@ -11,19 +11,25 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
-@_exported import CryptoKit
-#else
-@_implementationOnly import CCryptoBoringSSL
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
+#endif
+
+#if canImport(CryptoKit)
+@_exported import CryptoKit
+#else
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
+#else
+@_implementationOnly import CCryptoBoringSSL
 #endif
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 enum BoringSSLAESWRAPImpl {
-    static func wrap(key: SymmetricKey, keyToWrap: SymmetricKey) throws -> Data {
+    static func wrap(key: SymmetricKey, keyToWrap: SymmetricKey) throws(CryptoKitMetaError) -> Data {
         // There's a flat 8-byte overhead to AES KeyWrap.
         var output = Data(repeating: 0, count: keyToWrap.byteCount + 8)
 
@@ -46,7 +52,7 @@ enum BoringSSLAESWRAPImpl {
         }
 
         guard rc >= 0 else {
-            throw CryptoKitError.internalBoringSSLError()
+            throw error(CryptoKitError.internalBoringSSLError())
         }
 
         // Assert our 8-byte overhead story was true.
@@ -57,7 +63,7 @@ enum BoringSSLAESWRAPImpl {
     static func unwrap<WrappedKey: DataProtocol>(
         key: SymmetricKey,
         wrappedKey: WrappedKey
-    ) throws
+    ) throws(CryptoKitMetaError)
         -> SymmetricKey
     {
         if wrappedKey.regions.count == 1 {
@@ -71,29 +77,30 @@ enum BoringSSLAESWRAPImpl {
     private static func unwrap<WrappedKey: ContiguousBytes>(
         key: SymmetricKey,
         contiguousWrappedKey: WrappedKey
-    ) throws -> SymmetricKey {
-        let unwrapped = try contiguousWrappedKey.withUnsafeBytes { inPtr in
-            try [UInt8](unsafeUninitializedCapacity: inPtr.count) { outputPtr, count in
-                // Bind is safe: we cannot violate the aliasing rules here as we never call to arbitrary code.
-                let inPtr = inPtr.bindMemory(to: UInt8.self)
-                let rc = try key.withUnsafeAESKEY(mode: .decrypting) { aesKey in
-                    CCryptoBoringSSL_AES_unwrap_key(
+    ) throws(CryptoKitMetaError) -> SymmetricKey {
+        var unwrapResult: CInt = 0
+        let unwrapped = try key.withUnsafeAESKEY(mode: .decrypting) { aesKey in
+            withCryptoUnsafeBytes(contiguousWrappedKey) { inPtr in
+                [UInt8](unsafeUninitializedCapacity: inPtr.count) { outputPtr, count in
+                    // Bind is safe: we cannot violate the aliasing rules here as we never call to arbitrary code.
+                    let inPtr = inPtr.bindMemory(to: UInt8.self)
+                    unwrapResult = CCryptoBoringSSL_AES_unwrap_key(
                         aesKey,
                         nil,
                         outputPtr.baseAddress,
                         inPtr.baseAddress,
                         inPtr.count
                     )
-                }
 
-                guard rc > 0 else {
-                    throw CryptoKitError.internalBoringSSLError()
+                    // Assert our 8-byte overhead story is true.
+                    assert(unwrapResult <= 0 || unwrapResult == inPtr.count - 8)
+                    count = max(Int(unwrapResult), 0)
                 }
-
-                // Assert our 8-byte overhead story is true.
-                assert(rc == inPtr.count - 8)
-                count = Int(rc)
             }
+        }
+
+        guard unwrapResult > 0 else {
+            throw error(CryptoKitError.internalBoringSSLError())
         }
 
         return SymmetricKey(data: unwrapped)
@@ -110,9 +117,12 @@ extension SymmetricKey {
 
     fileprivate func withUnsafeAESKEY<ResultType>(
         mode: AESKeyMode,
-        _ body: (UnsafePointer<AES_KEY>) throws -> ResultType
-    ) throws -> ResultType {
-        try self.withUnsafeBytes { bytesPointer in
+        _ body: (UnsafePointer<AES_KEY>) -> ResultType
+    ) throws(CryptoKitMetaError) -> ResultType {
+        var result: ResultType?
+        var setKeyResult: CInt = -1
+
+        self.withUnsafeBytes { bytesPointer in
             // Bind is safe: cannot alias the pointer here.
             let bytesPointer = bytesPointer.bindMemory(to: UInt8.self)
 
@@ -135,15 +145,23 @@ extension SymmetricKey {
                 )
             }
 
+            setKeyResult = rc
+
             guard rc == 0 else {
-                throw CryptoKitError.internalBoringSSLError()
+                return
             }
 
-            return try withUnsafePointer(to: aesKey) {
-                try body($0)
+            result = withUnsafePointer(to: aesKey) {
+                body($0)
             }
         }
+
+        guard setKeyResult == 0, let result else {
+            throw error(CryptoKitError.internalBoringSSLError())
+        }
+
+        return result
     }
 }
 
-#endif  // CRYPTO_IN_SWIFTPM && !CRYPTO_IN_SWIFTPM_FORCE_BUILD_API
+#endif  // canImport(CryptoKit)
