@@ -14,7 +14,7 @@
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
@@ -30,7 +30,7 @@ private func itoh(_ value: UInt8) -> UInt8 {
     return (value > 9) ? (charA + value - 10) : (char0 + value)
 }
 
-private func htoi(_ value: UInt8) throws -> UInt8 {
+private func htoi(_ value: UInt8) throws(ByteHexEncodingErrors) -> UInt8 {
     switch value {
     case char0...char0 + 9:
         return value - char0
@@ -67,40 +67,42 @@ extension RangeReplaceableCollection where Element == UInt8 {
     }
 }
 
+#if canImport(FoundationEssentials) || canImport(Foundation)
 extension Data {
-    init(hexString: String) throws {
+    init(hexString: String) throws(ByteHexEncodingErrors) {
         self.init()
 
         if hexString.count % 2 != 0 || hexString.count == 0 {
             throw ByteHexEncodingErrors.incorrectString
         }
 
-        let stringBytes: [UInt8] = Array(hexString.lowercased().data(using: String.Encoding.utf8)!)
+        let stringBytes: [UInt8] = Array(hexString.lowercased().utf8)
 
         for i in stride(from: stringBytes.startIndex, to: stringBytes.endIndex - 1, by: 2) {
             let char1 = stringBytes[i]
             let char2 = stringBytes[i + 1]
 
-            try self.append(htoi(char1) << 4 + htoi(char2))
+            try self.append((htoi(char1) << 4) + htoi(char2))
         }
     }
 }
+#endif
 
 extension Array where Element == UInt8 {
-    init(hexString: String) throws {
+    init(hexString: String) throws(ByteHexEncodingErrors) {
         self.init()
         
         guard hexString.count.isMultiple(of: 2), !hexString.isEmpty else {
             throw ByteHexEncodingErrors.incorrectString
         }
 
-        let stringBytes: [UInt8] = Array(hexString.data(using: String.Encoding.utf8)!)
+        let stringBytes: [UInt8] = Array(hexString.lowercased().utf8)
 
         for i in stride(from: stringBytes.startIndex, to: stringBytes.endIndex - 1, by: 2) {
             let char1 = stringBytes[i]
             let char2 = stringBytes[i + 1]
 
-            try self.append(htoi(char1) << 4 + htoi(char2))
+            try self.append((htoi(char1) << 4) + htoi(char2))
         }
     }
 

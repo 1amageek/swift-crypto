@@ -12,17 +12,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 typealias DigestImpl = OpenSSLDigestImpl
 typealias DigestImplSHA3 = XKCPDigestImpl
 
-#if canImport(FoundationEssentials)
-public import FoundationEssentials
-#else
-public import Foundation
-#endif
 
 /// A type that performs cryptographically secure hashing.
 ///

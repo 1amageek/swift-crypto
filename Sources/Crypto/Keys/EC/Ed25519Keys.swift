@@ -12,14 +12,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
-#if canImport(FoundationEssentials)
-public import FoundationEssentials
-#else
-public import Foundation
-#endif
 
 extension Curve25519.Signing {
     static var keyByteCount: Int {
@@ -56,7 +58,11 @@ extension Curve25519 {
             ///   - data: A representation of the key as contiguous bytes from
             /// which to create the key.
             public init<D: ContiguousBytes>(rawRepresentation data: D) throws(CryptoKitMetaError) {
-                self.baseKey = try Curve25519.Signing.Curve25519PrivateKeyImpl(rawRepresentation: data)
+                do {
+                    self.baseKey = try Curve25519.Signing.Curve25519PrivateKeyImpl(rawRepresentation: data)
+                } catch let cryptoKitError {
+                    throw error(cryptoKitError)
+                }
             }
             
             /// The raw representation of the key as a collection of contiguous
@@ -80,7 +86,11 @@ extension Curve25519 {
             ///   - rawRepresentation: A representation of the key as contiguous
             /// bytes from which to create the key.
             public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
-                self.baseKey = try Curve25519.Signing.Curve25519PublicKeyImpl(rawRepresentation: rawRepresentation)
+                do {
+                    self.baseKey = try Curve25519.Signing.Curve25519PublicKeyImpl(rawRepresentation: rawRepresentation)
+                } catch let cryptoKitError {
+                    throw error(cryptoKitError)
+                }
             }
 
             fileprivate init(baseKey: Curve25519.Signing.Curve25519PublicKeyImpl) {

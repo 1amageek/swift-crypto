@@ -12,15 +12,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if canImport(FoundationEssentials)
-public import FoundationEssentials
-#else
-public import Foundation
-#endif
 
 internal struct ANSIKDFx963<H: HashFunction>: Sendable {
     public static func deriveKey<Info: DataProtocol>(inputKeyMaterial: SymmetricKey, info: Info, outputByteCount: Int) -> SymmetricKey {
@@ -42,7 +44,7 @@ internal struct ANSIKDFx963<H: HashFunction>: Sendable {
                 #if CRYPTOKIT_URBP_LACKS_CONFORMANCE
                 hasher.update(bufferPointer: ikmBytes)
                 #else
-                hasher.update(data: ikmBytes)
+                hasher.update(bytes: ikmBytes.bytes)
                 #endif
             }
             hasher.update(counter.bigEndian)
@@ -72,4 +74,3 @@ internal struct ANSIKDFx963<H: HashFunction>: Sendable {
 
 
 #endif
-

@@ -12,14 +12,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 protocol MACAlgorithm {
     associatedtype Key

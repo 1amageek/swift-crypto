@@ -12,15 +12,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 extension ASN1 {
     /// A bitstring is a representation of...well...some bits.

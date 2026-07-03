@@ -12,14 +12,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
-#if canImport(FoundationEssentials)
-public import FoundationEssentials
-#else
-public import Foundation
-#endif
 
 typealias MLKEMPublicKeyImpl = OpenSSLMLKEMPublicKeyImpl
 typealias MLKEMPrivateKeyImpl = OpenSSLMLKEMPrivateKeyImpl
@@ -36,7 +38,7 @@ extension MLKEM768 {
 
         /// Initializes a public key from a raw representation.
         /// - Parameter rawRepresentation: Data that represents the public key.
-        public init<D: DataProtocol>(rawRepresentation: D) throws {
+        public init<D: DataProtocol>(rawRepresentation: D) throws(CryptoKitMetaError) {
             self.impl = try MLKEMPublicKeyImpl(rawRepresentation: rawRepresentation)
         }
 
@@ -50,12 +52,12 @@ extension MLKEM768 {
         /// Generates and encapsulates a shared secret.
         ///
         /// - Returns: an encapsulated shared secret, that you decapsulate by calling ``MLKEM768/PrivateKey/decapsulate(_:)`` on the corresponding private key.
-        public func encapsulate() throws -> KEM.EncapsulationResult {
-            return try self.impl.encapsulate()
+        public func encapsulate() throws(CryptoKitMetaError) -> KEM.EncapsulationResult {
+            return self.impl.encapsulate()
         }
 
-        func encapsulateWithSeed(encapSeed: Data) throws -> KEM.EncapsulationResult {
-            return try self.impl.encapsulateWithSeed(encapSeed)
+        func encapsulateWithSeed(encapSeed: Data) throws(CryptoKitMetaError) -> KEM.EncapsulationResult {
+            return self.impl.encapsulateWithSeed(encapSeed)
         }
     }
 
@@ -68,18 +70,18 @@ extension MLKEM768 {
         }
 
         /// Generates a new, random private key.
-        public static func generate() throws -> MLKEM768.PrivateKey {
+        public static func generate() throws(CryptoKitMetaError) -> MLKEM768.PrivateKey {
             let impl = try MLKEMPrivateKeyImpl<MLKEM768>.generatePrivateKey()
             return PrivateKey(impl)
         }
 
-        static func generateWithSeed(_ seed: Data) throws -> MLKEM768.PrivateKey {
+        static func generateWithSeed(_ seed: Data) throws(CryptoKitMetaError) -> MLKEM768.PrivateKey {
             let impl = try MLKEMPrivateKeyImpl<MLKEM768>.generateWithSeed(seed)
             return PrivateKey(impl)
         }
 
         /// Initializes a random private key.
-        public init() throws {
+        public init() throws(CryptoKitMetaError) {
             self = try PrivateKey.generate()
         }
 
@@ -88,7 +90,7 @@ extension MLKEM768 {
         /// - Parameters:
         ///   - seedRepresentation: The seed representation `d||z`, as specified in the `ML-KEM.KeyGen_internal(d,z)` algorithm (Algorithm 16) of FIPS 203.
         ///   - publicKey: An optional public key. Pass this to check that the initialized private key is consistent with the public key. The initializer throws if the public key doesn't match the expected value.
-        public init<D: DataProtocol>(seedRepresentation: D, publicKey: MLKEM768.PublicKey?) throws {
+        public init<D: DataProtocol>(seedRepresentation: D, publicKey: MLKEM768.PublicKey?) throws(CryptoKitMetaError) {
             var publicKeyRawRepresentation: Data? = nil
             if publicKey != nil {
                 publicKeyRawRepresentation = publicKey!.rawRepresentation
@@ -110,7 +112,7 @@ extension MLKEM768 {
         /// - Parameters:
         ///   - encapsulated: An encapsulated shared secret, that you get by calling ``MLKEM768/PublicKey/encapsulate()`` on the corresponding public key.
         /// - Returns: The shared secret.
-        public func decapsulate<D: DataProtocol>(_ encapsulated: D) throws -> SymmetricKey {
+        public func decapsulate<D: DataProtocol>(_ encapsulated: D) throws(CryptoKitMetaError) -> SymmetricKey {
             return try impl.decapsulate(encapsulated: encapsulated)
         }
 
@@ -124,9 +126,9 @@ extension MLKEM768 {
         /// Initializes a private key from an integrity-checked representation.
         ///
         /// - Parameter integrityCheckedRepresentation: A representation of the private key that includes the seed value, and a hash of the corresponding public key.
-        public init<D: DataProtocol>(integrityCheckedRepresentation: D) throws {
+        public init<D: DataProtocol>(integrityCheckedRepresentation: D) throws(CryptoKitMetaError) {
             guard integrityCheckedRepresentation.count == MLKEMPrivateKeyImpl<MLKEM768>.seedSize + 32 else {
-                throw KEM.Errors.invalidSeed
+                throw error(KEM.Errors.invalidSeed)
             }
             let seed = Data(integrityCheckedRepresentation).subdata(in: 0..<MLKEMPrivateKeyImpl<MLKEM768>.seedSize)
             let publicKeyHashData = Data(integrityCheckedRepresentation).subdata(in: MLKEMPrivateKeyImpl<MLKEM768>.seedSize..<integrityCheckedRepresentation.count)
@@ -157,13 +159,13 @@ extension MLKEM768 {
         }
 
         /// Generates a new, random one-time-use private key.
-        public static func generate() throws -> MLKEM768.OneTimePrivateKey {
+        public static func generate() throws(CryptoKitMetaError) -> MLKEM768.OneTimePrivateKey {
             let impl = try MLKEMPrivateKeyImpl<MLKEM768>.generatePrivateKey()
             return OneTimePrivateKey(impl)
         }
 
         /// Initializes a random one-time-use private key.
-        public init() throws {
+        public init() throws(CryptoKitMetaError) {
             self = try OneTimePrivateKey.generate()
         }
 
@@ -172,7 +174,7 @@ extension MLKEM768 {
         /// - Parameters:
         ///   - encapsulated: An encapsulated shared secret, that you get by calling ``MLKEM768/PublicKey/encapsulate()`` on the corresponding public key.
         /// - Returns: The shared secret.
-        public consuming func decapsulate<D: DataProtocol>(_ encapsulated: D) throws -> SymmetricKey {
+        public consuming func decapsulate<D: DataProtocol>(_ encapsulated: D) throws(CryptoKitMetaError) -> SymmetricKey {
             return try impl.decapsulate(encapsulated: encapsulated)
         }
 
@@ -197,7 +199,7 @@ extension MLKEM1024 {
 
         /// Initializes a public key from a raw representation.
         /// - Parameter rawRepresentation: Data that represents the public key.
-        public init<D: DataProtocol>(rawRepresentation: D) throws {
+        public init<D: DataProtocol>(rawRepresentation: D) throws(CryptoKitMetaError) {
             self.impl = try MLKEMPublicKeyImpl(rawRepresentation: rawRepresentation)
         }
 
@@ -211,12 +213,12 @@ extension MLKEM1024 {
         /// Generates and encapsulates a shared secret.
         ///
         /// - Returns: an encapsulated shared secret, that you decapsulate by calling ``MLKEM1024/PrivateKey/decapsulate(_:)`` on the corresponding private key.
-        public func encapsulate() throws -> KEM.EncapsulationResult {
-            return try self.impl.encapsulate()
+        public func encapsulate() throws(CryptoKitMetaError) -> KEM.EncapsulationResult {
+            return self.impl.encapsulate()
         }
 
-        func encapsulateWithSeed(encapSeed: Data) throws -> KEM.EncapsulationResult {
-            return try self.impl.encapsulateWithSeed(encapSeed)
+        func encapsulateWithSeed(encapSeed: Data) throws(CryptoKitMetaError) -> KEM.EncapsulationResult {
+            return self.impl.encapsulateWithSeed(encapSeed)
         }
     }
 
@@ -229,18 +231,18 @@ extension MLKEM1024 {
         }
 
         /// Generates a new, random private key.
-        public static func generate() throws -> MLKEM1024.PrivateKey {
+        public static func generate() throws(CryptoKitMetaError) -> MLKEM1024.PrivateKey {
             let impl = try MLKEMPrivateKeyImpl<MLKEM1024>.generatePrivateKey()
             return PrivateKey(impl)
         }
 
-        static func generateWithSeed(_ seed: Data) throws -> MLKEM1024.PrivateKey {
+        static func generateWithSeed(_ seed: Data) throws(CryptoKitMetaError) -> MLKEM1024.PrivateKey {
             let impl = try MLKEMPrivateKeyImpl<MLKEM1024>.generateWithSeed(seed)
             return PrivateKey(impl)
         }
 
         /// Initializes a random private key.
-        public init() throws {
+        public init() throws(CryptoKitMetaError) {
             self = try PrivateKey.generate()
         }
 
@@ -249,7 +251,7 @@ extension MLKEM1024 {
         /// - Parameters:
         ///   - seedRepresentation: The seed representation `d||z`, as specified in the `ML-KEM.KeyGen_internal(d,z)` algorithm (Algorithm 16) of FIPS 203.
         ///   - publicKey: An optional public key. Pass this to check that the initialized private key is consistent with the public key. The initializer throws if the public key doesn't match the expected value.
-        public init<D: DataProtocol>(seedRepresentation: D, publicKey: MLKEM1024.PublicKey?) throws {
+        public init<D: DataProtocol>(seedRepresentation: D, publicKey: MLKEM1024.PublicKey?) throws(CryptoKitMetaError) {
             var publicKeyRawRepresentation: Data? = nil
             if publicKey != nil {
                 publicKeyRawRepresentation = publicKey!.rawRepresentation
@@ -271,7 +273,7 @@ extension MLKEM1024 {
         /// - Parameters:
         ///   - encapsulated: An encapsulated shared secret, that you get by calling ``MLKEM1024/PublicKey/encapsulate()`` on the corresponding public key.
         /// - Returns: The shared secret.
-        public func decapsulate<D: DataProtocol>(_ encapsulated: D) throws -> SymmetricKey {
+        public func decapsulate<D: DataProtocol>(_ encapsulated: D) throws(CryptoKitMetaError) -> SymmetricKey {
             return try impl.decapsulate(encapsulated: encapsulated)
         }
 
@@ -285,9 +287,9 @@ extension MLKEM1024 {
         /// Initializes a private key from an integrity-checked representation.
         ///
         /// - Parameter integrityCheckedRepresentation: A representation of the private key that includes the seed value, and a hash of the corresponding public key.
-        public init<D: DataProtocol>(integrityCheckedRepresentation: D) throws {
+        public init<D: DataProtocol>(integrityCheckedRepresentation: D) throws(CryptoKitMetaError) {
             guard integrityCheckedRepresentation.count == MLKEMPrivateKeyImpl<MLKEM1024>.seedSize + 32 else {
-                throw KEM.Errors.invalidSeed
+                throw error(KEM.Errors.invalidSeed)
             }
             let seed = Data(integrityCheckedRepresentation).subdata(in: 0..<MLKEMPrivateKeyImpl<MLKEM1024>.seedSize)
             let publicKeyHashData = Data(integrityCheckedRepresentation).subdata(in: MLKEMPrivateKeyImpl<MLKEM1024>.seedSize..<integrityCheckedRepresentation.count)
@@ -318,13 +320,13 @@ extension MLKEM1024 {
         }
 
         /// Generates a new, random one-time-use private key.
-        public static func generate() throws -> MLKEM1024.OneTimePrivateKey {
+        public static func generate() throws(CryptoKitMetaError) -> MLKEM1024.OneTimePrivateKey {
             let impl = try MLKEMPrivateKeyImpl<MLKEM1024>.generatePrivateKey()
             return OneTimePrivateKey(impl)
         }
 
         /// Initializes a random one-time-use private key.
-        public init() throws {
+        public init() throws(CryptoKitMetaError) {
             self = try OneTimePrivateKey.generate()
         }
 
@@ -333,7 +335,7 @@ extension MLKEM1024 {
         /// - Parameters:
         ///   - encapsulated: An encapsulated shared secret, that you get by calling ``MLKEM1024/PublicKey/encapsulate()`` on the corresponding public key.
         /// - Returns: The shared secret.
-        public consuming func decapsulate<D: DataProtocol>(_ encapsulated: D) throws -> SymmetricKey {
+        public consuming func decapsulate<D: DataProtocol>(_ encapsulated: D) throws(CryptoKitMetaError) -> SymmetricKey {
             return try impl.decapsulate(encapsulated: encapsulated)
         }
 

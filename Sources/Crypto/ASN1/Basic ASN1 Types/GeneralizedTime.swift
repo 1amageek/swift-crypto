@@ -12,15 +12,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 extension ASN1 {
     struct GeneralizedTime: ASN1ImplicitlyTaggable, Hashable {

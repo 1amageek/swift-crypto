@@ -12,31 +12,37 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
-@_implementationOnly import CCryptoBoringSSL
-#if canImport(FoundationEssentials)
-import FoundationEssentials
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
 #else
-import Foundation
+@_implementationOnly import CCryptoBoringSSL
 #endif
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 protocol BoringSSLBackedMLKEMPrivateKey: Sendable {
     associatedtype InteriorPublicKey: BoringSSLBackedMLKEMPublicKey
 
-    static func generatePrivateKey() throws -> Self
+    static func generatePrivateKey() throws(CryptoKitMetaError) -> Self
 
-    static func generateWithSeed(_ seed: Data) throws -> Self
+    static func generateWithSeed(_ seed: Data) throws(CryptoKitMetaError) -> Self
 
-    init<Bytes: DataProtocol>(seedRepresentation: Bytes, publicKeyRawRepresentation: Data?) throws
+    init<Bytes: DataProtocol>(seedRepresentation: Bytes, publicKeyRawRepresentation: Data?) throws(CryptoKitMetaError)
 
-    init<Bytes: DataProtocol>(seedRepresentation: Bytes, publicKeyHash: SHA3_256Digest?) throws
+    init<Bytes: DataProtocol>(seedRepresentation: Bytes, publicKeyHash: SHA3_256Digest?) throws(CryptoKitMetaError)
 
     var seedRepresentation: Data { get }
 
-    func decapsulate<Bytes: DataProtocol>(_ encapsulated: Bytes) throws -> SymmetricKey
+    func decapsulate<Bytes: DataProtocol>(_ encapsulated: Bytes) throws(CryptoKitMetaError) -> SymmetricKey
 
     var interiorPublicKey: InteriorPublicKey { get }
 
@@ -45,25 +51,25 @@ protocol BoringSSLBackedMLKEMPrivateKey: Sendable {
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension BoringSSLBackedMLKEMPrivateKey {
-    func decapsulate<Bytes: DataProtocol>(encapsulated: Bytes) throws -> SymmetricKey {
+    func decapsulate<Bytes: DataProtocol>(encapsulated: Bytes) throws(CryptoKitMetaError) -> SymmetricKey {
         try self.decapsulate(encapsulated)
     }
 }
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 protocol BoringSSLBackedMLKEMPublicKey: Sendable {
-    init<Bytes: DataProtocol>(rawRepresentation: Bytes) throws
+    init<Bytes: DataProtocol>(rawRepresentation: Bytes) throws(CryptoKitMetaError)
 
     var rawRepresentation: Data { get }
 
-    func encapsulate() throws -> KEM.EncapsulationResult
+    func encapsulate() -> KEM.EncapsulationResult
 
-    func encapsulateWithSeed(_ encapSeed: Data) throws -> KEM.EncapsulationResult
+    func encapsulateWithSeed(_ encapSeed: Data) -> KEM.EncapsulationResult
 }
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 protocol BoringSSLBackedMLKEMOuterPublicKey: Sendable {
-    init(rawRepresentation: Data) throws
+    init(rawRepresentation: Data) throws(CryptoKitMetaError)
 }
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
@@ -85,11 +91,11 @@ extension MLKEM768.PublicKey: BoringSSLBackedMLKEMOuterPublicKey {}
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLKEM768.InternalPrivateKey: BoringSSLBackedMLKEMPrivateKey {
-    static func generatePrivateKey() throws -> Self {
+    static func generatePrivateKey() throws(CryptoKitMetaError) -> Self {
         .generate()
     }
 
-    static func generateWithSeed(_ seed: Data) throws -> Self {
+    static func generateWithSeed(_ seed: Data) throws(CryptoKitMetaError) -> Self {
         let seed = Array(seed)
         var fullSeed: [UInt8] = []
         fullSeed.reserveCapacity(MLKEM.seedByteCount)
@@ -101,18 +107,18 @@ extension MLKEM768.InternalPrivateKey: BoringSSLBackedMLKEMPrivateKey {
         return try .init(seedRepresentation: fullSeed)
     }
 
-    init<Bytes>(seedRepresentation: Bytes, publicKeyRawRepresentation: Data?) throws where Bytes: DataProtocol {
+    init<Bytes>(seedRepresentation: Bytes, publicKeyRawRepresentation: Data?) throws(CryptoKitMetaError) where Bytes: DataProtocol {
         let publicKeyHash = publicKeyRawRepresentation.map {
             SHA3_256.hash(data: $0)
         }
         self = try .init(seedRepresentation: seedRepresentation, publicKeyHash: publicKeyHash)
     }
 
-    init<Bytes: DataProtocol>(seedRepresentation: Bytes, publicKeyHash: SHA3_256Digest?) throws {
+    init<Bytes: DataProtocol>(seedRepresentation: Bytes, publicKeyHash: SHA3_256Digest?) throws(CryptoKitMetaError) {
         self = try .init(seedRepresentation: seedRepresentation)
         let generatedHash = SHA3_256.hash(data: self.publicKey.rawRepresentation)
         if let publicKeyHash, generatedHash != publicKeyHash {
-            throw KEM.Errors.publicKeyMismatchDuringInitialization
+            throw error(KEM.Errors.publicKeyMismatchDuringInitialization)
         }
     }
 
@@ -131,7 +137,7 @@ extension MLKEM768.InternalPrivateKey: BoringSSLBackedMLKEMPrivateKey {
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLKEM768.InternalPublicKey: BoringSSLBackedMLKEMPublicKey {
-    func encapsulateWithSeed(_ encapSeed: Data) throws -> KEM.EncapsulationResult {
+    func encapsulateWithSeed(_ encapSeed: Data) -> KEM.EncapsulationResult {
         fatalError()
     }
 }
@@ -147,11 +153,11 @@ extension MLKEM1024.PublicKey: BoringSSLBackedMLKEMOuterPublicKey {}
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLKEM1024.InternalPrivateKey: BoringSSLBackedMLKEMPrivateKey {
-    static func generatePrivateKey() throws -> Self {
+    static func generatePrivateKey() throws(CryptoKitMetaError) -> Self {
         .generate()
     }
 
-    static func generateWithSeed(_ seed: Data) throws -> Self {
+    static func generateWithSeed(_ seed: Data) throws(CryptoKitMetaError) -> Self {
         let seed = Array(seed)
         var fullSeed: [UInt8] = []
         fullSeed.reserveCapacity(MLKEM.seedByteCount)
@@ -163,18 +169,18 @@ extension MLKEM1024.InternalPrivateKey: BoringSSLBackedMLKEMPrivateKey {
         return try .init(seedRepresentation: fullSeed)
     }
 
-    init<Bytes>(seedRepresentation: Bytes, publicKeyRawRepresentation: Data?) throws where Bytes: DataProtocol {
+    init<Bytes>(seedRepresentation: Bytes, publicKeyRawRepresentation: Data?) throws(CryptoKitMetaError) where Bytes: DataProtocol {
         let publicKeyHash = publicKeyRawRepresentation.map {
             SHA3_256.hash(data: $0)
         }
         self = try .init(seedRepresentation: seedRepresentation, publicKeyHash: publicKeyHash)
     }
 
-    init<Bytes: DataProtocol>(seedRepresentation: Bytes, publicKeyHash: SHA3_256Digest?) throws {
+    init<Bytes: DataProtocol>(seedRepresentation: Bytes, publicKeyHash: SHA3_256Digest?) throws(CryptoKitMetaError) {
         self = try .init(seedRepresentation: seedRepresentation)
         let generatedHash = SHA3_256.hash(data: self.publicKey.rawRepresentation)
         if let publicKeyHash, generatedHash != publicKeyHash {
-            throw KEM.Errors.publicKeyMismatchDuringInitialization
+            throw error(KEM.Errors.publicKeyMismatchDuringInitialization)
         }
     }
 
@@ -193,7 +199,7 @@ extension MLKEM1024.InternalPrivateKey: BoringSSLBackedMLKEMPrivateKey {
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLKEM1024.InternalPublicKey: BoringSSLBackedMLKEMPublicKey {
-    func encapsulateWithSeed(_ encapSeed: Data) throws -> KEM.EncapsulationResult {
+    func encapsulateWithSeed(_ encapSeed: Data) -> KEM.EncapsulationResult {
         fatalError()
     }
 }
@@ -206,7 +212,7 @@ struct OpenSSLMLKEMPublicKeyImpl<Parameters: BoringSSLBackedMLKEMParameters>: Bo
         self.backing = backing
     }
 
-    init<Bytes>(rawRepresentation: Bytes) throws where Bytes: DataProtocol {
+    init<Bytes>(rawRepresentation: Bytes) throws(CryptoKitMetaError) where Bytes: DataProtocol {
         self.backing = try .init(rawRepresentation: rawRepresentation)
     }
 
@@ -214,12 +220,12 @@ struct OpenSSLMLKEMPublicKeyImpl<Parameters: BoringSSLBackedMLKEMParameters>: Bo
         self.backing.rawRepresentation
     }
 
-    func encapsulate() throws -> KEM.EncapsulationResult {
-        try self.backing.encapsulate()
+    func encapsulate() -> KEM.EncapsulationResult {
+        self.backing.encapsulate()
     }
 
-    func encapsulateWithSeed(_ encapSeed: Data) throws -> KEM.EncapsulationResult {
-        try self.backing.encapsulateWithSeed(encapSeed)
+    func encapsulateWithSeed(_ encapSeed: Data) -> KEM.EncapsulationResult {
+        self.backing.encapsulateWithSeed(encapSeed)
     }
 }
 
@@ -234,18 +240,18 @@ struct OpenSSLMLKEMPrivateKeyImpl<Parameters: BoringSSLBackedMLKEMParameters>: B
         self.backing = backing
     }
 
-    static func generatePrivateKey() throws -> Self {
+    static func generatePrivateKey() throws(CryptoKitMetaError) -> Self {
         try Self(backing: .generatePrivateKey())
     }
 
-    static func generateWithSeed(_ seed: Data) throws -> Self {
+    static func generateWithSeed(_ seed: Data) throws(CryptoKitMetaError) -> Self {
         try Self(backing: .generateWithSeed(seed))
     }
 
     init<Bytes: DataProtocol>(
         seedRepresentation: Bytes,
         publicKeyRawRepresentation: Data?
-    ) throws {
+    ) throws(CryptoKitMetaError) {
         self.backing = try .init(
             seedRepresentation: seedRepresentation,
             publicKeyRawRepresentation: publicKeyRawRepresentation
@@ -255,7 +261,7 @@ struct OpenSSLMLKEMPrivateKeyImpl<Parameters: BoringSSLBackedMLKEMParameters>: B
     init<Bytes: DataProtocol>(
         seedRepresentation: Bytes,
         publicKeyHash: SHA3_256Digest?
-    ) throws {
+    ) throws(CryptoKitMetaError) {
         self.backing = try .init(
             seedRepresentation: seedRepresentation,
             publicKeyHash: publicKeyHash
@@ -266,7 +272,7 @@ struct OpenSSLMLKEMPrivateKeyImpl<Parameters: BoringSSLBackedMLKEMParameters>: B
         self.backing.seedRepresentation
     }
 
-    func decapsulate<Bytes>(_ encapsulated: Bytes) throws -> SymmetricKey where Bytes: DataProtocol {
+    func decapsulate<Bytes>(_ encapsulated: Bytes) throws(CryptoKitMetaError) -> SymmetricKey where Bytes: DataProtocol {
         try self.backing.decapsulate(encapsulated)
     }
 

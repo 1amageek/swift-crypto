@@ -12,14 +12,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 // This doesn't seem to be present on Linux.
 extension InlineArray where Element == UInt8 {

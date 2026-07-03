@@ -12,15 +12,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if canImport(FoundationEssentials)
-public import FoundationEssentials
-#else
-public import Foundation
-#endif
 
 /// A type that ``HPKE`` uses to encode the public key.
 @preconcurrency
@@ -30,14 +32,14 @@ public protocol HPKEPublicKeySerialization: Sendable {
 	/// - Parameters:
 	///  - serialization: The serialized key data.
 	///  - kem: The key encapsulation mechanism that the sender used to encapsulate the key.
-    init<D: ContiguousBytes>(_ serialization: D, kem: HPKE.KEM) throws
+    init<D: ContiguousBytes>(_ serialization: D, kem: HPKE.KEM) throws(CryptoKitMetaError)
 	/// Creates an encoded representation of the public key.
 	///
 	/// - Parameters:
 	///  - kem: The key encapsulation mechanism for encapsulating the key.
     ///  
 	/// - Returns: The encoded key data.
-    func hpkeRepresentation(kem: HPKE.KEM) throws -> Data
+    func hpkeRepresentation(kem: HPKE.KEM) throws(CryptoKitMetaError) -> Data
 }
 
 /// A type that represents the public key in a Diffie-Hellman key exchange.
@@ -73,7 +75,7 @@ public protocol HPKEDiffieHellmanPrivateKeyGeneration: HPKEDiffieHellmanPrivateK
 @preconcurrency
 public protocol HPKEKEMPrivateKeyGeneration: HPKEKEMPrivateKey, Sendable {
     /// Creates a private key generator.
-    init() throws
+    init() throws(CryptoKitMetaError)
 }
 
 extension HPKE {
@@ -86,14 +88,14 @@ extension HPKE {
 
             typealias EncapsulationResult = Crypto.KEM.EncapsulationResult
 
-            init(_ publicKey: DHPK, kem: HPKE.KEM) throws {
+            init(_ publicKey: DHPK, kem: HPKE.KEM) throws(CryptoKitMetaError) {
                 // TODO: Validate Ciphersuite Mismatches
                 _ = try publicKey.hpkeRepresentation(kem: kem)
                 self.key = publicKey
                 self.kem = kem
             }
             
-            func encapsulate() throws -> EncapsulationResult {
+            func encapsulate() throws(CryptoKitMetaError) -> EncapsulationResult {
                 let ephemeralKeys = DHPK.EphemeralPrivateKey()
                 let dh =
                 try ephemeralKeys.sharedSecretFromKeyAgreement(with: key)
@@ -112,18 +114,18 @@ extension HPKE {
             let kem: HPKE.KEM
             let key: DHSK
             
-            init(_ privateKey: DHSK, kem: HPKE.KEM) throws {
+            init(_ privateKey: DHSK, kem: HPKE.KEM) throws(CryptoKitMetaError) {
                 // TODO: Validate Ciphersuite Mismatches
                 _ = try privateKey.publicKey.hpkeRepresentation(kem: kem)
                 self.key = privateKey
                 self.kem = kem
             }
             
-            static func generate() throws -> Self {
+            static func generate() throws(CryptoKitMetaError) -> Self {
                 fatalError("generate() is not available on HPKE.DHKEM.PrivateKey, use generate(kem:) instead.")
             }
             
-            public func decapsulate(_ encapsulated: Data) throws -> SymmetricKey {
+            public func decapsulate(_ encapsulated: Data) throws(CryptoKitMetaError) -> SymmetricKey {
                 let pkE = try DHSK.PublicKey(encapsulated, kem: kem)
                 let dh = try key.sharedSecretFromKeyAgreement(with: pkE)
                 
@@ -133,7 +135,7 @@ extension HPKE {
                                                       kem: kem, kdf: kem.kdf)
             }
             
-            func decapsulate(_ encapsulated: Data, authenticating pkS: DHSK.PublicKey) throws -> SymmetricKey {
+            func decapsulate(_ encapsulated: Data, authenticating pkS: DHSK.PublicKey) throws(CryptoKitMetaError) -> SymmetricKey {
                 let pkE = try DHSK.PublicKey(encapsulated, kem: kem)
                 
                 var dh = try Data(unsafeFromContiguousBytes: key.sharedSecretFromKeyAgreement(with: pkE))
@@ -147,7 +149,7 @@ extension HPKE {
                                                       kdf: kem.kdf)
             }
             
-            func authenticateAndEncapsulateTo(_ publicKey: Self.PublicKey) throws -> (sharedSecret: SymmetricKey, encapsulated: Data) {
+            func authenticateAndEncapsulateTo(_ publicKey: Self.PublicKey) throws(CryptoKitMetaError) -> (sharedSecret: SymmetricKey, encapsulated: Data) {
                 let ephemeralKeys = DHSK.PublicKey.EphemeralPrivateKey()
                 
                 var dh = try Data(unsafeFromContiguousBytes: ephemeralKeys.sharedSecretFromKeyAgreement(with: publicKey.key))

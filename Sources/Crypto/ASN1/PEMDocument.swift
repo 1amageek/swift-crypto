@@ -12,15 +12,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 extension ASN1 {
     /// A PEM document is some data, and a discriminator type that is used to advertise the content.
@@ -31,7 +33,7 @@ extension ASN1 {
 
         var derBytes: Data
 
-        init(pemString: String) throws {
+        init(pemString: String) throws(CryptoKitASN1Error) {
             // A PEM document looks like this:
             //
             // -----BEGIN <SOME DISCRIMINATOR>-----

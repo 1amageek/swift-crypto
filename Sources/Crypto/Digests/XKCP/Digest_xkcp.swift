@@ -11,11 +11,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
-@_implementationOnly import CXKCP
-@_implementationOnly import CXKCPShims
+#if hasFeature(Embedded)
+import CXKCP
+import CXKCPShims
+#else
+import CXKCP
+import CXKCPShims
+#endif
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 protocol XKCPBackedHashFunction: HashFunctionImplementationDetails {

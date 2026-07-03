@@ -12,14 +12,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 nonisolated(unsafe) private let emptyStorage:SecureBytes.Backing = SecureBytes.Backing.createEmpty()
 
@@ -56,7 +58,6 @@ struct SecureBytes: @unchecked Sendable {
     /// Allows initializing a SecureBytes object with a closure that will initialize the memory.
     ///
     /// Note: Please use the safe counterpart, `init(capacity:initializingWith:)`.
-    #if hasFeature(Embedded)
     init<E: Error>(unsafeUninitializedCapacity: Int, initializingWith callback: (inout UnsafeMutableRawBufferPointer, inout Int) throws(E) -> Void) throws(E) {
         self.backing = Backing.create(capacity: unsafeUninitializedCapacity)
         try self.backing._withVeryUnsafeMutableBytes { veryUnsafePointer throws(E) in
@@ -68,19 +69,6 @@ struct SecureBytes: @unchecked Sendable {
             self.backing.count = initializedCount
         }
     }
-    #else
-    init(unsafeUninitializedCapacity: Int, initializingWith callback: (inout UnsafeMutableRawBufferPointer, inout Int) throws -> Void) rethrows {
-        self.backing = Backing.create(capacity: unsafeUninitializedCapacity)
-        try self.backing._withVeryUnsafeMutableBytes { veryUnsafePointer in
-            // As Array does, we want to truncate the initializing pointer to only have the requested size.
-            var veryUnsafePointer = UnsafeMutableRawBufferPointer(rebasing: veryUnsafePointer.prefix(unsafeUninitializedCapacity))
-            var initializedCount = 0
-            try callback(&veryUnsafePointer, &initializedCount)
-
-            self.backing.count = initializedCount
-        }
-    }
-    #endif
 }
 
 extension SecureBytes {
@@ -264,6 +252,7 @@ extension SecureBytes: ContiguousBytes {
 }
 
 // MARK: - DataProtocol conformance
+#if canImport(FoundationEssentials) || canImport(Foundation) || hasFeature(Embedded)
 extension SecureBytes: DataProtocol {
     var regions: CollectionOfOne<SecureBytes> {
         return CollectionOfOne(self)
@@ -272,6 +261,7 @@ extension SecureBytes: DataProtocol {
 
 // MARK: - MutableDataProtocol conformance
 extension SecureBytes: MutableDataProtocol { }
+#endif
 
 // MARK: - Index conformances
 extension SecureBytes.Index: Hashable { }
@@ -464,7 +454,7 @@ extension SecureBytes {
 
         class func create(capacity: Int) -> Backing {
             let capacity = Int(UInt32(capacity).nextPowerOf2ClampedToMax())
-            let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: capacity, alignment: Int(CC_MAX_ALIGNMENT))
+            let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: capacity, alignment: MemoryLayout<UInt64>.alignment)
             return Backing.init(storage: buffer, count: 0)
         }
 
@@ -489,7 +479,7 @@ extension SecureBytes {
         }
 
         class func create(copying original: Backing) -> Backing {
-            let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: original.capacity, alignment: Int(CC_MAX_ALIGNMENT))
+            let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: original.capacity, alignment: MemoryLayout<UInt64>.alignment)
             buffer.copyBytes(from: original.storage)
             return Backing.init(storage: buffer, count: original.count)
         }
@@ -736,6 +726,7 @@ extension UInt32 {
     }
 }
 
+#if canImport(FoundationEssentials) || canImport(Foundation)
 extension Data {
     /// A custom initializer for Data that attempts to share the same storage as the current SecureBytes instance.
     /// This is our best-effort attempt to expose the data in an auto-zeroing fashion. Any mutating function called on
@@ -776,4 +767,5 @@ extension Data {
         }
     }
 }
+#endif
 #endif // canImport(CryptoKit)

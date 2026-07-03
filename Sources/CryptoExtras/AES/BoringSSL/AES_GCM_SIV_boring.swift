@@ -35,7 +35,11 @@ extension BoringSSLAEAD {
         authenticatedData: AuthenticatedData
     ) throws -> Data {
         do {
+            #if hasFeature(Embedded)
+            let context = try AEADContext(cipher: self, key: key.bytes)
+            #else
             let context = try AEADContext(cipher: self, key: key)
+            #endif
             return try context.seal(message: message, nonce: nonce, authenticatedData: authenticatedData)
         } catch CryptoBoringWrapperError.underlyingCoreCryptoError(let errorCode) {
             throw CryptoKitError.underlyingCoreCryptoError(error: errorCode)
@@ -50,7 +54,11 @@ extension BoringSSLAEAD {
         authenticatedData: AuthenticatedData
     ) throws -> Data {
         do {
+            #if hasFeature(Embedded)
+            let context = try AEADContext(cipher: self, key: key.bytes)
+            #else
             let context = try AEADContext(cipher: self, key: key)
+            #endif
             return try context.open(
                 combinedCiphertextAndTag: combinedCiphertextAndTag,
                 nonce: nonce,

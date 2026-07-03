@@ -12,14 +12,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
-#if canImport(FoundationEssentials)
-public import FoundationEssentials
-#else
-public import Foundation
-#endif
 
 typealias MLDSAPublicKeyImpl = OpenSSLMLDSAPublicKeyImpl
 typealias MLDSAPrivateKeyImpl = OpenSSLMLDSAPrivateKeyImpl
@@ -42,7 +44,7 @@ extension MLDSA65 {
         ///
         /// - Parameter rawRepresentation: The public key, in the FIPS 204 standard serialization format.
         /// - Returns: The deserialized public key.
-        public init<D: DataProtocol>(rawRepresentation: D) throws {
+        public init<D: DataProtocol>(rawRepresentation: D) throws(CryptoKitMetaError) {
             self.impl = try MLDSAPublicKeyImpl(rawRepresentation: rawRepresentation)
         }
 
@@ -77,6 +79,8 @@ extension MLDSA65 {
 
     /// The private key for MLDSA65.
     public struct PrivateKey: Signer, Sendable {
+        public typealias Signature = Data
+
         internal let impl: MLDSAPrivateKeyImpl<MLDSA65>
 
         internal init(_ impl: MLDSAPrivateKeyImpl<MLDSA65>) {
@@ -94,7 +98,7 @@ extension MLDSA65 {
         /// ```swift
         /// let privateKey = try! MLDSA65.PrivateKey()
         /// ```
-        public init() throws {
+        public init() throws(CryptoKitMetaError) {
             let impl = try MLDSAPrivateKeyImpl<MLDSA65>()
             self = PrivateKey(impl)
         }
@@ -107,7 +111,7 @@ extension MLDSA65 {
         /// This initializer implements the `ML-DSA.KeyGen_internal` algorithm (Algorithm 16) of FIPS 204.
         ///
         /// If a public key is provided, a consistency check is performed between it and the derived public key.
-        public init<D: DataProtocol>(seedRepresentation: D, publicKey: MLDSA65.PublicKey?) throws {
+        public init<D: DataProtocol>(seedRepresentation: D, publicKey: MLDSA65.PublicKey?) throws(CryptoKitMetaError) {
             var publicKeyRawRepresentation: Data? = nil
             if publicKey != nil {
                 publicKeyRawRepresentation = publicKey!.rawRepresentation
@@ -130,7 +134,7 @@ extension MLDSA65 {
         ///   - data: The data to sign.
         /// - Returns: The MLDSA65 signature.
         /// This method throws if CryptoKit encounters an error producing the signature.
-        public func signature<D: DataProtocol>(for data: D) throws -> Data {
+        public func signature<D: DataProtocol>(for data: D) throws(CryptoKitMetaError) -> Data {
             return try impl.signature(for: data)
         }
 
@@ -140,7 +144,7 @@ extension MLDSA65 {
         ///   - context: Context for the signature.
         /// - Returns: The MLDSA65 signature.
         /// This method throws if CryptoKit encounters an error producing the signature.
-        public func signature<D: DataProtocol, C: DataProtocol>(for data: D, context: C) throws -> Data {
+        public func signature<D: DataProtocol, C: DataProtocol>(for data: D, context: C) throws(CryptoKitMetaError) -> Data {
             return try impl.signature(for: data, context: context)
         }
 
@@ -155,10 +159,10 @@ extension MLDSA65 {
         ///
         /// - Parameter integrityCheckedRepresentation: The integrity-checked data representation of the private key.
         ///   The parameter needs to be 64 bytes long, and contain the seed and a hash of the public key.
-        public init<D: DataProtocol>(integrityCheckedRepresentation: D) throws {
+        public init<D: DataProtocol>(integrityCheckedRepresentation: D) throws(CryptoKitMetaError) {
             let seedSize = MLDSAPrivateKeyImpl<MLDSA65>.seedSize
             guard integrityCheckedRepresentation.count == seedSize + 32 else {
-                throw CryptoKitError.incorrectParameterSize
+                throw error(CryptoKitError.incorrectParameterSize)
             }
 
             let seed = Data(integrityCheckedRepresentation).subdata(in: 0..<seedSize)
@@ -197,7 +201,7 @@ extension MLDSA87 {
         ///
         /// - Parameter rawRepresentation: The public key, in the FIPS 204 standard serialization format.
         /// - Returns: The deserialized public key.
-        public init<D: DataProtocol>(rawRepresentation: D) throws {
+        public init<D: DataProtocol>(rawRepresentation: D) throws(CryptoKitMetaError) {
             self.impl = try MLDSAPublicKeyImpl(rawRepresentation: rawRepresentation)
         }
 
@@ -232,6 +236,8 @@ extension MLDSA87 {
 
     /// The private key for MLDSA87.
     public struct PrivateKey: Signer, Sendable {
+        public typealias Signature = Data
+
         internal let impl: MLDSAPrivateKeyImpl<MLDSA87>
 
         internal init(_ impl: MLDSAPrivateKeyImpl<MLDSA87>) {
@@ -249,7 +255,7 @@ extension MLDSA87 {
         /// ```swift
         /// let privateKey = try! MLDSA87.PrivateKey()
         /// ```
-        public init() throws {
+        public init() throws(CryptoKitMetaError) {
             let impl = try MLDSAPrivateKeyImpl<MLDSA87>()
             self = PrivateKey(impl)
         }
@@ -262,7 +268,7 @@ extension MLDSA87 {
         /// This initializer implements the `ML-DSA.KeyGen_internal` algorithm (Algorithm 16) of FIPS 204.
         ///
         /// If a public key is provided, a consistency check is performed between it and the derived public key.
-        public init<D: DataProtocol>(seedRepresentation: D, publicKey: MLDSA87.PublicKey?) throws {
+        public init<D: DataProtocol>(seedRepresentation: D, publicKey: MLDSA87.PublicKey?) throws(CryptoKitMetaError) {
             var publicKeyRawRepresentation: Data? = nil
             if publicKey != nil {
                 publicKeyRawRepresentation = publicKey!.rawRepresentation
@@ -285,7 +291,7 @@ extension MLDSA87 {
         ///   - data: The data to sign.
         /// - Returns: The MLDSA87 signature.
         /// This method throws if CryptoKit encounters an error producing the signature.
-        public func signature<D: DataProtocol>(for data: D) throws -> Data {
+        public func signature<D: DataProtocol>(for data: D) throws(CryptoKitMetaError) -> Data {
             return try impl.signature(for: data)
         }
 
@@ -295,7 +301,7 @@ extension MLDSA87 {
         ///   - context: Context for the signature.
         /// - Returns: The MLDSA87 signature.
         /// This method throws if CryptoKit encounters an error producing the signature.
-        public func signature<D: DataProtocol, C: DataProtocol>(for data: D, context: C) throws -> Data {
+        public func signature<D: DataProtocol, C: DataProtocol>(for data: D, context: C) throws(CryptoKitMetaError) -> Data {
             return try impl.signature(for: data, context: context)
         }
 
@@ -310,10 +316,10 @@ extension MLDSA87 {
         ///
         /// - Parameter integrityCheckedRepresentation: The integrity-checked data representation of the private key.
         ///   The parameter needs to be 64 bytes long, and contain the seed and a hash of the public key.
-        public init<D: DataProtocol>(integrityCheckedRepresentation: D) throws {
+        public init<D: DataProtocol>(integrityCheckedRepresentation: D) throws(CryptoKitMetaError) {
             let seedSize = MLDSAPrivateKeyImpl<MLDSA87>.seedSize
             guard integrityCheckedRepresentation.count == seedSize + 32 else {
-                throw CryptoKitError.incorrectParameterSize
+                throw error(CryptoKitError.incorrectParameterSize)
             }
 
             let seed = Data(integrityCheckedRepresentation).subdata(in: 0..<seedSize)

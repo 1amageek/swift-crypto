@@ -12,14 +12,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
-#if canImport(FoundationEssentials)
-public import FoundationEssentials
-#else
-public import Foundation
-#endif
 
 /// A hash-based message authentication algorithm.
 ///
@@ -92,7 +94,7 @@ public struct HMAC<H: HashFunction>: MACAlgorithm, Sendable {
                 $0[i] ^= 0x5c
             }
         }
-        outerHasher.update(data: outerKey)
+        outerHasher.update(bytes: outerKey.bytes)
         #endif
     }
     

@@ -12,15 +12,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 extension HPKE {
     internal struct KeySchedule: Sendable {
@@ -37,35 +39,35 @@ extension HPKE {
         var exporterSecret: SymmetricKey
         var ciphersuite: HPKE.Ciphersuite
         
-        static func verifyPSKInputs(mode: HPKE.Mode, psk: SymmetricKey?, pskID: Data?) throws {
+        static func verifyPSKInputs(mode: HPKE.Mode, psk: SymmetricKey?, pskID: Data?) throws(CryptoKitMetaError) {
             let gotPSK = (psk != nil)
             let gotPSKID = (pskID != nil)
             
             if gotPSK != gotPSKID {
-                throw HPKE.Errors.inconsistentPSKInputs
+                throw error(HPKE.Errors.inconsistentPSKInputs)
             }
             
             if gotPSK && !HPKE.Mode.pskModes.contains(mode) {
-                throw HPKE.Errors.unexpectedPSK
+                throw error(HPKE.Errors.unexpectedPSK)
             }
             
             if !gotPSK && HPKE.Mode.pskModes.contains(mode) {
-                throw HPKE.Errors.expectedPSK
+                throw error(HPKE.Errors.expectedPSK)
             }
         }
         
-        init(mode: HPKE.Mode, sharedSecret: ContiguousBytes, info: Data, psk: SymmetricKey?, pskID: Data?, ciphersuite: Ciphersuite) throws {
+        init<SharedSecretBytes: ContiguousBytes>(mode: HPKE.Mode, sharedSecret: SharedSecretBytes, info: Data, psk: SymmetricKey?, pskID: Data?, ciphersuite: Ciphersuite) throws(CryptoKitMetaError) {
             try HPKE.KeySchedule.verifyPSKInputs(mode: mode, psk: psk, pskID: pskID)
             
             let pskIDHash = NonSecretOutputLabeledExtract(salt: nil,
                                                           label: HPKE.KeySchedule.pksIDHashLabel,
-                                                          ikm: pskID.map { SymmetricKey(data: $0) },
+                                                          ikm: pskID,
                                                           suiteID: ciphersuite.identifier,
                                                           kdf: ciphersuite.kdf)
             
             let infoHash = NonSecretOutputLabeledExtract(salt: nil,
                                                          label: HPKE.KeySchedule.infoHashLabel,
-                                                         ikm: SymmetricKey(data: info),
+                                                         ikm: info,
                                                          suiteID: ciphersuite.identifier,
                                                          kdf: ciphersuite.kdf)
             
@@ -76,7 +78,7 @@ extension HPKE {
             
             let secret = LabeledExtract(salt: Data(unsafeFromContiguousBytes: sharedSecret),
                                         label: HPKE.KeySchedule.secretLabel,
-                                        ikm: psk.map { SymmetricKey(data: $0) },
+                                        ikm: psk.map { Data(unsafeFromContiguousBytes: $0) },
                                         suiteID: ciphersuite.identifier,
                                         kdf: ciphersuite.kdf)
             
@@ -118,16 +120,16 @@ extension HPKE {
             }
         }
         
-        mutating func incrementSequenceNumber() throws {
+        mutating func incrementSequenceNumber() throws(CryptoKitMetaError) {
             if self.sequenceNumber >= maxSequenceNumber {
-                throw HPKE.Errors.outOfRangeSequenceNumber
+                throw error(HPKE.Errors.outOfRangeSequenceNumber)
             }
             sequenceNumber += 1
         }
         
-        mutating func seal<M: DataProtocol, AD: DataProtocol>(_ msg: M, authenticating aad: AD) throws -> Data {
+        mutating func seal<M: DataProtocol, AD: DataProtocol>(_ msg: M, authenticating aad: AD) throws(CryptoKitMetaError) -> Data {
             guard !self.ciphersuite.aead.isExportOnly else {
-                throw HPKE.Errors.exportOnlyMode
+                throw error(HPKE.Errors.exportOnlyMode)
             }
             
             let ct = try ciphersuite.aead.seal(msg, authenticating: aad, nonce: currentNonce, using: self.key!)
@@ -135,9 +137,9 @@ extension HPKE {
             return ct
         }
         
-        mutating func open<C: DataProtocol, AD: DataProtocol>(_ ciphertext: C, authenticating aad: AD) throws -> Data {
+        mutating func open<C: DataProtocol, AD: DataProtocol>(_ ciphertext: C, authenticating aad: AD) throws(CryptoKitMetaError) -> Data {
             guard !self.ciphersuite.aead.isExportOnly else {
-                throw HPKE.Errors.exportOnlyMode
+                throw error(HPKE.Errors.exportOnlyMode)
             }
             
             let pt = try ciphersuite.aead.open(ciphertext, nonce: currentNonce, authenticating: aad, using: self.key!)

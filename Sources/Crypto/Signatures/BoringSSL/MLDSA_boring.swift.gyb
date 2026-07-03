@@ -15,22 +15,20 @@
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
-@_implementationOnly import CCryptoBoringSSL
-#if canImport(FoundationEssentials)
-import FoundationEssentials
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
 #else
-import Foundation
+@_implementationOnly import CCryptoBoringSSL
 #endif
 
 // MARK: - Generated file, do NOT edit
 // any edits of this file WILL be overwritten and thus discarded
 // see section `gyb` in `README` for details.
 
-@_implementationOnly import CCryptoBoringSSL
-#if canImport(FoundationEssentials)
-import FoundationEssentials
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
 #else
-import Foundation
+@_implementationOnly import CCryptoBoringSSL
 #endif
 %{
     parameter_sets = ["65", "87"]
@@ -44,7 +42,7 @@ extension MLDSA${parameter_set} {
         private var backing: Backing
 
         /// Initialize a ML-DSA-${parameter_set} private key from a random seed.
-        init() throws {
+        init() throws(CryptoKitError) {
             self.backing = try Backing()
         }
 
@@ -53,8 +51,8 @@ extension MLDSA${parameter_set} {
         /// - Parameter seedRepresentation: The seed to use to generate the private key.
         ///
         /// - Throws: `CryptoKitError.incorrectKeySize` if the seed is not 32 bytes long.
-        init(seedRepresentation: some DataProtocol) throws {
-            self.backing = try Backing(seedRepresentation: seedRepresentation)
+        init(seedRepresentation: some DataProtocol) throws(CryptoKitError) {
+            self.backing = try Backing(seedRepresentation: Data(seedRepresentation))
         }
 
         /// The seed from which this private key was generated.
@@ -72,7 +70,7 @@ extension MLDSA${parameter_set} {
         /// - Parameter data: The message to sign.
         ///
         /// - Returns: The signature of the message.
-        func signature<D: DataProtocol>(for data: D) throws -> Data {
+        func signature<D: DataProtocol>(for data: D) throws(CryptoKitError) -> Data {
             let context: Data? = nil
             return try self.backing.signature(for: data, context: context)
         }
@@ -84,7 +82,7 @@ extension MLDSA${parameter_set} {
         ///   - context: The context to use for the signature.
         ///
         /// - Returns: The signature of the message.
-        func signature<D: DataProtocol, C: DataProtocol>(for data: D, context: C) throws -> Data {
+        func signature<D: DataProtocol, C: DataProtocol>(for data: D, context: C) throws(CryptoKitError) -> Data {
             try self.backing.signature(for: data, context: context)
         }
 
@@ -96,32 +94,35 @@ extension MLDSA${parameter_set} {
             var seed: Data
 
             /// Initialize a ML-DSA-${parameter_set} private key from a random seed.
-            init() throws {
+            init() throws(CryptoKitError) {
                 // We have to initialize all members before `self` is captured by the closure
                 self.key = .init()
                 self.seed = Data()
 
-                self.seed = try withUnsafeTemporaryAllocation(
+                let generatedSeed: Data? = withUnsafeTemporaryAllocation(
                     of: UInt8.self,
                     capacity: MLDSA.seedByteCount
                 ) { seedPtr in
-                    try withUnsafeTemporaryAllocation(
+                    withUnsafeTemporaryAllocation(
                         of: UInt8.self,
                         capacity: MLDSA${parameter_set}.InternalPublicKey.Backing.byteCount
                     ) { publicKeyPtr in
-                        guard
-                            CCryptoBoringSSL_MLDSA${parameter_set}_generate_key(
-                                publicKeyPtr.baseAddress,
-                                seedPtr.baseAddress,
-                                &self.key
-                            ) == 1
-                        else {
-                            throw CryptoKitError.internalBoringSSLError()
+                        let rc = CCryptoBoringSSL_MLDSA${parameter_set}_generate_key(
+                            publicKeyPtr.baseAddress,
+                            seedPtr.baseAddress,
+                            &self.key
+                        )
+                        guard rc == 1 else {
+                            return nil
                         }
 
                         return Data(bytes: seedPtr.baseAddress!, count: MLDSA.seedByteCount)
                     }
                 }
+                guard let generatedSeed else {
+                    throw CryptoKitError.internalBoringSSLError()
+                }
+                self.seed = generatedSeed
             }
 
             /// Initialize a ML-DSA-${parameter_set} private key from a seed.
@@ -129,7 +130,7 @@ extension MLDSA${parameter_set} {
             /// - Parameter seedRepresentation: The seed to use to generate the private key.
             ///
             /// - Throws: `CryptoKitError.incorrectKeySize` if the seed is not 32 bytes long.
-            init(seedRepresentation: some DataProtocol) throws {
+            init(seedRepresentation: Data) throws(CryptoKitError) {
                 guard seedRepresentation.count == MLDSA.seedByteCount else {
                     throw CryptoKitError.incorrectKeySize
                 }
@@ -162,12 +163,11 @@ extension MLDSA${parameter_set} {
             ///   - context: The context to use for the signature.
             ///
             /// - Returns: The signature of the message.
-            func signature<D: DataProtocol, C: DataProtocol>(for data: D, context: C?) throws -> Data {
+            func signature<D: DataProtocol, C: DataProtocol>(for data: D, context: C?) throws(CryptoKitError) -> Data {
                 var signature = Data(repeating: 0, count: MLDSA${parameter_set}.signatureByteCount)
 
                 let rc: CInt = signature.withUnsafeMutableBytes { signaturePtr in
-                    let bytes: ContiguousBytes = data.regions.count == 1 ? data.regions.first! : Array(data)
-                    return bytes.withUnsafeBytes { dataPtr in
+                    return withCryptoDataProtocolUnsafeBytes(data) { dataPtr in
                         context.withUnsafeBytes { contextPtr in
                             CCryptoBoringSSL_MLDSA${parameter_set}_sign(
                                 signaturePtr.baseAddress,
@@ -209,8 +209,8 @@ extension MLDSA${parameter_set} {
         /// - Parameter rawRepresentation: The public key bytes.
         ///
         /// - Throws: `CryptoKitError.incorrectKeySize` if the raw representation is not the correct size.
-        init(rawRepresentation: some DataProtocol) throws {
-            self.backing = try Backing(rawRepresentation: rawRepresentation)
+        init(rawRepresentation: some DataProtocol) throws(CryptoKitError) {
+            self.backing = try Backing(rawRepresentation: Data(rawRepresentation))
         }
 
         /// The raw binary representation of the public key.
@@ -262,24 +262,21 @@ extension MLDSA${parameter_set} {
             /// - Parameter rawRepresentation: The public key bytes.
             ///
             /// - Throws: `CryptoKitError.incorrectKeySize` if the raw representation is not the correct size.
-            init(rawRepresentation: some DataProtocol) throws {
+            init(rawRepresentation: Data) throws(CryptoKitError) {
                 guard rawRepresentation.count == MLDSA${parameter_set}.InternalPublicKey.Backing.byteCount else {
                     throw CryptoKitError.incorrectKeySize
                 }
 
                 self.key = .init()
 
-                let bytes: ContiguousBytes =
-                    rawRepresentation.regions.count == 1
-                    ? rawRepresentation.regions.first!
-                    : Array(rawRepresentation)
-                try bytes.withUnsafeBytes { rawBuffer in
-                    try rawBuffer.withMemoryRebound(to: UInt8.self) { buffer in
+                let parsed = withCryptoDataProtocolUnsafeBytes(rawRepresentation) { rawBuffer in
+                    rawBuffer.withMemoryRebound(to: UInt8.self) { buffer in
                         var cbs = CBS(data: buffer.baseAddress, len: buffer.count)
-                        guard CCryptoBoringSSL_MLDSA${parameter_set}_parse_public_key(&self.key, &cbs) == 1 else {
-                            throw CryptoKitError.internalBoringSSLError()
-                        }
+                        return CCryptoBoringSSL_MLDSA${parameter_set}_parse_public_key(&self.key, &cbs) == 1
                     }
+                }
+                guard parsed else {
+                    throw CryptoKitError.internalBoringSSLError()
                 }
             }
 
@@ -306,11 +303,8 @@ extension MLDSA${parameter_set} {
                 for data: D,
                 context: C?
             ) -> Bool {
-                let signatureBytes: ContiguousBytes =
-                    signature.regions.count == 1 ? signature.regions.first! : Array(signature)
-                return signatureBytes.withUnsafeBytes { signaturePtr in
-                    let dataBytes: ContiguousBytes = data.regions.count == 1 ? data.regions.first! : Array(data)
-                    let rc: CInt = dataBytes.withUnsafeBytes { dataPtr in
+                return withCryptoDataProtocolUnsafeBytes(signature) { signaturePtr in
+                    let rc: CInt = withCryptoDataProtocolUnsafeBytes(data) { dataPtr in
                         context.withUnsafeBytes { contextPtr in
                             CCryptoBoringSSL_MLDSA${parameter_set}_verify(
                                 &self.key,

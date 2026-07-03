@@ -55,7 +55,7 @@ extension AES.GCM {
         /// - Throws: CipherError errors
         public static func seal<Plaintext: DataProtocol>
             (_ message: Plaintext, using key: SymmetricKey, nonce: Nonce? = nil) throws -> SealedBox {
-            return try OpenSSLAESGCMSIVImpl.seal(key: key, message: message, nonce: nonce, authenticatedData: Data?.none)
+            return try OpenSSLAESGCMSIVImpl.seal(key: key, message: message, nonce: nonce, authenticatedData: Optional<Data>.none)
         }
 
         /// Authenticates and decrypts data using AES-GCM-SIV.
@@ -81,7 +81,7 @@ extension AES.GCM {
         /// - Returns: The ciphertext if opening was successful
         /// - Throws: CipherError errors. If the authentication of the sealed box failed, incorrectTag is thrown.
         public static func open(_ sealedBox: SealedBox, using key: SymmetricKey) throws -> Data {
-            return try OpenSSLAESGCMSIVImpl.open(key: key, sealedBox: sealedBox, authenticatedData: Data?.none)
+            return try OpenSSLAESGCMSIVImpl.open(key: key, sealedBox: sealedBox, authenticatedData: Optional<Data>.none)
         }
     }
 }

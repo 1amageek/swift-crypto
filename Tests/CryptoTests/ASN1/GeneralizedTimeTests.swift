@@ -92,11 +92,15 @@ final class GeneralizedTimeTests: XCTestCase {
             serialized.append(UInt8(stringRepresentation.utf8.count))
             serialized.append(contentsOf: stringRepresentation.utf8)
 
-            let result = try? ASN1.GeneralizedTime(asn1Encoded: serialized)
-            XCTAssertEqual(result, expectedResult)
+            do {
+                let result = try ASN1.GeneralizedTime(asn1Encoded: serialized)
+                XCTAssertEqual(result, expectedResult)
 
-            if let expectedResult {
-                try self.assertRoundTrips(expectedResult)
+                if let expectedResult {
+                    try self.assertRoundTrips(expectedResult)
+                }
+            } catch {
+                XCTAssertNil(expectedResult)
             }
         }
     }

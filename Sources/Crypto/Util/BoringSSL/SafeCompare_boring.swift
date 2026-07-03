@@ -11,9 +11,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
@@ -27,8 +28,8 @@ internal func openSSLSafeCompare<LHS: ContiguousBytes, RHS: ContiguousBytes>(
 )
     -> Bool
 {
-    lhs.withUnsafeBytes { lhsPtr in
-        rhs.withUnsafeBytes { rhsPtr in
+    withCryptoUnsafeBytes(lhs) { lhsPtr in
+        withCryptoUnsafeBytes(rhs) { rhsPtr in
             constantTimeCompare(lhsPtr, rhsPtr)
         }
     }

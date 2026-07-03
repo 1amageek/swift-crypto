@@ -12,21 +12,23 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 typealias ChaChaPolyImpl = OpenSSLChaChaPolyImpl
 
-#if canImport(FoundationEssentials)
-public import FoundationEssentials
-#else
-public import Foundation
-#endif
 
 
 /// An implementation of the ChaCha20-Poly1305 cipher.
 @nonexhaustive
-public enum ChaChaPoly: Cipher, Sendable {
+public enum ChaChaPoly: Sendable {
     static let tagByteCount = 16
     static let keyBitsCount = 256
     static let nonceByteCount = 12
@@ -43,7 +45,7 @@ public enum ChaChaPoly: Cipher, Sendable {
     ///
     /// - Returns: The sealed message.
     public static func seal<Plaintext: DataProtocol, AuthenticatedData: DataProtocol>
-        (_ message: Plaintext, using key: SymmetricKey, nonce: Nonce? = nil, authenticating authenticatedData: AuthenticatedData) throws -> SealedBox {
+        (_ message: Plaintext, using key: SymmetricKey, nonce: Nonce? = nil, authenticating authenticatedData: AuthenticatedData) throws(CryptoKitMetaError) -> SealedBox {
         return try ChaChaPolyImpl.encrypt(key: key, message: message, nonce: nonce, authenticatedData: authenticatedData)
     }
 
@@ -57,8 +59,8 @@ public enum ChaChaPoly: Cipher, Sendable {
     ///
     /// - Returns: The sealed message.
     public static func seal<Plaintext: DataProtocol>
-        (_ message: Plaintext, using key: SymmetricKey, nonce: Nonce? = nil) throws -> SealedBox {
-        return try ChaChaPolyImpl.encrypt(key: key, message: message, nonce: nonce, authenticatedData: Data?.none)
+        (_ message: Plaintext, using key: SymmetricKey, nonce: Nonce? = nil) throws(CryptoKitMetaError) -> SealedBox {
+        return try ChaChaPolyImpl.encrypt(key: key, message: message, nonce: nonce, authenticatedData: Optional<Data>.none)
     }
 
     /// Secures the given plaintext message in place with encryption and an
@@ -110,7 +112,7 @@ public enum ChaChaPoly: Cipher, Sendable {
     /// long as the correct key is used and authentication succeeds. The call
     /// throws an error if decryption or authentication fail.
     public static func open<AuthenticatedData: DataProtocol>
-        (_ sealedBox: SealedBox, using key: SymmetricKey, authenticating authenticatedData: AuthenticatedData) throws -> Data {
+        (_ sealedBox: SealedBox, using key: SymmetricKey, authenticating authenticatedData: AuthenticatedData) throws(CryptoKitMetaError) -> Data {
         return try ChaChaPolyImpl.decrypt(key: key, ciphertext: sealedBox, authenticatedData: authenticatedData)
     }
 
@@ -124,8 +126,8 @@ public enum ChaChaPoly: Cipher, Sendable {
     /// long as the correct key is used and authentication succeeds. The call
     /// throws an error if decryption or authentication fail.
     public static func open
-        (_ sealedBox: SealedBox, using key: SymmetricKey) throws -> Data {
-        return try ChaChaPolyImpl.decrypt(key: key, ciphertext: sealedBox, authenticatedData: Data?.none)
+        (_ sealedBox: SealedBox, using key: SymmetricKey) throws(CryptoKitMetaError) -> Data {
+        return try ChaChaPolyImpl.decrypt(key: key, ciphertext: sealedBox, authenticatedData: Optional<Data>.none)
     }
 
     /// Decrypts the message and verifies the authenticity of both the encrypted
@@ -211,13 +213,13 @@ extension ChaChaPoly {
         /// - Parameters:
         ///   - combined: The combined bytes of the tag and ciphertext.
         @inlinable
-        public init<D: DataProtocol>(combined: D) throws {
+        public init<D: DataProtocol>(combined: D) throws(CryptoKitMetaError) {
             // ChachaPoly nonce (12 bytes) + ChachaPoly tag (16 bytes)
             // While we have these values in the internal APIs, we can't use it in inlinable code.
             let chachaPolyOverhead = 12 + 16
             
             if combined.count < chachaPolyOverhead {
-                throw CryptoKitError.incorrectParameterSize
+                throw error(CryptoKitError.incorrectParameterSize)
             }
             
             self.combined = Data(combined)
@@ -229,9 +231,9 @@ extension ChaChaPoly {
         ///   - nonce: The nonce.
         ///   - ciphertext: The encrypted data.
         ///   - tag: An authentication tag.
-        public init<C: DataProtocol, T: DataProtocol>(nonce: ChaChaPoly.Nonce, ciphertext: C, tag: T) throws {
+        public init<C: DataProtocol, T: DataProtocol>(nonce: ChaChaPoly.Nonce, ciphertext: C, tag: T) throws(CryptoKitMetaError) {
             guard tag.count == ChaChaPoly.tagByteCount else {
-                throw CryptoKitError.incorrectParameterSize
+                throw error(CryptoKitError.incorrectParameterSize)
             }
             
             self.combined = Data(nonce) + ciphertext + tag
@@ -243,4 +245,5 @@ extension ChaChaPoly {
         }
     }
 }
+extension ChaChaPoly: Cipher {}
 #endif // canImport(CryptoKit)

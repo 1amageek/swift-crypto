@@ -14,18 +14,29 @@
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension Optional where Wrapped: DataProtocol {
-    func withUnsafeBytes<ReturnValue>(_ body: (UnsafeRawBufferPointer) throws -> ReturnValue) rethrows -> ReturnValue {
+#if hasFeature(Embedded)
+    func withUnsafeBytes<ReturnValue, E: Error>(_ body: (UnsafeRawBufferPointer) throws(E) -> ReturnValue) throws(E) -> ReturnValue {
         if let self {
-            let bytes: ContiguousBytes = self.regions.count == 1 ? self.regions.first! : Array(self)
-            return try bytes.withUnsafeBytes { try body($0) }
+            return try withCryptoDataProtocolUnsafeBytes(self, body)
         } else {
             return try body(UnsafeRawBufferPointer(start: nil, count: 0))
         }
     }
+#else
+    func withUnsafeBytes<ReturnValue>(_ body: (UnsafeRawBufferPointer) throws -> ReturnValue) rethrows -> ReturnValue {
+        if let self {
+            return try self.regions.count == 1
+                ? self.regions.first!.withUnsafeBytes(body)
+                : Array(self).withUnsafeBytes(body)
+        } else {
+            return try body(UnsafeRawBufferPointer(start: nil, count: 0))
+        }
+    }
+#endif
 }

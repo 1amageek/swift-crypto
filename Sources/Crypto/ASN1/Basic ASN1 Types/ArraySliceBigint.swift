@@ -12,15 +12,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 // For temporary purposes we pretend that ArraySlice is our "bigint" type. We don't really need anything else.
 extension ArraySlice: ASN1Serializable where Element == UInt8 { }

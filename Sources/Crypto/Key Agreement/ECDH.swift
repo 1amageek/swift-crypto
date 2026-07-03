@@ -12,17 +12,21 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
+import CryptoBoringWrapper
+
 typealias NISTCurvePublicKeyImpl = OpenSSLNISTCurvePublicKeyImpl
 typealias NISTCurvePrivateKeyImpl = OpenSSLNISTCurvePrivateKeyImpl
 
-#if canImport(FoundationEssentials)
-public import FoundationEssentials
-#else
-public import Foundation
-#endif
 
 // MARK: - Generated file, do NOT edit
 // any edits of this file WILL be overwritten and thus discarded
@@ -46,7 +50,7 @@ extension P256 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
             }
 
             /// Creates a P-256 public key for signing from a compact
@@ -56,7 +60,7 @@ extension P256 {
             ///   - compactRepresentation: A compact representation of the key
             /// as a collection of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compactRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
             }
 
             /// Creates a P-256 public key for signing from an ANSI x9.63
@@ -65,7 +69,7 @@ extension P256 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(x963Representation: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
             }
             
             /// Creates a P-256 public key for signing from a compressed representation of
@@ -75,7 +79,7 @@ extension P256 {
             ///   - compressedRepresentation: A compressed representation of the key as a collection
             /// of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compressedRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -162,7 +166,7 @@ extension P256 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(x963: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
             }
 
             /// Creates a P-256 private key for signing from a collection of bytes.
@@ -171,7 +175,7 @@ extension P256 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<Bytes: ContiguousBytes>(rawRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(data: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -270,7 +274,7 @@ extension P256 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
             }
 
             /// Creates a P-256 public key for key agreement from a compact
@@ -280,7 +284,7 @@ extension P256 {
             ///   - compactRepresentation: A compact representation of the key
             /// as a collection of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compactRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
             }
 
             /// Creates a P-256 public key for key agreement from an ANSI x9.63
@@ -289,7 +293,7 @@ extension P256 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(x963Representation: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
             }
             
             /// Creates a P-256 public key for key agreement from a compressed representation of
@@ -299,7 +303,7 @@ extension P256 {
             ///   - compressedRepresentation: A compressed representation of the key as a collection
             /// of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compressedRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -386,7 +390,7 @@ extension P256 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(x963: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
             }
 
             /// Creates a P-256 private key for key agreement from a collection of bytes.
@@ -395,7 +399,7 @@ extension P256 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<Bytes: ContiguousBytes>(rawRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(data: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -493,7 +497,7 @@ extension P384 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
             }
 
             /// Creates a P-384 public key for signing from a compact
@@ -503,7 +507,7 @@ extension P384 {
             ///   - compactRepresentation: A compact representation of the key
             /// as a collection of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compactRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
             }
 
             /// Creates a P-384 public key for signing from an ANSI x9.63
@@ -512,7 +516,7 @@ extension P384 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(x963Representation: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
             }
             
             /// Creates a P-384 public key for signing from a compressed representation of
@@ -522,7 +526,7 @@ extension P384 {
             ///   - compressedRepresentation: A compressed representation of the key as a collection
             /// of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compressedRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -609,7 +613,7 @@ extension P384 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(x963: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
             }
 
             /// Creates a P-384 private key for signing from a collection of bytes.
@@ -618,7 +622,7 @@ extension P384 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<Bytes: ContiguousBytes>(rawRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(data: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -717,7 +721,7 @@ extension P384 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
             }
 
             /// Creates a P-384 public key for key agreement from a compact
@@ -727,7 +731,7 @@ extension P384 {
             ///   - compactRepresentation: A compact representation of the key
             /// as a collection of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compactRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
             }
 
             /// Creates a P-384 public key for key agreement from an ANSI x9.63
@@ -736,7 +740,7 @@ extension P384 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(x963Representation: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
             }
             
             /// Creates a P-384 public key for key agreement from a compressed representation of
@@ -746,7 +750,7 @@ extension P384 {
             ///   - compressedRepresentation: A compressed representation of the key as a collection
             /// of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compressedRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -833,7 +837,7 @@ extension P384 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(x963: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
             }
 
             /// Creates a P-384 private key for key agreement from a collection of bytes.
@@ -842,7 +846,7 @@ extension P384 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<Bytes: ContiguousBytes>(rawRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(data: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -940,7 +944,7 @@ extension P521 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
             }
 
             /// Creates a P-521 public key for signing from a compact
@@ -950,7 +954,7 @@ extension P521 {
             ///   - compactRepresentation: A compact representation of the key
             /// as a collection of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compactRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
             }
 
             /// Creates a P-521 public key for signing from an ANSI x9.63
@@ -959,7 +963,7 @@ extension P521 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(x963Representation: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
             }
             
             /// Creates a P-521 public key for signing from a compressed representation of
@@ -969,7 +973,7 @@ extension P521 {
             ///   - compressedRepresentation: A compressed representation of the key as a collection
             /// of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compressedRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -1056,7 +1060,7 @@ extension P521 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(x963: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
             }
 
             /// Creates a P-521 private key for signing from a collection of bytes.
@@ -1065,7 +1069,7 @@ extension P521 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<Bytes: ContiguousBytes>(rawRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(data: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -1164,7 +1168,7 @@ extension P521 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
             }
 
             /// Creates a P-521 public key for key agreement from a compact
@@ -1174,7 +1178,7 @@ extension P521 {
             ///   - compactRepresentation: A compact representation of the key
             /// as a collection of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compactRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
             }
 
             /// Creates a P-521 public key for key agreement from an ANSI x9.63
@@ -1183,7 +1187,7 @@ extension P521 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(x963Representation: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
             }
             
             /// Creates a P-521 public key for key agreement from a compressed representation of
@@ -1193,7 +1197,7 @@ extension P521 {
             ///   - compressedRepresentation: A compressed representation of the key as a collection
             /// of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compressedRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -1280,7 +1284,7 @@ extension P521 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(x963: x963Representation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
             }
 
             /// Creates a P-521 private key for key agreement from a collection of bytes.
@@ -1289,7 +1293,7 @@ extension P521 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<Bytes: ContiguousBytes>(rawRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try NISTCurvePrivateKeyImpl(data: rawRepresentation)
+                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
 #if !hasFeature(Embedded)
@@ -1379,7 +1383,7 @@ extension P256.KeyAgreement.PrivateKey: DiffieHellmanKeyAgreement {
     /// key from this user to create the shared secret.
     /// - Returns: The computed shared secret.
     public func sharedSecretFromKeyAgreement(with publicKeyShare: P256.KeyAgreement.PublicKey) throws(CryptoKitMetaError) -> SharedSecret {
-        return try self.openSSLSharedSecretFromKeyAgreement(with: publicKeyShare)
+        return try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try self.openSSLSharedSecretFromKeyAgreement(with: publicKeyShare) }
     }
 }
 // MARK: - P384 + DH
@@ -1391,7 +1395,7 @@ extension P384.KeyAgreement.PrivateKey: DiffieHellmanKeyAgreement {
     /// key from this user to create the shared secret.
     /// - Returns: The computed shared secret.
     public func sharedSecretFromKeyAgreement(with publicKeyShare: P384.KeyAgreement.PublicKey) throws(CryptoKitMetaError) -> SharedSecret {
-        return try self.openSSLSharedSecretFromKeyAgreement(with: publicKeyShare)
+        return try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try self.openSSLSharedSecretFromKeyAgreement(with: publicKeyShare) }
     }
 }
 // MARK: - P521 + DH
@@ -1403,7 +1407,7 @@ extension P521.KeyAgreement.PrivateKey: DiffieHellmanKeyAgreement {
     /// key from this user to create the shared secret.
     /// - Returns: The computed shared secret.
     public func sharedSecretFromKeyAgreement(with publicKeyShare: P521.KeyAgreement.PublicKey) throws(CryptoKitMetaError) -> SharedSecret {
-        return try self.openSSLSharedSecretFromKeyAgreement(with: publicKeyShare)
+        return try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try self.openSSLSharedSecretFromKeyAgreement(with: publicKeyShare) }
     }
 }
 #endif // canImport(CryptoKit)

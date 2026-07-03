@@ -12,22 +12,24 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 extension HPKE {
     struct Context: Sendable {
         var keySchedule: KeySchedule
         var encapsulated: Data
         
-        init<PublicKey: HPKEDiffieHellmanPublicKey>(senderRoleWithCiphersuite ciphersuite: Ciphersuite, mode: Mode, psk: SymmetricKey?, pskID: Data?, pkR: PublicKey, info: Data) throws {
+        init<PublicKey: HPKEDiffieHellmanPublicKey>(senderRoleWithCiphersuite ciphersuite: Ciphersuite, mode: Mode, psk: SymmetricKey?, pskID: Data?, pkR: PublicKey, info: Data) throws(CryptoKitMetaError) {
             let pkRKEM = try HPKE.DHKEM.PublicKey(pkR, kem: ciphersuite.kem)
             
             let encapsulationResult = try pkRKEM.encapsulate()
@@ -36,14 +38,14 @@ extension HPKE {
                                                sharedSecret: encapsulationResult.sharedSecret, info: info, psk: psk, pskID: pskID, ciphersuite: ciphersuite)
         }
 
-        init<PublicKey: HPKEKEMPublicKey>(senderRoleWithCiphersuite ciphersuite: Ciphersuite, mode: Mode, psk: SymmetricKey?, pskID: Data?, pkR: PublicKey, info: Data) throws {
+        init<PublicKey: HPKEKEMPublicKey>(senderRoleWithCiphersuite ciphersuite: Ciphersuite, mode: Mode, psk: SymmetricKey?, pskID: Data?, pkR: PublicKey, info: Data) throws(CryptoKitMetaError) {
             let encapsulationResult = try pkR.encapsulate()
             encapsulated = encapsulationResult.encapsulated
             self.keySchedule = try KeySchedule(mode: mode,
                                                sharedSecret: encapsulationResult.sharedSecret, info: info, psk: psk, pskID: pskID, ciphersuite: ciphersuite)
         }
 
-        init<SK: HPKEDiffieHellmanPrivateKey>(senderRoleWithCiphersuite ciphersuite: Ciphersuite, mode: Mode, psk: SymmetricKey?, pskID: Data?, pkR: SK.PublicKey, info: Data, skS: SK) throws {
+        init<SK: HPKEDiffieHellmanPrivateKey>(senderRoleWithCiphersuite ciphersuite: Ciphersuite, mode: Mode, psk: SymmetricKey?, pskID: Data?, pkR: SK.PublicKey, info: Data, skS: SK) throws(CryptoKitMetaError) {
 
             let skSKEM = try HPKE.DHKEM.PrivateKey(skS, kem: ciphersuite.kem)
             let pkRKEM = try HPKE.DHKEM.PublicKey(pkR, kem: ciphersuite.kem)
@@ -54,7 +56,7 @@ extension HPKE {
             self.keySchedule = try KeySchedule(mode: mode, sharedSecret: encapsulationResult.sharedSecret, info: info, psk: psk, pskID: pskID, ciphersuite: ciphersuite)
         }
         
-        init<PrivateKey: HPKEDiffieHellmanPrivateKey>(recipientRoleWithCiphersuite ciphersuite: Ciphersuite, mode: Mode, enc: Data, psk: SymmetricKey?, pskID: Data?, skR: PrivateKey, info: Data, pkS: PrivateKey.PublicKey?) throws {
+        init<PrivateKey: HPKEDiffieHellmanPrivateKey>(recipientRoleWithCiphersuite ciphersuite: Ciphersuite, mode: Mode, enc: Data, psk: SymmetricKey?, pskID: Data?, skR: PrivateKey, info: Data, pkS: PrivateKey.PublicKey?) throws(CryptoKitMetaError) {
             let skRKEM = try HPKE.DHKEM.PrivateKey(skR, kem: ciphersuite.kem)
             
             let sharedSecret: SymmetricKey
@@ -68,7 +70,7 @@ extension HPKE {
             self.keySchedule = try KeySchedule(mode: mode, sharedSecret: sharedSecret, info: info, psk: psk, pskID: pskID, ciphersuite: ciphersuite)
         }
         
-        init<PrivateKey: HPKEKEMPrivateKey>(recipientRoleWithCiphersuite ciphersuite: Ciphersuite, mode: Mode, enc: Data, psk: SymmetricKey?, pskID: Data?, skR: PrivateKey, info: Data, pkS: PrivateKey.PublicKey?) throws {
+        init<PrivateKey: HPKEKEMPrivateKey>(recipientRoleWithCiphersuite ciphersuite: Ciphersuite, mode: Mode, enc: Data, psk: SymmetricKey?, pskID: Data?, skR: PrivateKey, info: Data, pkS: PrivateKey.PublicKey?) throws(CryptoKitMetaError) {
             let sharedSecret = try skR.decapsulate(enc)
             self.encapsulated = enc
             self.keySchedule = try KeySchedule(mode: mode, sharedSecret: sharedSecret, info: info, psk: psk, pskID: pskID, ciphersuite: ciphersuite)

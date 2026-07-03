@@ -12,6 +12,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
 // MARK: - Generated file, do NOT edit
 // any edits of this file WILL be overwritten and thus discarded
 // see section `gyb` in `README` for details.
@@ -19,18 +26,17 @@
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
-@_implementationOnly import CCryptoBoringSSL
-#if canImport(FoundationEssentials)
-import FoundationEssentials
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
 #else
-import Foundation
+@_implementationOnly import CCryptoBoringSSL
 #endif
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLKEM768 {
     /// A ML-KEM-768 private key.
     @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-    struct InternalPrivateKey: @unchecked Sendable, KEMPrivateKey {
+    struct InternalPrivateKey: @unchecked Sendable {
         private var backing: Backing
 
         /// Initialize a ML-KEM-768 private key from a random seed.
@@ -50,8 +56,8 @@ extension MLKEM768 {
         /// - Parameter seedRepresentation: The seed to use to generate the private key.
         ///
         /// - Throws: `CryptoKitError.incorrectKeySize` if the seed is not 64 bytes long.
-        init(seedRepresentation: some DataProtocol) throws {
-            self.backing = try Backing(seedRepresentation: seedRepresentation)
+        init(seedRepresentation: some DataProtocol) throws(CryptoKitMetaError) {
+            self.backing = try Backing(seedRepresentation: Data(seedRepresentation))
         }
 
         /// The seed from which this private key was generated.
@@ -71,7 +77,7 @@ extension MLKEM768 {
         /// - Throws: `CryptoKitError.incorrectParameterSize` if the encapsulated shared secret is not 1088 bytes long.
         ///
         /// - Returns: The symmetric key.
-        func decapsulate(_ encapsulated: some DataProtocol) throws -> SymmetricKey {
+        func decapsulate(_ encapsulated: some DataProtocol) throws(CryptoKitMetaError) -> SymmetricKey {
             try self.backing.decapsulate(encapsulated)
         }
 
@@ -108,9 +114,9 @@ extension MLKEM768 {
             /// - Parameter seedRepresentation: The seed to use to generate the private key.
             ///
             /// - Throws: `CryptoKitError.incorrectKeySize` if the seed is not 64 bytes long.
-            init(seedRepresentation: some DataProtocol) throws {
+            init(seedRepresentation: Data) throws(CryptoKitMetaError) {
                 guard seedRepresentation.count == MLKEM.seedByteCount else {
-                    throw CryptoKitError.incorrectKeySize
+                    throw error(CryptoKitError.incorrectKeySize)
                 }
 
                 self.key = .init()
@@ -125,7 +131,7 @@ extension MLKEM768 {
                         )
                     }) == 1
                 else {
-                    throw CryptoKitError.internalBoringSSLError()
+                    throw error(CryptoKitError.internalBoringSSLError())
                 }
             }
 
@@ -141,19 +147,15 @@ extension MLKEM768 {
             /// - Throws: `CryptoKitError.incorrectParameterSize` if the encapsulated shared secret is not 1088 bytes long.
             ///
             /// - Returns: The symmetric key.
-            func decapsulate(_ encapsulated: some DataProtocol) throws -> SymmetricKey {
+            func decapsulate(_ encapsulated: some DataProtocol) throws(CryptoKitMetaError) -> SymmetricKey {
                 guard encapsulated.count == MLKEM768.ciphertextByteCount else {
-                    throw CryptoKitError.incorrectParameterSize
+                    throw error(CryptoKitError.incorrectParameterSize)
                 }
 
                 var symmetricKeyData = Data(repeating: 0, count: MLKEM.sharedSecretByteCount)
 
                 let rc: CInt = symmetricKeyData.withUnsafeMutableBytes { symmetricKeyDataPtr in
-                    let bytes: ContiguousBytes =
-                        encapsulated.regions.count == 1
-                        ? encapsulated.regions.first!
-                        : Array(encapsulated)
-                    return bytes.withUnsafeBytes { encapsulatedPtr in
+                    return withCryptoDataProtocolUnsafeBytes(encapsulated) { encapsulatedPtr in
                         CCryptoBoringSSL_MLKEM768_decap(
                             symmetricKeyDataPtr.baseAddress,
                             encapsulatedPtr.baseAddress,
@@ -164,7 +166,7 @@ extension MLKEM768 {
                 }
 
                 guard rc == 1 else {
-                    throw CryptoKitError.internalBoringSSLError()
+                    throw error(CryptoKitError.internalBoringSSLError())
                 }
 
                 return SymmetricKey(data: symmetricKeyData)
@@ -177,7 +179,7 @@ extension MLKEM768 {
 extension MLKEM768 {
     /// A ML-KEM-768 public key.
     @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-    struct InternalPublicKey: @unchecked Sendable, KEMPublicKey {
+    struct InternalPublicKey: @unchecked Sendable {
         private var backing: Backing
 
         fileprivate init(privateKeyBacking: InternalPrivateKey.Backing) {
@@ -189,8 +191,8 @@ extension MLKEM768 {
         /// - Parameter rawRepresentation: The public key bytes.
         ///
         /// - Throws: `CryptoKitError.incorrectKeySize` if the raw representation is not the correct size.
-        init(rawRepresentation: some DataProtocol) throws {
-            self.backing = try Backing(rawRepresentation: rawRepresentation)
+        init(rawRepresentation: some DataProtocol) throws(CryptoKitMetaError) {
+            self.backing = try Backing(rawRepresentation: Data(rawRepresentation))
         }
 
         /// The raw binary representation of the public key.
@@ -221,24 +223,21 @@ extension MLKEM768 {
             /// - Parameter rawRepresentation: The public key bytes.
             ///
             /// - Throws: `CryptoKitError.incorrectKeySize` if the raw representation is not the correct size.
-            init(rawRepresentation: some DataProtocol) throws {
+            init(rawRepresentation: Data) throws(CryptoKitMetaError) {
                 guard rawRepresentation.count == MLKEM768.InternalPublicKey.byteCount else {
-                    throw CryptoKitError.incorrectKeySize
+                    throw error(CryptoKitError.incorrectKeySize)
                 }
 
                 self.key = .init()
 
-                let bytes: ContiguousBytes =
-                    rawRepresentation.regions.count == 1
-                    ? rawRepresentation.regions.first!
-                    : Array(rawRepresentation)
-                try bytes.withUnsafeBytes { rawBuffer in
-                    try rawBuffer.withMemoryRebound(to: UInt8.self) { buffer in
+                let parsed = withCryptoDataProtocolUnsafeBytes(rawRepresentation) { rawBuffer in
+                    rawBuffer.withMemoryRebound(to: UInt8.self) { buffer in
                         var cbs = CBS(data: buffer.baseAddress, len: buffer.count)
-                        guard CCryptoBoringSSL_MLKEM768_parse_public_key(&self.key, &cbs) == 1 else {
-                            throw CryptoKitError.internalBoringSSLError()
-                        }
+                        return CCryptoBoringSSL_MLKEM768_parse_public_key(&self.key, &cbs) == 1
                     }
+                }
+                guard parsed else {
+                    throw error(CryptoKitError.internalBoringSSLError())
                 }
             }
 
@@ -299,7 +298,7 @@ extension MLKEM768 {
 extension MLKEM1024 {
     /// A ML-KEM-1024 private key.
     @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-    struct InternalPrivateKey: @unchecked Sendable, KEMPrivateKey {
+    struct InternalPrivateKey: @unchecked Sendable {
         private var backing: Backing
 
         /// Initialize a ML-KEM-1024 private key from a random seed.
@@ -319,8 +318,8 @@ extension MLKEM1024 {
         /// - Parameter seedRepresentation: The seed to use to generate the private key.
         ///
         /// - Throws: `CryptoKitError.incorrectKeySize` if the seed is not 64 bytes long.
-        init(seedRepresentation: some DataProtocol) throws {
-            self.backing = try Backing(seedRepresentation: seedRepresentation)
+        init(seedRepresentation: some DataProtocol) throws(CryptoKitMetaError) {
+            self.backing = try Backing(seedRepresentation: Data(seedRepresentation))
         }
 
         /// The seed from which this private key was generated.
@@ -340,7 +339,7 @@ extension MLKEM1024 {
         /// - Throws: `CryptoKitError.incorrectParameterSize` if the encapsulated shared secret is not 1088 bytes long.
         ///
         /// - Returns: The symmetric key.
-        func decapsulate(_ encapsulated: some DataProtocol) throws -> SymmetricKey {
+        func decapsulate(_ encapsulated: some DataProtocol) throws(CryptoKitMetaError) -> SymmetricKey {
             try self.backing.decapsulate(encapsulated)
         }
 
@@ -377,9 +376,9 @@ extension MLKEM1024 {
             /// - Parameter seedRepresentation: The seed to use to generate the private key.
             ///
             /// - Throws: `CryptoKitError.incorrectKeySize` if the seed is not 64 bytes long.
-            init(seedRepresentation: some DataProtocol) throws {
+            init(seedRepresentation: Data) throws(CryptoKitMetaError) {
                 guard seedRepresentation.count == MLKEM.seedByteCount else {
-                    throw CryptoKitError.incorrectKeySize
+                    throw error(CryptoKitError.incorrectKeySize)
                 }
 
                 self.key = .init()
@@ -394,7 +393,7 @@ extension MLKEM1024 {
                         )
                     }) == 1
                 else {
-                    throw CryptoKitError.internalBoringSSLError()
+                    throw error(CryptoKitError.internalBoringSSLError())
                 }
             }
 
@@ -410,19 +409,15 @@ extension MLKEM1024 {
             /// - Throws: `CryptoKitError.incorrectParameterSize` if the encapsulated shared secret is not 1088 bytes long.
             ///
             /// - Returns: The symmetric key.
-            func decapsulate(_ encapsulated: some DataProtocol) throws -> SymmetricKey {
+            func decapsulate(_ encapsulated: some DataProtocol) throws(CryptoKitMetaError) -> SymmetricKey {
                 guard encapsulated.count == MLKEM1024.ciphertextByteCount else {
-                    throw CryptoKitError.incorrectParameterSize
+                    throw error(CryptoKitError.incorrectParameterSize)
                 }
 
                 var symmetricKeyData = Data(repeating: 0, count: MLKEM.sharedSecretByteCount)
 
                 let rc: CInt = symmetricKeyData.withUnsafeMutableBytes { symmetricKeyDataPtr in
-                    let bytes: ContiguousBytes =
-                        encapsulated.regions.count == 1
-                        ? encapsulated.regions.first!
-                        : Array(encapsulated)
-                    return bytes.withUnsafeBytes { encapsulatedPtr in
+                    return withCryptoDataProtocolUnsafeBytes(encapsulated) { encapsulatedPtr in
                         CCryptoBoringSSL_MLKEM1024_decap(
                             symmetricKeyDataPtr.baseAddress,
                             encapsulatedPtr.baseAddress,
@@ -433,7 +428,7 @@ extension MLKEM1024 {
                 }
 
                 guard rc == 1 else {
-                    throw CryptoKitError.internalBoringSSLError()
+                    throw error(CryptoKitError.internalBoringSSLError())
                 }
 
                 return SymmetricKey(data: symmetricKeyData)
@@ -446,7 +441,7 @@ extension MLKEM1024 {
 extension MLKEM1024 {
     /// A ML-KEM-1024 public key.
     @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-    struct InternalPublicKey: @unchecked Sendable, KEMPublicKey {
+    struct InternalPublicKey: @unchecked Sendable {
         private var backing: Backing
 
         fileprivate init(privateKeyBacking: InternalPrivateKey.Backing) {
@@ -458,8 +453,8 @@ extension MLKEM1024 {
         /// - Parameter rawRepresentation: The public key bytes.
         ///
         /// - Throws: `CryptoKitError.incorrectKeySize` if the raw representation is not the correct size.
-        init(rawRepresentation: some DataProtocol) throws {
-            self.backing = try Backing(rawRepresentation: rawRepresentation)
+        init(rawRepresentation: some DataProtocol) throws(CryptoKitMetaError) {
+            self.backing = try Backing(rawRepresentation: Data(rawRepresentation))
         }
 
         /// The raw binary representation of the public key.
@@ -490,24 +485,21 @@ extension MLKEM1024 {
             /// - Parameter rawRepresentation: The public key bytes.
             ///
             /// - Throws: `CryptoKitError.incorrectKeySize` if the raw representation is not the correct size.
-            init(rawRepresentation: some DataProtocol) throws {
+            init(rawRepresentation: Data) throws(CryptoKitMetaError) {
                 guard rawRepresentation.count == MLKEM1024.InternalPublicKey.byteCount else {
-                    throw CryptoKitError.incorrectKeySize
+                    throw error(CryptoKitError.incorrectKeySize)
                 }
 
                 self.key = .init()
 
-                let bytes: ContiguousBytes =
-                    rawRepresentation.regions.count == 1
-                    ? rawRepresentation.regions.first!
-                    : Array(rawRepresentation)
-                try bytes.withUnsafeBytes { rawBuffer in
-                    try rawBuffer.withMemoryRebound(to: UInt8.self) { buffer in
+                let parsed = withCryptoDataProtocolUnsafeBytes(rawRepresentation) { rawBuffer in
+                    rawBuffer.withMemoryRebound(to: UInt8.self) { buffer in
                         var cbs = CBS(data: buffer.baseAddress, len: buffer.count)
-                        guard CCryptoBoringSSL_MLKEM1024_parse_public_key(&self.key, &cbs) == 1 else {
-                            throw CryptoKitError.internalBoringSSLError()
-                        }
+                        return CCryptoBoringSSL_MLKEM1024_parse_public_key(&self.key, &cbs) == 1
                     }
+                }
+                guard parsed else {
+                    throw error(CryptoKitError.internalBoringSSLError())
                 }
             }
 

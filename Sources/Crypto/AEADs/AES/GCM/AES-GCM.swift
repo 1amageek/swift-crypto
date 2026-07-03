@@ -12,22 +12,24 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 typealias AESGCMImpl = OpenSSLAESGCMImpl
 
-#if canImport(FoundationEssentials)
-public import FoundationEssentials
-#else
-public import Foundation
-#endif
 
 extension AES {
     /// The Advanced Encryption Standard (AES) Galois Counter Mode (GCM) cipher
     /// suite.
     @nonexhaustive
-    public enum GCM: Cipher, Sendable {
+    public enum GCM: Sendable {
         static let tagByteCount = 16
         static let defaultNonceByteCount = 12
 
@@ -61,7 +63,7 @@ extension AES {
         /// - Returns: The sealed message.
         public static func seal<Plaintext: DataProtocol>
             (_ message: Plaintext, using key: SymmetricKey, nonce: Nonce? = nil) throws(CryptoKitMetaError) -> SealedBox {
-            return try AESGCMImpl.seal(key: key, message: message, nonce: nonce, authenticatedData: Data?.none)
+            return try AESGCMImpl.seal(key: key, message: message, nonce: nonce, authenticatedData: Optional<Data>.none)
         }
 
         /// Secures the given plaintext message with encryption and an optional authentication tag.
@@ -129,7 +131,7 @@ extension AES {
         /// box, as long as the correct key is used and authentication succeeds.
         /// The call throws an error if decryption or authentication fail.
         public static func open(_ sealedBox: SealedBox, using key: SymmetricKey) throws(CryptoKitMetaError) -> Data {
-            return try AESGCMImpl.open(key: key, sealedBox: sealedBox, authenticatedData: Data?.none)
+            return try AESGCMImpl.open(key: key, sealedBox: sealedBox, authenticatedData: Optional<Data>.none)
         }
 
         /// Decrypts the message and verifies its authenticity.
@@ -262,11 +264,7 @@ extension AES.GCM {
             let aesGCMOverhead = 12 + 16
             
             if combined.count < aesGCMOverhead {
-                #if hasFeature(Embedded)
-                throw CryptoKitMetaError.cryptoKitError(underlyingError: CryptoKitError.incorrectParameterSize)
-                #else
-                throw CryptoKitError.incorrectParameterSize
-                #endif
+                throw error(CryptoKitError.incorrectParameterSize)
             }
             
             self.init(combined: Data(combined))
@@ -295,4 +293,5 @@ extension AES.GCM {
         
     }
 }
+extension AES.GCM: Cipher {}
 #endif  // canImport(CryptoKit)

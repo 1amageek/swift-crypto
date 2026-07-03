@@ -14,9 +14,11 @@
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
+
+
 
 #if canImport(CryptoKit)
 @_exported import CryptoKit

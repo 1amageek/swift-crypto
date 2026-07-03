@@ -12,14 +12,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
-#if canImport(FoundationEssentials)
-public import FoundationEssentials
-#else
-public import Foundation
-#endif
 
 extension Curve25519.KeyAgreement {
     static var keyByteCount: Int {
@@ -46,7 +48,11 @@ extension Curve25519 {
             /// - rawRepresentation: A raw representation of the key as a
             /// collection of contiguous bytes.
             public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
-                self.baseKey = try Curve25519PublicKeyImpl(rawRepresentation: rawRepresentation)
+                do {
+                    self.baseKey = try Curve25519PublicKeyImpl(rawRepresentation: rawRepresentation)
+                } catch let cryptoKitError {
+                    throw error(cryptoKitError)
+                }
             }
 
             fileprivate init(baseKey: Curve25519PublicKeyImpl) {
@@ -95,7 +101,11 @@ extension Curve25519 {
             ///   - rawRepresentation: A raw representation of the key as a
             /// collection of contiguous bytes.
             public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
-                self.baseKey = try Curve25519PrivateKeyImpl(rawRepresentation: rawRepresentation)
+                do {
+                    self.baseKey = try Curve25519PrivateKeyImpl(rawRepresentation: rawRepresentation)
+                } catch let cryptoKitError {
+                    throw error(cryptoKitError)
+                }
             }
 
             /// Computes a shared secret with the provided public key from
@@ -108,7 +118,11 @@ extension Curve25519 {
             ///
             /// - Returns: The computed shared secret.
             public func sharedSecretFromKeyAgreement(with publicKeyShare: Curve25519.KeyAgreement.PublicKey) throws(CryptoKitMetaError) -> SharedSecret {
-                return try self.baseKey.sharedSecretFromKeyAgreement(with: publicKeyShare.baseKey)
+                do {
+                    return try self.baseKey.sharedSecretFromKeyAgreement(with: publicKeyShare.baseKey)
+                } catch let cryptoKitError {
+                    throw error(cryptoKitError)
+                }
             }
             
             /// The raw representation of the key as a collection of contiguous

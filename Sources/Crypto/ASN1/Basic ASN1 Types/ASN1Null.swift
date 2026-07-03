@@ -12,15 +12,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 extension ASN1 {
     /// An ASN1 NULL represents nothing.

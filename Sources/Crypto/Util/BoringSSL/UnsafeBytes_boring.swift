@@ -1,0 +1,80 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the SwiftCrypto open source project
+//
+// Copyright (c) 2026 Apple Inc. and the SwiftCrypto project authors
+// Licensed under Apache License v2.0
+//
+// See LICENSE.txt for license information
+// See CONTRIBUTORS.txt for the list of SwiftCrypto project authors
+//
+// SPDX-License-Identifier: Apache-2.0
+//
+//===----------------------------------------------------------------------===//
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+@usableFromInline
+func withCryptoUnsafeBytes<Bytes: ContiguousBytes, Result, E: Error>(
+    _ bytes: Bytes,
+    _ body: (UnsafeRawBufferPointer) throws(E) -> Result
+) throws(E) -> Result {
+    #if hasFeature(Embedded) && !canImport(FoundationEssentials) && !canImport(Foundation)
+    return try bytes.withUnsafeBytes(body)
+    #else
+    do {
+        return try bytes.withUnsafeBytes { buffer in
+            try body(buffer)
+        }
+    } catch let typedError as E {
+        throw typedError
+    } catch {
+        preconditionFailure("Unexpected error type escaped ContiguousBytes.withUnsafeBytes")
+    }
+    #endif
+}
+
+@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+@usableFromInline
+func withCryptoDataProtocolUnsafeBytes<Bytes: DataProtocol, Result, E: Error>(
+    _ bytes: Bytes,
+    _ body: (UnsafeRawBufferPointer) throws(E) -> Result
+) throws(E) -> Result {
+    #if hasFeature(Embedded) && !canImport(FoundationEssentials) && !canImport(Foundation)
+    if bytes.regions.count == 1 {
+        return try bytes.regions.first!.withUnsafeBytes(body)
+    }
+    return try Array(bytes).withUnsafeBytes(body)
+    #else
+    do {
+        if bytes.regions.count == 1 {
+            return try bytes.regions.first!.withUnsafeBytes { buffer in
+                try body(buffer)
+            }
+        }
+        return try Array(bytes).withUnsafeBytes { buffer in
+            try body(buffer)
+        }
+    } catch let typedError as E {
+        throw typedError
+    } catch {
+        preconditionFailure("Unexpected error type escaped DataProtocol.withUnsafeBytes")
+    }
+    #endif
+}
+
+@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+@usableFromInline
+func cryptoData<Bytes: ContiguousBytes>(_ bytes: Bytes) -> Data {
+    bytes.withUnsafeBytes { buffer in
+        guard buffer.count > 0 else {
+            return Data()
+        }
+        return Data(bytes: buffer.baseAddress!, count: buffer.count)
+    }
+}

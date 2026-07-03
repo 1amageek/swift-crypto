@@ -11,15 +11,25 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
-@_implementationOnly import CCryptoBoringSSL
-@_implementationOnly import CCryptoBoringSSLShims
-#if canImport(FoundationEssentials)
-import FoundationEssentials
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
 #else
-import Foundation
+@_implementationOnly import CCryptoBoringSSL
+#endif
+#if hasFeature(Embedded)
+import CCryptoBoringSSLShims
+#else
+@_implementationOnly import CCryptoBoringSSLShims
 #endif
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
@@ -34,14 +44,12 @@ extension Curve25519.KeyAgreement {
         var keyBytes: [UInt8]
 
         @inlinable
-        init<D: ContiguousBytes>(rawRepresentation: D) throws {
-            self.keyBytes = try rawRepresentation.withUnsafeBytes { dataPtr in
-                guard dataPtr.count == Curve25519.KeyAgreement.keySizeBytes else {
-                    throw CryptoKitError.incorrectKeySize
-                }
-
-                return Array(dataPtr)
+        init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitError) {
+            let keyBytes = rawRepresentation.withUnsafeBytes { Array($0) }
+            guard keyBytes.count == Curve25519.KeyAgreement.keySizeBytes else {
+                throw CryptoKitError.incorrectKeySize
             }
+            self.keyBytes = keyBytes
         }
 
         @usableFromInline
@@ -90,13 +98,14 @@ extension Curve25519.KeyAgreement {
             self.key[lastByteIndex] |= 64
         }
 
-        init<D: ContiguousBytes>(rawRepresentation: D) throws {
-            let publicBytes: [UInt8] = try rawRepresentation.withUnsafeBytes { privatePointer in
-                try OpenSSLCurve25519PrivateKeyImpl.validateX25519PrivateKeyData(
-                    rawRepresentation: privatePointer
-                )
+        init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitError) {
+            let privateBytes = rawRepresentation.withUnsafeBytes { Array($0) }
+            guard privateBytes.count == Curve25519.KeyAgreement.keySizeBytes else {
+                throw CryptoKitError.incorrectKeySize
+            }
 
-                return Array(unsafeUninitializedCapacity: Curve25519.KeyAgreement.keySizeBytes) {
+            let publicBytes: [UInt8] = privateBytes.withUnsafeBytes { privatePointer in
+                Array(unsafeUninitializedCapacity: Curve25519.KeyAgreement.keySizeBytes) {
                     publicKeyBytes,
                     publicKeySize in
                     precondition(publicKeyBytes.count >= Curve25519.KeyAgreement.keySizeBytes)
@@ -108,14 +117,14 @@ extension Curve25519.KeyAgreement {
                 }
             }
 
-            self.key = SecureBytes(bytes: rawRepresentation)
+            self.key = SecureBytes(bytes: privateBytes)
             self.publicKey = .init(publicBytes)
         }
 
         @usableFromInline
         func sharedSecretFromKeyAgreement(
             with publicKeyShare: OpenSSLCurve25519PublicKeyImpl
-        ) throws
+        ) throws(CryptoKitError)
             -> SharedSecret
         {
             let sharedSecret = SecureBytes(
@@ -155,7 +164,7 @@ extension Curve25519.KeyAgreement {
 
         /// Validates whether the passed x25519 key representation is valid.
         /// - Parameter rawRepresentation: The provided key representation. Expected to be a valid 32-bytes private key.
-        static func validateX25519PrivateKeyData(rawRepresentation: UnsafeRawBufferPointer) throws {
+        static func validateX25519PrivateKeyData(rawRepresentation: UnsafeRawBufferPointer) throws(CryptoKitError) {
             guard rawRepresentation.count == 32 else {
                 throw CryptoKitError.incorrectKeySize
             }

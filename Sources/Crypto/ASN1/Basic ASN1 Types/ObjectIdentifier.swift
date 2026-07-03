@@ -12,15 +12,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 extension ASN1 {
     /// An Object Identifier is a representation of some kind of object: really any kind of object.

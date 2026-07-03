@@ -12,14 +12,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
-#if canImport(FoundationEssentials)
-public import FoundationEssentials
-#else
-public import Foundation
-#endif
 // MARK: - Generated file, do NOT edit
 // any edits of this file WILL be overwritten and thus discarded
 // see section `gyb` in `README` for details.
@@ -59,7 +61,7 @@ extension AES.GCM {
                 throw error(CryptoKitError.incorrectParameterSize)
             }
 
-            self.storage = Storage(copying: data)
+            self.storage = data.withUnsafeBytes { Storage(copying: $0.bytes) }
         }
 
         /// Creates a nonce from the given data.
@@ -183,7 +185,7 @@ extension ChaChaPoly {
                 throw error(CryptoKitError.incorrectParameterSize)
             }
 
-            self.storage = Storage(copying: data)
+            self.storage = data.withUnsafeBytes { Storage(copying: $0.bytes) }
         }
 
         /// Creates a nonce from the given data.
@@ -215,7 +217,7 @@ extension ChaChaPoly {
                 throw error(CryptoKitError.incorrectParameterSize)
             }
 
-            self.storage = Storage(copying: data)
+            self.storage = Data(data).withUnsafeBytes { Storage(copying: $0.bytes) }
         }
 
         /// Calls the given closure with a pointer to the underlying bytes of the array’s

@@ -12,15 +12,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 extension HPKE {
     /// The authenticated encryption with associated data (AEAD) algorithms to use in HPKE.
@@ -89,7 +91,7 @@ extension HPKE {
             return I2OSP(value: Int(self.value), outputByteCount: 2)
         }
         
-        internal func seal<D: DataProtocol, AD: DataProtocol>(_ message: D, authenticating aad: AD, nonce: Data, using key: SymmetricKey) throws -> Data {
+        internal func seal<D: DataProtocol, AD: DataProtocol>(_ message: D, authenticating aad: AD, nonce: Data, using key: SymmetricKey) throws(CryptoKitMetaError) -> Data {
             switch self {
             case .chaChaPoly:
                 return try ChaChaPoly.seal(message, using: key, nonce: ChaChaPoly.Nonce(data: nonce), authenticating: aad).combined.dropFirst(nonce.count)
@@ -98,9 +100,9 @@ extension HPKE {
             }
         }
         
-        internal func open<C: DataProtocol, AD: DataProtocol>(_ ct: C, nonce: Data, authenticating aad: AD, using key: SymmetricKey) throws -> Data {
+        internal func open<C: DataProtocol, AD: DataProtocol>(_ ct: C, nonce: Data, authenticating aad: AD, using key: SymmetricKey) throws(CryptoKitMetaError) -> Data {
             guard ct.count >= self.tagByteCount else {
-                throw HPKE.Errors.expectedPSK
+                throw error(HPKE.Errors.expectedPSK)
             }
             
             switch self {
@@ -115,7 +117,7 @@ extension HPKE {
                 return try ChaChaPoly.open(sealedBox, using: key, authenticating: aad)
             }
             case .exportOnly:
-                throw HPKE.Errors.exportOnlyMode
+                throw error(HPKE.Errors.exportOnlyMode)
             }
         }
     }

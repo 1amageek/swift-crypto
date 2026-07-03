@@ -12,15 +12,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if canImport(FoundationEssentials)
-public import FoundationEssentials
-#else
-public import Foundation
-#endif
 
 /// A key encapsulation mechanism.
 ///
@@ -50,7 +52,7 @@ public protocol KEMPublicKey: Sendable {
     /// Share the encapsulated secret with the person who has the ``KEMPrivateKey``.
     /// They use ``KEMPrivateKey/decapsulate(_:)`` to recover the shared secret.
     /// - Returns: The shared secret, and its encapsulated version.
-    func encapsulate() throws -> KEM.EncapsulationResult
+    func encapsulate() throws(CryptoKitMetaError) -> KEM.EncapsulationResult
 }
 
 /// The private key for a key encapsulation mechanism.
@@ -63,12 +65,12 @@ public protocol KEMPrivateKey: Sendable {
     ///
     /// Give the ``publicKey`` to another person so that they can encapsulate
     /// shared secrets that you recover by calling ``decapsulate(_:)``.
-    static func generate() throws -> Self
+    static func generate() throws(CryptoKitMetaError) -> Self
     
     /// Recovers a shared secret from an encapsulated representation.
     /// - Parameter encapsulated: The encapsulated shared secret that someone created using this key's ``publicKey``.
     /// - Returns: The decapsulated shared secret.
-    func decapsulate(_ encapsulated: Data) throws -> SymmetricKey
+    func decapsulate(_ encapsulated: Data) throws(CryptoKitMetaError) -> SymmetricKey
     
     /// The associated public key.
     var publicKey: PublicKey { get }
@@ -84,12 +86,12 @@ public protocol KEMOneTimePrivateKey: ~Copyable, Sendable {
     ///
     /// Give the ``publicKey`` to another person so that they can encapsulate
     /// shared secrets that you recover by calling ``decapsulate(_:)``.
-    static func generate() throws -> Self
+    static func generate() throws(CryptoKitMetaError) -> Self
 
     /// Recovers a shared secret from an encapsulated representation.
     /// - Parameter encapsulated: The encapsulated shared secret that someone created using this key's ``publicKey``.
     /// - Returns: The decapsulated shared secret.
-    consuming func decapsulate(_ encapsulated: Data) throws -> SymmetricKey
+    consuming func decapsulate(_ encapsulated: Data) throws(CryptoKitMetaError) -> SymmetricKey
 
     /// The associated public key.
     var publicKey: PublicKey { get }

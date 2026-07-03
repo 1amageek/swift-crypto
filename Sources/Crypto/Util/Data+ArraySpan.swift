@@ -11,16 +11,19 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
+#if canImport(FoundationEssentials) || canImport(Foundation)
 extension Data {
     /// Copy the raw bytes from the given span into a new Data instance.
     init(copying bytes: RawSpan) {
@@ -57,5 +60,6 @@ extension InlineArray where Element == UInt8 {
         }
     }
 }
+#endif
 
 #endif

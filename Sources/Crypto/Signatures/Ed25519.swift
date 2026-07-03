@@ -12,14 +12,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
-#if canImport(FoundationEssentials)
-public import FoundationEssentials
-#else
-public import Foundation
-#endif
 
 protocol DigestValidator {
     associatedtype Signature
@@ -66,7 +67,11 @@ extension Curve25519.Signing.PrivateKey: Signer {
     /// different signature on every call, even for the same data and key, to
     /// guard against side-channel attacks.
     public func signature<D: DataProtocol>(for data: D) throws(CryptoKitMetaError) -> Data {
-        return try self.openSSLSignature(for: data)
+        do {
+            return try self.openSSLSignature(for: data)
+        } catch let cryptoKitError {
+            throw error(cryptoKitError)
+        }
     }
 }
 #endif // canImport(CryptoKit)

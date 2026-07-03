@@ -12,15 +12,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if canImport(FoundationEssentials)
-public import FoundationEssentials
-#else
-public import Foundation
-#endif
 
 typealias AESWRAPImpl = BoringSSLAESWRAPImpl
 
@@ -39,7 +41,7 @@ extension AES {
         ///   - kek: The key encryption key.
         ///
         /// - Returns: The wrapped key.
-        public static func wrap(_ keyToWrap: SymmetricKey, using kek: SymmetricKey) throws -> Data {
+        public static func wrap(_ keyToWrap: SymmetricKey, using kek: SymmetricKey) throws(CryptoKitMetaError) -> Data {
             return try AESWRAPImpl.wrap(key: kek, keyToWrap: keyToWrap)
         }
 
@@ -54,7 +56,7 @@ extension AES {
         ///   - kek: The key encryption key.
         ///
         /// - Returns: The unwrapped key.
-        public static func unwrap<WrappedKey: DataProtocol>(_ wrappedKey: WrappedKey, using kek: SymmetricKey) throws -> SymmetricKey {
+        public static func unwrap<WrappedKey: DataProtocol>(_ wrappedKey: WrappedKey, using kek: SymmetricKey) throws(CryptoKitMetaError) -> SymmetricKey {
             return try AESWRAPImpl.unwrap(key: kek, wrappedKey: wrappedKey)
         }
     }

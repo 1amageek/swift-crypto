@@ -12,16 +12,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if canImport(CryptoKit)
-@_exported import CryptoKit
-#else
-
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
+
+#if canImport(CryptoKit)
+@_exported import CryptoKit
+#else
 
 protocol AEADSealedBox: Sendable {
     associatedtype Nonce: Sequence
@@ -38,7 +38,7 @@ protocol AEADSealedBox: Sendable {
     ///   - nonce: The nonce.
     ///   - tag: The authentication tag
     ///   - ciphertext: The ciphertext
-    init<C: DataProtocol, T: DataProtocol>(nonce: Nonce, ciphertext: C, tag: T) throws
+    init<C: DataProtocol, T: DataProtocol>(nonce: Nonce, ciphertext: C, tag: T) throws(CryptoKitMetaError)
 }
 
 /// A type representing authenticated encryption with associated data.

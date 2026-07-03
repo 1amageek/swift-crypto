@@ -12,15 +12,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+
 #if canImport(CryptoKit)
 @_exported import CryptoKit
 #else
 
-#if canImport(FoundationEssentials)
-public import FoundationEssentials
-#else
-public import Foundation
-#endif
 
 extension P256.KeyAgreement.PrivateKey: HPKEDiffieHellmanPrivateKeyGeneration {
 	/// Creates a NIST P-256 elliptic curve private key for use with Diffie-Hellman key exchange.
@@ -33,11 +35,11 @@ extension P256.KeyAgreement.PublicKey: HPKEDiffieHellmanPublicKey {
 	/// The type of the ephemeral private key associated with this public key.
     public typealias EphemeralPrivateKey = P256.KeyAgreement.PrivateKey
     
-    static func validatekem(_ kem: HPKE.KEM) throws {
+    static func validatekem(_ kem: HPKE.KEM) throws(CryptoKitMetaError) {
         switch kem {
         case .P256_HKDF_SHA256: do {}
         default: do {
-            throw HPKE.Errors.inconsistentCiphersuiteAndKey
+            throw error(HPKE.Errors.inconsistentCiphersuiteAndKey)
         }
         }
     }
@@ -48,7 +50,7 @@ extension P256.KeyAgreement.PublicKey: HPKEDiffieHellmanPublicKey {
 	///  - serialization: The serialized bytes of the public key.
 	///  - kem: The key encapsulation mechanism to use with the public key.
     /// - Throws: ``CryptoKit/HPKE/Errors/inconsistentCiphersuiteAndKey`` if the key encapsulation mechanism requested is incompatible with this public key.
-    public init<D>(_ serialization: D, kem: HPKE.KEM) throws where D: ContiguousBytes {
+    public init<D>(_ serialization: D, kem: HPKE.KEM) throws(CryptoKitMetaError) where D: ContiguousBytes {
         try Self.validatekem(kem)
         try self.init(x963Representation: serialization)
     }
@@ -59,7 +61,7 @@ extension P256.KeyAgreement.PublicKey: HPKEDiffieHellmanPublicKey {
 	///  - kem: The Key Encapsulation Mechanism to use with the public key.
 	/// - Returns: The serialized representation of the public key.
     /// - Throws: ``CryptoKit/HPKE/Errors/inconsistentCiphersuiteAndKey`` if the key encapsulation mechanism requested is incompatible with this public key.
-    public func hpkeRepresentation(kem: HPKE.KEM) throws -> Data {
+    public func hpkeRepresentation(kem: HPKE.KEM) throws(CryptoKitMetaError) -> Data {
         try Self.validatekem(kem)
         return self.x963Representation
     }
@@ -79,11 +81,11 @@ extension P384.KeyAgreement.PublicKey: HPKEDiffieHellmanPublicKey {
 	/// The type of the ephemeral private key associated with this public key.
     public typealias EphemeralPrivateKey = P384.KeyAgreement.PrivateKey
     
-    static func validatekem(_ kem: HPKE.KEM) throws {
+    static func validatekem(_ kem: HPKE.KEM) throws(CryptoKitMetaError) {
         switch kem {
         case .P384_HKDF_SHA384: do {}
         default: do {
-            throw HPKE.Errors.inconsistentCiphersuiteAndKey
+            throw error(HPKE.Errors.inconsistentCiphersuiteAndKey)
         }
         }
     }
@@ -95,7 +97,7 @@ extension P384.KeyAgreement.PublicKey: HPKEDiffieHellmanPublicKey {
 	///  - kem: The Key Encapsulation Mechanism to use with the public key.
     ///
     /// - Throws: ``CryptoKit/HPKE/Errors/inconsistentCiphersuiteAndKey`` if the key encapsulation mechanism requested is incompatible with this public key.
-    public init<D>(_ serialization: D, kem: HPKE.KEM) throws where D: ContiguousBytes {
+    public init<D>(_ serialization: D, kem: HPKE.KEM) throws(CryptoKitMetaError) where D: ContiguousBytes {
         try Self.validatekem(kem)
         try self.init(x963Representation: serialization)
     }
@@ -108,7 +110,7 @@ extension P384.KeyAgreement.PublicKey: HPKEDiffieHellmanPublicKey {
 	/// - Returns: The serialized representation of the public key.
     ///
     /// - Throws: ``CryptoKit/HPKE/Errors/inconsistentCiphersuiteAndKey`` if the key encapsulation mechanism requested is incompatible with this public key.
-    public func hpkeRepresentation(kem: HPKE.KEM) throws -> Data {
+    public func hpkeRepresentation(kem: HPKE.KEM) throws(CryptoKitMetaError) -> Data {
         try Self.validatekem(kem)
         return self.x963Representation
     }
@@ -125,11 +127,11 @@ extension P521.KeyAgreement.PublicKey: HPKEDiffieHellmanPublicKey {
 	/// The type of the ephemeral private key associated with this public key.
     public typealias EphemeralPrivateKey = P521.KeyAgreement.PrivateKey
     
-    static func validatekem(_ kem: HPKE.KEM) throws {
+    static func validatekem(_ kem: HPKE.KEM) throws(CryptoKitMetaError) {
         switch kem {
         case .P521_HKDF_SHA512: do {}
         default: do {
-            throw HPKE.Errors.inconsistentCiphersuiteAndKey
+            throw error(HPKE.Errors.inconsistentCiphersuiteAndKey)
         }
         }
     }
@@ -141,7 +143,7 @@ extension P521.KeyAgreement.PublicKey: HPKEDiffieHellmanPublicKey {
 	///  - kem: The Key Encapsulation Mechanism to use with the public key.
     ///
     /// - Throws: ``CryptoKit/HPKE/Errors/inconsistentCiphersuiteAndKey`` if the key encapsulation mechanism requested is incompatible with this public key.
-    public init<D>(_ serialization: D, kem: HPKE.KEM) throws where D: ContiguousBytes {
+    public init<D>(_ serialization: D, kem: HPKE.KEM) throws(CryptoKitMetaError) where D: ContiguousBytes {
         try Self.validatekem(kem)
         try self.init(x963Representation: serialization)
     }
@@ -154,7 +156,7 @@ extension P521.KeyAgreement.PublicKey: HPKEDiffieHellmanPublicKey {
 	/// - Returns: The serialized representation of the public key.
     ///
     /// - Throws: ``CryptoKit/HPKE/Errors/inconsistentCiphersuiteAndKey`` if the key encapsulation mechanism requested is incompatible with this public key.
-    public func hpkeRepresentation(kem: HPKE.KEM) throws -> Data {
+    public func hpkeRepresentation(kem: HPKE.KEM) throws(CryptoKitMetaError) -> Data {
         try Self.validatekem(kem)
         return self.x963Representation
     }

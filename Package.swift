@@ -43,17 +43,20 @@ let swiftSettings: [SwiftSetting] = [
     .enableExperimentalFeature("Lifetimes"),
 ]
 
-// This doesn't work when cross-compiling: the privacy manifest will be included in the Bundle and
-// Foundation will be linked. This is, however, strictly better than unconditionally adding the
-// resource.
-#if canImport(Darwin)
-let privacyManifestExclude: [String] = []
-let privacyManifestResource: [PackageDescription.Resource] = [.copy("PrivacyInfo.xcprivacy")]
-#else
-// Exclude on other platforms to avoid build warnings.
-let privacyManifestExclude: [String] = ["PrivacyInfo.xcprivacy"]
-let privacyManifestResource: [PackageDescription.Resource] = []
-#endif
+// SwiftPM resources generate a Foundation.Bundle accessor. Embedded builds do not have Foundation,
+// and Package.swift is evaluated for the host platform when cross-compiling. Keep the privacy
+// manifest opt-in so embedded and non-Darwin cross-compilation do not accidentally link Foundation.
+let includePrivacyManifest: Bool = {
+    #if canImport(Darwin)
+    return ProcessInfo.processInfo.environment["SWIFT_CRYPTO_ENABLE_PRIVACY_MANIFEST"] == "1"
+    #else
+    return false
+    #endif
+}()
+
+let privacyManifestExclude: [String] = includePrivacyManifest ? [] : ["PrivacyInfo.xcprivacy"]
+let privacyManifestResource: [PackageDescription.Resource] =
+    includePrivacyManifest ? [.copy("PrivacyInfo.xcprivacy")] : []
 
 let package = Package(
     name: "swift-crypto",
@@ -106,7 +109,6 @@ let package = Package(
                 "CMakeLists.txt"
             ],
             cSettings: [
-                .define("XKCP_has_KeccakP1600"),
                 .headerSearchPath("include"),
                 .headerSearchPath("high"),
                 .headerSearchPath("low"),
@@ -142,6 +144,7 @@ let package = Package(
             ],
             exclude: privacyManifestExclude + [
                 "CMakeLists.txt",
+                "vendored-sources.txt",
                 "Signatures/BoringSSL/MLDSA_boring.swift.gyb",
                 "KEM/BoringSSL/MLKEM_boring.swift.gyb",
             ],
