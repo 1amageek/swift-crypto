@@ -18,7 +18,7 @@ import XCTest
 class ARCTests: XCTestCase {
     func assertEndToEndWorkflow() throws {
         let ciphersuite = P256._ARCV1.ciphersuite
-        let (generatorG, generatorH) = ARC.getGenerators(suite: ciphersuite)
+        let (generatorG, generatorH) = try ARC.getGenerators(suite: ciphersuite)
 
         // Create a server, passing in the server keys and key blinding.
         let x0 = PrimeOrderCurveGroup<P256>.Scalar.random
@@ -26,7 +26,7 @@ class ARCTests: XCTestCase {
         let x2 = PrimeOrderCurveGroup<P256>.Scalar.random
         let x0Blinding = PrimeOrderCurveGroup<P256>.Scalar.random
         let serverPrivateKey = ARC.ServerPrivateKey(x0: x0, x1: x1, x2: x2, x0Blinding: x0Blinding)
-        let server = ARC.Server(ciphersuite: ciphersuite, x0: x0, x1: x1, x2: x2, x0Blinding: x0Blinding)
+        let server = try ARC.Server(ciphersuite: ciphersuite, x0: x0, x1: x1, x2: x2, x0Blinding: x0Blinding)
         let serverPublicKey = server.serverPublicKey
         XCTAssert(serverPublicKey.X0 == x0 * generatorG + x0Blinding * generatorH)
         XCTAssert(serverPublicKey.X1 == x1 * generatorH)
@@ -142,7 +142,7 @@ class ARCTests: XCTestCase {
             nonce: nonce1))
 
         // Test that verifying with the wrong server (wrong server keys) fails.
-        let wrongServer = ARC.Server(ciphersuite: ciphersuite)
+        let wrongServer = try ARC.Server(ciphersuite: ciphersuite)
         XCTAssertFalse(try wrongServer.verify(
             presentation: presentation3,
             requestContext: requestContext,

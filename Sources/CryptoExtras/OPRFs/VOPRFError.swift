@@ -20,7 +20,6 @@ public enum VOPRFError: Error, Equatable, Sendable {
     case invalidElement
     case invalidProof
     case invalidEncoding
-    case invalidScalar
     case invalidSeed
     case messageTooLong
     case keyInfoTooLong
@@ -46,40 +45,47 @@ private func voprfError(
     #if hasFeature(Embedded)
     switch error {
     case .cryptoKitError(let underlyingError):
-        if underlyingError == .authenticationFailure {
+        switch underlyingError {
+        case .authenticationFailure:
             return .invalidProof
+        case .incorrectKeySize, .incorrectParameterSize, .invalidParameter:
+            return fallback
+        case .underlyingCoreCryptoError, .wrapFailure, .unwrapFailure:
+            return .internalFailure
+        @unknown default:
+            return .internalFailure
         }
-        return fallback
     case .asn1Error, .hpkeError, .kemError, .rsapssspkiError:
-        return fallback
+        return .internalFailure
     @unknown default:
-        return fallback
+        return .internalFailure
     }
     #else
     if let oprfError = error as? OPRF.Errors {
         switch oprfError {
         case .invalidProof:
             return .invalidProof
-        case .invalidScalar:
-            return .invalidScalar
-        case .invalidSeed:
-            return .invalidSeed
-        case .messageTooLong:
-            return .messageTooLong
-        case .infoTooLong:
-            return .keyInfoTooLong
-        case .keyDerivationFailed:
-            return .keyDerivationFailed
-        case .invalidModeForInfo, .incompatibleMode, .missingInfo, .emptyBatch,
+        case .invalidScalar, .invalidSeed, .messageTooLong, .infoTooLong,
+            .keyDerivationFailed, .invalidModeForInfo, .incompatibleMode, .missingInfo, .emptyBatch,
             .invalidBatchSize, .batchTooLarge, .transcriptElementTooLong:
             return fallback
         }
     }
-    if let cryptoKitError = error as? CryptoKitError,
-        cryptoKitError == .authenticationFailure
-    {
-        return .invalidProof
+    if let cryptoKitError = error as? CryptoKitError {
+        switch cryptoKitError {
+        case .authenticationFailure:
+            return .invalidProof
+        case .incorrectKeySize, .incorrectParameterSize, .invalidParameter:
+            return fallback
+        case .underlyingCoreCryptoError, .wrapFailure, .unwrapFailure:
+            return .internalFailure
+        @unknown default:
+            return .internalFailure
+        }
     }
-    return fallback
+    if error is CryptoKitASN1Error {
+        return .internalFailure
+    }
+    return .internalFailure
     #endif
 }

@@ -24,18 +24,34 @@ package final class BoringSSLEllipticCurveGroup: @unchecked Sendable {
 
     @usableFromInline package let generator: EllipticCurvePoint
 
+    private let curveCoefficients: (
+        field: ArbitraryPrecisionInteger,
+        a: ArbitraryPrecisionInteger,
+        b: ArbitraryPrecisionInteger
+    )
+
     @usableFromInline
     package init(_ curve: CurveName) throws(CryptoBoringWrapperError) {
         guard let group = CCryptoBoringSSL_EC_GROUP_new_by_curve_name(curve.baseNID) else {
             throw CryptoBoringWrapperError.internalBoringSSLError()
         }
-
-        self._group = group
-
-        let baseOrder = CCryptoBoringSSL_EC_GROUP_get0_order(self._group)!
-        self.order = try! ArbitraryPrecisionInteger(copying: baseOrder)
-
-        self.generator = try EllipticCurvePoint(_generatorOf: self._group)
+        do throws(CryptoBoringWrapperError) {
+            guard let baseOrder = CCryptoBoringSSL_EC_GROUP_get0_order(group) else {
+                throw CryptoBoringWrapperError.internalBoringSSLError()
+            }
+            let order = try ArbitraryPrecisionInteger(copying: baseOrder)
+            let generator = try EllipticCurvePoint(_generatorOf: group)
+            let curveCoefficients = try Self.readWeierstrassCoefficients(
+                from: group
+            )
+            self._group = group
+            self.order = order
+            self.generator = generator
+            self.curveCoefficients = curveCoefficients
+        } catch let error {
+            CCryptoBoringSSL_EC_GROUP_free(group)
+            throw error
+        }
     }
 
     deinit {
@@ -89,6 +105,16 @@ extension BoringSSLEllipticCurveGroup {
     package var weierstrassCoefficients:
         (field: ArbitraryPrecisionInteger, a: ArbitraryPrecisionInteger, b: ArbitraryPrecisionInteger)
     {
+        self.curveCoefficients
+    }
+
+    private static func readWeierstrassCoefficients(
+        from group: OpaquePointer
+    ) throws(CryptoBoringWrapperError) -> (
+        field: ArbitraryPrecisionInteger,
+        a: ArbitraryPrecisionInteger,
+        b: ArbitraryPrecisionInteger
+    ) {
         var field = ArbitraryPrecisionInteger()
         var a = ArbitraryPrecisionInteger()
         var b = ArbitraryPrecisionInteger()
@@ -96,11 +122,13 @@ extension BoringSSLEllipticCurveGroup {
         let rc = field.withUnsafeMutableBignumPointer { fieldPtr in
             a.withUnsafeMutableBignumPointer { aPtr in
                 b.withUnsafeMutableBignumPointer { bPtr in
-                    CCryptoBoringSSL_EC_GROUP_get_curve_GFp(self._group, fieldPtr, aPtr, bPtr, nil)
+                    CCryptoBoringSSL_EC_GROUP_get_curve_GFp(group, fieldPtr, aPtr, bPtr, nil)
                 }
             }
         }
-        precondition(rc == 1, "Unable to extract curve weierstrass parameters")
+        guard rc == 1 else {
+            throw CryptoBoringWrapperError.internalBoringSSLError()
+        }
 
         return (field: field, a: a, b: b)
     }

@@ -19,7 +19,7 @@ final class ARCPublicAPITests: XCTestCase {
 
     func testARCEndToEnd() throws {
         // [Issuer] Create the server secrets (other initializers will be available).
-        let privateKey = P256._ARCV1.PrivateKey()
+        let privateKey = try P256._ARCV1.PrivateKey()
 
         // [Issuer] Serialize public key to share with client (other serializations may be available).
         let publicKeyBytes = privateKey.publicKey.rawRepresentation
@@ -86,7 +86,7 @@ final class ARCPublicAPITests: XCTestCase {
     }
 
     func testCrendentialEnforcesPresentationLimitLocally() throws {
-        let privateKey = P256._ARCV1.PrivateKey()
+        let privateKey = try P256._ARCV1.PrivateKey()
         let publicKey = privateKey.publicKey
         let requestContext = Data("shared request context".utf8)
         let presentationContext = Data("shared presentation context".utf8)

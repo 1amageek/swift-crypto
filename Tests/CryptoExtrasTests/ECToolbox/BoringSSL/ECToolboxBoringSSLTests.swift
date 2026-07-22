@@ -23,36 +23,41 @@ import Foundation
 @testable import CryptoExtras
 
 final class ECToolboxBoringSSLTests: XCTestCase {
-    func testSharedArithmeticContextSerializesConcurrentOperations() async {
-        await assertConcurrentArithmetic(P256.self)
-        await assertConcurrentArithmetic(P384.self)
+    func testSharedArithmeticContextSerializesConcurrentOperations() async throws {
+        try await assertConcurrentArithmetic(P256.self)
+        try await assertConcurrentArithmetic(P384.self)
     }
 
     private func assertConcurrentArithmetic<Curve: HashToGroupCurve & Sendable>(
         _ curve: Curve.Type
-    ) async {
+    ) async throws {
         typealias Scalar = PrimeOrderCurveGroup<Curve>.Scalar
-        let expectedContextIdentifier = ObjectIdentifier(Curve.arithmeticContext)
-        let results = await withTaskGroup(of: ArithmeticResult.self, returning: [ArithmeticResult].self) { group in
+        let expectedContextIdentifier = ObjectIdentifier(try Curve.runtime().scalarArithmetic)
+        let results = try await withThrowingTaskGroup(
+            of: ArithmeticResult.self,
+            returning: [ArithmeticResult].self
+        ) { group in
             for _ in 0..<64 {
                 group.addTask {
-                    let lhs = Scalar.random
-                    let rhs = Scalar.random
-                    let sum = lhs + rhs
-                    let restored = sum - rhs
-                    let generator = PrimeOrderCurveGroup<Curve>.Element.generator
-                    let point = lhs * generator
+                    let lhs = try Scalar.randomNonzero()
+                    let rhs = try Scalar.randomNonzero()
+                    let sum = try lhs.adding(rhs)
+                    let restored = try sum.subtracting(rhs)
+                    let generator = try PrimeOrderCurveGroup<Curve>.Element.generator()
+                    let point = try generator.multiplied(by: lhs)
                     return ArithmeticResult(
-                        contextIdentifier: ObjectIdentifier(Curve.arithmeticContext),
+                        contextIdentifier: ObjectIdentifier(try Curve.runtime().scalarArithmetic),
                         scalarRoundTripSucceeded: restored == lhs,
-                        pointMultiplicationSucceeded: point == lhs * generator
+                        pointMultiplicationSucceeded: try point.isEqual(
+                            to: generator.multiplied(by: lhs)
+                        )
                     )
                 }
             }
 
             var results: [ArithmeticResult] = []
             results.reserveCapacity(64)
-            for await result in group {
+            for try await result in group {
                 results.append(result)
             }
             return results

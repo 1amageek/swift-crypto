@@ -30,7 +30,7 @@ final class ECDSASignature {
     private var _baseSig: UnsafeMutablePointer<ECDSA_SIG>
 
     init(contiguousDERBytes derBytes: Data) throws(CryptoBoringWrapperError) {
-        self._baseSig = try withCryptoUnsafeBytes(derBytes) { (bytesPtr) throws(CryptoBoringWrapperError) in
+        self._baseSig = try Crypto.withUnsafeBytes(of: derBytes) { (bytesPtr) throws(CryptoBoringWrapperError) in
             guard
                 let sig = CCryptoBoringSSLShims_ECDSA_SIG_from_bytes(bytesPtr.baseAddress, bytesPtr.count)
             else {

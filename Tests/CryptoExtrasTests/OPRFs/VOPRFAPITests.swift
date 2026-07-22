@@ -16,6 +16,34 @@ import Crypto
 import XCTest
 
 final class VOPRFAPITests: XCTestCase {
+    private typealias VOPRFScalar = P384._VOPRF.H2G.G.Scalar
+
+    private func throwBackendFailure() throws(CryptoKitMetaError) -> VOPRFScalar {
+        throw cryptoExtrasError(
+            CryptoKitError.underlyingCoreCryptoError(error: -1)
+        )
+    }
+
+    private func returnZeroScalar() throws(CryptoKitMetaError) -> VOPRFScalar {
+        .zero
+    }
+
+    private func assertVOPRFError(
+        _ expectedError: VOPRFError,
+        operation: () throws -> Void,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        do {
+            try operation()
+            XCTFail("Expected \(expectedError)", file: file, line: line)
+        } catch let error as VOPRFError {
+            XCTAssertEqual(error, expectedError, file: file, line: line)
+        } catch {
+            XCTFail("Expected \(expectedError), received \(error)", file: file, line: line)
+        }
+    }
+
     private func singletonVectors(in suite: OPRFSuite) -> [OPRFTestVector] {
         let singletonVectors = suite.vectors.filter { $0.batchSize == 1 }
         XCTAssertEqual(singletonVectors.count, 2)
@@ -45,7 +73,7 @@ final class VOPRFAPITests: XCTestCase {
             let blindedInput = try publicKey.blind(privateInput, with: fixedBlind)
 
             // [Client -> Server] Send the blinded element.
-            let blindedElementBytes = blindedInput.blindedElement.oprfRepresentation
+            let blindedElementBytes = try blindedInput.blindedElement.oprfRepresentation()
 
             // [CHECK] Blinded element matches test vector.
             XCTAssertEqual(blindedElementBytes.hexString, vector.blindedElements)
@@ -62,13 +90,19 @@ final class VOPRFAPITests: XCTestCase {
             let blindEvaluation = try privateKey.evaluate(blindedElement, using: fixedProofScalar)
 
             // [CHECK] Evaluated element matches test vector.
-            XCTAssertEqual(blindEvaluation.evaluatedElement.oprfRepresentation.hexString, vector.evaluatedElements)
+            XCTAssertEqual(
+                try blindEvaluation.evaluatedElement.oprfRepresentation().hexString,
+                vector.evaluatedElements
+            )
 
             // [CHECK] Proof matches test vector.
-            XCTAssertEqual(blindEvaluation.proof.rawRepresentation.hexString, proofVector.proof)
+            XCTAssertEqual(
+                try blindEvaluation.proof.rawRepresentation().hexString,
+                proofVector.proof
+            )
 
             // [Server -> Client] Send the serialized blind evaluation.
-            let blindEvaluationBytes = blindEvaluation.rawRepresentation
+            let blindEvaluationBytes = try blindEvaluation.rawRepresentation()
 
             // [Client] Receive the blind evaluation.
             let deserializedBlindEvaluation = try P384._VOPRF.BlindEvaluation(rawRepresentation: blindEvaluationBytes)
@@ -114,12 +148,12 @@ final class VOPRFAPITests: XCTestCase {
         )
         XCTAssertThrowsError(
             try P384._VOPRF.Proof(
-                rawRepresentation: Data(repeating: 0, count: P384._VOPRF.Proof.serializedByteCount - 1)
+                rawRepresentation: Data(repeating: 0, count: P384._VOPRF.Proof.rawRepresentationByteCount - 1)
             )
         )
         XCTAssertThrowsError(
             try P384._VOPRF.Proof(
-                rawRepresentation: Data(repeating: 0, count: P384._VOPRF.Proof.serializedByteCount + 1)
+                rawRepresentation: Data(repeating: 0, count: P384._VOPRF.Proof.rawRepresentationByteCount + 1)
             )
         )
     }
@@ -147,5 +181,45 @@ final class VOPRFAPITests: XCTestCase {
                 oprfRepresentation: publicKey.compressedRepresentation + Data([0])
             )
         )
+    }
+
+    func testRandomScalarFailuresReturnInternalFailure() throws {
+        assertVOPRFError(.internalFailure) {
+            _ = try P384._VOPRF.PrivateKey(
+                randomScalar: self.throwBackendFailure
+            )
+        }
+        assertVOPRFError(.internalFailure) {
+            _ = try P384._VOPRF.PrivateKey(
+                randomScalar: self.returnZeroScalar
+            )
+        }
+
+        let suite = try OPRFSuite.p384SHA384VOPRF()
+        let privateKey = try P384._VOPRF.PrivateKey(
+            rawRepresentation: Data(hexString: suite.privateKey)
+        )
+        let input = Data("failure injection".utf8)
+
+        assertVOPRFError(.internalFailure) {
+            _ = try privateKey.publicKey.blind(
+                input,
+                randomScalar: self.throwBackendFailure
+            )
+        }
+        assertVOPRFError(.internalFailure) {
+            _ = try privateKey.publicKey.blind(
+                input,
+                randomScalar: self.returnZeroScalar
+            )
+        }
+
+        let blindedInput = try privateKey.publicKey.blind(input)
+        assertVOPRFError(.internalFailure) {
+            _ = try privateKey.evaluate(
+                blindedInput.blindedElement,
+                randomScalar: self.throwBackendFailure
+            )
+        }
     }
 }

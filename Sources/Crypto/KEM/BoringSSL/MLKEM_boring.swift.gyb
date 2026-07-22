@@ -152,7 +152,7 @@ extension MLKEM${parameter_set} {
                 var symmetricKeyData = Data(repeating: 0, count: MLKEM.sharedSecretByteCount)
 
                 let rc: CInt = symmetricKeyData.withUnsafeMutableBytes { symmetricKeyDataPtr in
-                    return withCryptoDataProtocolUnsafeBytes(encapsulated) { encapsulatedPtr in
+                    return withContiguousBytes(of: encapsulated) { encapsulatedPtr in
                         CCryptoBoringSSL_MLKEM${parameter_set}_decap(
                             symmetricKeyDataPtr.baseAddress,
                             encapsulatedPtr.baseAddress,
@@ -225,7 +225,7 @@ extension MLKEM${parameter_set} {
 
                 self.key = .init()
 
-                let parsed = withCryptoDataProtocolUnsafeBytes(rawRepresentation) { rawBuffer in
+                let parsed = withContiguousBytes(of: rawRepresentation) { rawBuffer in
                     rawBuffer.withMemoryRebound(to: UInt8.self) { buffer in
                         var cbs = CBS(data: buffer.baseAddress, len: buffer.count)
                         return CCryptoBoringSSL_MLKEM${parameter_set}_parse_public_key(&self.key, &cbs) == 1

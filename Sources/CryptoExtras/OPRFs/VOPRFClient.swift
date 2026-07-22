@@ -32,8 +32,14 @@ extension OPRF {
         }
         
         func blindMessage(
+            _ message: Data
+        ) throws(CryptoKitMetaError) -> (blind: G.Scalar, blindedElement: G.Element) {
+            try self.client.blindMessage(message)
+        }
+
+        func blindMessage(
             _ message: Data,
-            blind: G.Scalar = G.Scalar.random
+            blind: G.Scalar
         ) throws(CryptoKitMetaError) -> (blind: G.Scalar, blindedElement: G.Element) {
             try self.client.blindMessage(message, blind: blind)
         }
@@ -52,7 +58,7 @@ extension OPRF {
             }
             if self.client.mode == .verifiable {
                 guard try DLEQ<H2G>.verify(
-                    generator: H2G.G.Element.generator,
+                    generator: H2G.G.Element.generator(),
                     publicKey: publicKey,
                     inputs: CollectionOfOne(blindedElement),
                     outputs: CollectionOfOne(evaluatedElement),
@@ -74,9 +80,10 @@ extension OPRF {
                 domainSeparationTag: client.hashToScalarDomainSeparationTag,
                 using: H2G.self
             )
-            let tweakedPublicKey = (infoScalar * G.Element.generator) + publicKey
+            let infoCommitment = try G.Element.generator().multiplied(by: infoScalar)
+            let tweakedPublicKey = try infoCommitment.adding(publicKey)
             guard try DLEQ<H2G>.verify(
-                generator: H2G.G.Element.generator,
+                generator: H2G.G.Element.generator(),
                 publicKey: tweakedPublicKey,
                 inputs: CollectionOfOne(evaluatedElement),
                 outputs: CollectionOfOne(blindedElement),
@@ -115,7 +122,7 @@ extension OPRF {
 
             if self.client.mode == .verifiable {
                 guard try DLEQ<H2G>.verify(
-                    generator: G.Element.generator,
+                    generator: G.Element.generator(),
                     publicKey: publicKey,
                     inputs: blindedElements,
                     outputs: evaluatedElements,
@@ -134,9 +141,10 @@ extension OPRF {
                     domainSeparationTag: client.hashToScalarDomainSeparationTag,
                     using: H2G.self
                 )
-                let tweakedPublicKey = (infoScalar * G.Element.generator) + publicKey
+                let infoCommitment = try G.Element.generator().multiplied(by: infoScalar)
+                let tweakedPublicKey = try infoCommitment.adding(publicKey)
                 guard try DLEQ<H2G>.verify(
-                    generator: G.Element.generator,
+                    generator: G.Element.generator(),
                     publicKey: tweakedPublicKey,
                     inputs: evaluatedElements,
                     outputs: blindedElements,

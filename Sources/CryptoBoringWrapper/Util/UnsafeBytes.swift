@@ -19,8 +19,8 @@ import Foundation
 #endif
 
 @usableFromInline
-internal func withCryptoBoringWrapperUnsafeBytes<Bytes: ContiguousBytes, Result>(
-    _ bytes: Bytes,
+package func withUnsafeBytes<Bytes: ContiguousBytes, Result>(
+    of bytes: Bytes,
     _ body: (UnsafeRawBufferPointer) throws(CryptoBoringWrapperError) -> Result
 ) throws(CryptoBoringWrapperError) -> Result {
     #if !canImport(FoundationEssentials) && !canImport(Foundation)
@@ -40,8 +40,8 @@ internal func withCryptoBoringWrapperUnsafeBytes<Bytes: ContiguousBytes, Result>
 
 #if canImport(FoundationEssentials) || canImport(Foundation)
 @usableFromInline
-internal func withCryptoBoringWrapperUnsafeMutableBytes<Result>(
-    _ data: inout Data,
+package func withUnsafeMutableBytes<Result>(
+    of data: inout Data,
     _ body: (UnsafeMutableRawBufferPointer) throws(CryptoBoringWrapperError) -> Result
 ) throws(CryptoBoringWrapperError) -> Result {
     #if hasFeature(Embedded) && !canImport(FoundationEssentials) && !canImport(Foundation)

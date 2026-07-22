@@ -49,7 +49,7 @@ class HashToCurveTests: XCTestCase {
         for vector in testVectorFile.vectors {
             let msg = vector.msg.data(using: .ascii)!
 
-            let point = h2c.hashToGroup(msg, domainSeparationString: Data(dst.utf8))
+            let point = try h2c.hashToGroup(msg, domainSeparationString: Data(dst.utf8))
 
             XCTAssert(point.oprfRepresentation.hexString.dropFirst(2) == vector.P.x.dropFirst(2))
         }

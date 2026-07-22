@@ -25,7 +25,18 @@ extension OPRF {
         
         init(
             ciphersuite: Ciphersuite<H2G>,
-            privateKey: G.Scalar = G.Scalar.random,
+            mode: OPRF.Mode
+        ) throws(CryptoKitMetaError) {
+            try self.init(
+                ciphersuite: ciphersuite,
+                privateKey: G.Scalar.randomNonzero(),
+                mode: mode
+            )
+        }
+
+        init(
+            ciphersuite: Ciphersuite<H2G>,
+            privateKey: G.Scalar,
             mode: OPRF.Mode
         ) throws(CryptoKitMetaError) {
             if mode != .partiallyOblivious && mode != .verifiable {
@@ -39,7 +50,22 @@ extension OPRF {
             server.publicKey
         }
         
-        func evaluate(blindedElement: G.Element, info: Data? = nil, proofScalar: G.Scalar = G.Scalar.random) throws(CryptoKitMetaError) ->
+        func evaluate(
+            blindedElement: G.Element,
+            info: Data? = nil
+        ) throws(CryptoKitMetaError) -> (G.Element, DLEQProof<G.Scalar>) {
+            try self.evaluate(
+                blindedElement: blindedElement,
+                info: info,
+                proofScalar: G.Scalar.randomNonzero()
+            )
+        }
+
+        func evaluate(
+            blindedElement: G.Element,
+            info: Data? = nil,
+            proofScalar: G.Scalar
+        ) throws(CryptoKitMetaError) ->
         (G.Element, DLEQProof<H2G.G.Element.Scalar>) {
             if info != nil && self.server.mode == .verifiable {
                 throw cryptoExtrasError(OPRF.Errors.invalidModeForInfo)
@@ -57,8 +83,19 @@ extension OPRF {
 
         func evaluate(
             blindedElements: [G.Element],
+            info: Data? = nil
+        ) throws(CryptoKitMetaError) -> ([G.Element], DLEQProof<G.Scalar>) {
+            try self.evaluate(
+                blindedElements: blindedElements,
+                info: info,
+                proofScalar: G.Scalar.randomNonzero()
+            )
+        }
+
+        func evaluate(
+            blindedElements: [G.Element],
             info: Data? = nil,
-            proofScalar: G.Scalar = G.Scalar.random
+            proofScalar: G.Scalar
         ) throws(CryptoKitMetaError) -> ([G.Element], DLEQProof<G.Scalar>) {
             if info != nil && self.server.mode == .verifiable {
                 throw cryptoExtrasError(OPRF.Errors.invalidModeForInfo)

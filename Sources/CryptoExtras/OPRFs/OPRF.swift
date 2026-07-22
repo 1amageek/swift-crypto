@@ -189,7 +189,7 @@ extension OPRF {
             if privateKey != .zero {
                 return (
                     privateKey: privateKey,
-                    publicKey: privateKey * H2G.G.Element.generator
+                    publicKey: try H2G.G.Element.generator().multiplied(by: privateKey)
                 )
             }
         }

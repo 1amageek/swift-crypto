@@ -58,11 +58,11 @@ extension ARC {
         }
     }
 
-    static func getGenerators<H2G: HashToGroup>(suite: Ciphersuite<H2G>) -> (
+    static func getGenerators<H2G: HashToGroup>(suite: Ciphersuite<H2G>) throws(CryptoKitMetaError) -> (
         generatorG: H2G.G.Element, generatorH: H2G.G.Element
     ) {
-        let generatorG = H2G.G.Element.generator
-        let generatorH = H2G.hashToGroup(generatorG.oprfRepresentation, domainSeparationString: Data(("HashToGroup-" + suite.domain + "generatorH").utf8))
+        let generatorG = try H2G.G.Element.generator()
+        let generatorH = try H2G.hashToGroup(generatorG.oprfRepresentation, domainSeparationString: Data(("HashToGroup-" + suite.domain + "generatorH").utf8))
         return (generatorG, generatorH)
     }
 }

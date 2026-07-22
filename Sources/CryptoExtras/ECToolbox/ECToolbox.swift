@@ -46,7 +46,7 @@ protocol HashToGroup {
     static func hashToGroup<Bytes: Crypto.ContiguousBytes>(
         _ data: Bytes,
         domainSeparationString: Data
-    ) -> G.Element
+    ) throws(CryptoKitMetaError) -> G.Element
 }
 
 extension HashToGroup {
@@ -107,6 +107,17 @@ protocol GroupScalar: Sendable, Equatable {
         into destination: UnsafeMutableRawBufferPointer
     ) throws(CryptoKitMetaError)
 
+    /// Generates a uniformly random nonzero scalar.
+    static func randomNonzero() throws(CryptoKitMetaError) -> Self
+
+    consuming func adding(_ other: consuming Self) throws(CryptoKitMetaError) -> Self
+
+    consuming func subtracting(_ other: consuming Self) throws(CryptoKitMetaError) -> Self
+
+    consuming func multiplied(by other: consuming Self) throws(CryptoKitMetaError) -> Self
+
+    consuming func negated() throws(CryptoKitMetaError) -> Self
+
     // Generates a Random Scalar Element
     static var random: Self { get }
 
@@ -129,9 +140,19 @@ protocol GroupScalar: Sendable, Equatable {
 protocol GroupElement: Sendable {
     associatedtype Scalar: GroupScalar
 
-    static var generator: Self { get }
+    static func generator() throws(CryptoKitMetaError) -> Self
 
-    var isIdentity: Bool { get }
+    func isIdentity() throws(CryptoKitMetaError) -> Bool
+
+    func isEqual(to other: Self) throws(CryptoKitMetaError) -> Bool
+
+    consuming func adding(_ other: consuming Self) throws(CryptoKitMetaError) -> Self
+
+    consuming func subtracting(_ other: consuming Self) throws(CryptoKitMetaError) -> Self
+
+    consuming func multiplied(by scalar: consuming Scalar) throws(CryptoKitMetaError) -> Self
+
+    consuming func negated() throws(CryptoKitMetaError) -> Self
 
     // Generates a Random Group Element
     static var random: Self { get }

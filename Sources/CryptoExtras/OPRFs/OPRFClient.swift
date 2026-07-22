@@ -45,8 +45,14 @@ extension OPRF {
         }
         
         func blindMessage(
+            _ message: Data
+        ) throws(CryptoKitMetaError) -> (blind: G.Scalar, blindedElement: G.Element) {
+            try self.blindMessage(message, blind: G.Scalar.randomNonzero())
+        }
+
+        func blindMessage(
             _ message: Data,
-            blind: G.Scalar = G.Scalar.random
+            blind: G.Scalar
         ) throws(CryptoKitMetaError) -> (blind: G.Scalar, blindedElement: G.Element) {
             guard message.count <= Int(UInt16.max) else {
                 throw cryptoExtrasError(OPRF.Errors.messageTooLong)
@@ -54,11 +60,11 @@ extension OPRF {
             guard blind != .zero else {
                 throw cryptoExtrasError(OPRF.Errors.invalidScalar)
             }
-            let inputElement: G.Element = H2G.hashToGroup(
+            let inputElement: G.Element = try H2G.hashToGroup(
                 message,
                 domainSeparationString: hashToGroupDomainSeparationTag
             )
-            let blindedElement = blind * inputElement
+            let blindedElement = try inputElement.multiplied(by: blind)
             return (blind: blind, blindedElement: blindedElement)
         }
         
@@ -69,7 +75,7 @@ extension OPRF {
             guard blind != .zero else {
                 throw cryptoExtrasError(OPRF.Errors.invalidScalar)
             }
-            return try blind.inverted() * evaluatedElement
+            return try evaluatedElement.multiplied(by: blind.inverted())
         }
         
         func finalize(message: Data, info: Data?, blind: G.Scalar, evaluatedElement: G.Element) throws(CryptoKitMetaError) -> Data {

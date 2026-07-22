@@ -40,7 +40,7 @@ extension BoringSSLAEAD {
 
         #if !hasFeature(Embedded)
         public init<Key: ContiguousBytes>(cipher: BoringSSLAEAD, key: Key) throws(CryptoBoringWrapperError) {
-            self.context = try withCryptoBoringWrapperUnsafeBytes(key) { keyPointer throws(CryptoBoringWrapperError) in
+            self.context = try withUnsafeBytes(of: key) { keyPointer throws(CryptoBoringWrapperError) in
                 try Self.makeContext(cipher: cipher, keyPointer: keyPointer)
             }
         }
@@ -148,9 +148,9 @@ extension BoringSSLAEAD.AEADContext {
         nonce: Nonce,
         authenticatedData: AuthenticatedData
     ) throws(CryptoBoringWrapperError) -> Data {
-        try withCryptoBoringWrapperUnsafeBytes(message) { (messagePointer) throws(CryptoBoringWrapperError) in
-            try withCryptoBoringWrapperUnsafeBytes(nonce) { (noncePointer) throws(CryptoBoringWrapperError) in
-                try withCryptoBoringWrapperUnsafeBytes(authenticatedData) { (authenticatedDataPointer) throws(CryptoBoringWrapperError) in
+        try withUnsafeBytes(of: message) { (messagePointer) throws(CryptoBoringWrapperError) in
+            try withUnsafeBytes(of: nonce) { (noncePointer) throws(CryptoBoringWrapperError) in
+                try withUnsafeBytes(of: authenticatedData) { (authenticatedDataPointer) throws(CryptoBoringWrapperError) in
                     try self._sealContiguous(
                         plaintext: messagePointer.bytes,
                         nonce: noncePointer.bytes,
@@ -227,7 +227,7 @@ extension BoringSSLAEAD.AEADContext {
         combined.append(contentsOf: plaintext)
         combined.append(Data(count: tagByteCount))
 
-        try withCryptoBoringWrapperUnsafeMutableBytes(&combined) { (combinedBuffer: UnsafeMutableRawBufferPointer) throws(CryptoBoringWrapperError) in
+        try withUnsafeMutableBytes(of: &combined) { (combinedBuffer: UnsafeMutableRawBufferPointer) throws(CryptoBoringWrapperError) in
             let messageRange = nonce.byteCount..<(nonce.byteCount + plaintext.byteCount)
             let messageBuffer = UnsafeMutableRawBufferPointer(rebasing: combinedBuffer[messageRange])
             var messageSpan = messageBuffer.mutableBytes
@@ -296,10 +296,10 @@ extension BoringSSLAEAD.AEADContext {
         tag: Data,
         authenticatedData: AuthenticatedData
     ) throws(CryptoBoringWrapperError) -> Data {
-        try withCryptoBoringWrapperUnsafeBytes(ciphertext) { (ciphertextPointer) throws(CryptoBoringWrapperError) in
-            try withCryptoBoringWrapperUnsafeBytes(nonce) { (nonceBytes) throws(CryptoBoringWrapperError) in
-                try withCryptoBoringWrapperUnsafeBytes(tag) { (tagBytes) throws(CryptoBoringWrapperError) in
-                    try withCryptoBoringWrapperUnsafeBytes(authenticatedData) { (authenticatedDataBytes) throws(CryptoBoringWrapperError) in
+        try withUnsafeBytes(of: ciphertext) { (ciphertextPointer) throws(CryptoBoringWrapperError) in
+            try withUnsafeBytes(of: nonce) { (nonceBytes) throws(CryptoBoringWrapperError) in
+                try withUnsafeBytes(of: tag) { (tagBytes) throws(CryptoBoringWrapperError) in
+                    try withUnsafeBytes(of: authenticatedData) { (authenticatedDataBytes) throws(CryptoBoringWrapperError) in
                         try self._openContiguous(
                             ciphertext: ciphertextPointer.bytes,
                             nonceBytes: nonceBytes.bytes,
@@ -402,9 +402,9 @@ extension BoringSSLAEAD.AEADContext {
         nonce: Nonce,
         authenticatedData: AuthenticatedData
     ) throws(CryptoBoringWrapperError) -> Data {
-        try withCryptoBoringWrapperUnsafeBytes(combinedCiphertextAndTag) { (combinedCiphertextAndTagPointer) throws(CryptoBoringWrapperError) in
-            try withCryptoBoringWrapperUnsafeBytes(nonce) { (nonceBytes) throws(CryptoBoringWrapperError) in
-                try withCryptoBoringWrapperUnsafeBytes(authenticatedData) { (authenticatedDataBytes) throws(CryptoBoringWrapperError) in
+        try withUnsafeBytes(of: combinedCiphertextAndTag) { (combinedCiphertextAndTagPointer) throws(CryptoBoringWrapperError) in
+            try withUnsafeBytes(of: nonce) { (nonceBytes) throws(CryptoBoringWrapperError) in
+                try withUnsafeBytes(of: authenticatedData) { (authenticatedDataBytes) throws(CryptoBoringWrapperError) in
                     try self._openContiguous(
                         combinedCiphertextAndTag: combinedCiphertextAndTagPointer,
                         nonceBytes: nonceBytes,

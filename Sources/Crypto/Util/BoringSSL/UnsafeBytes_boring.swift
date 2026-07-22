@@ -19,8 +19,8 @@ import Foundation
 #endif
 
 @usableFromInline
-func withCryptoUnsafeBytes<Bytes: ContiguousBytes, Result, E: Error>(
-    _ bytes: Bytes,
+package func withUnsafeBytes<Bytes: ContiguousBytes, Result, E: Error>(
+    of bytes: Bytes,
     _ body: (UnsafeRawBufferPointer) throws(E) -> Result
 ) throws(E) -> Result {
     #if !canImport(FoundationEssentials) && !canImport(Foundation)
@@ -39,8 +39,8 @@ func withCryptoUnsafeBytes<Bytes: ContiguousBytes, Result, E: Error>(
 }
 
 @usableFromInline
-func withCryptoDataProtocolUnsafeBytes<Bytes: DataProtocol, Result, E: Error>(
-    _ bytes: Bytes,
+package func withContiguousBytes<Bytes: DataProtocol, Result, E: Error>(
+    of bytes: Bytes,
     _ body: (UnsafeRawBufferPointer) throws(E) -> Result
 ) throws(E) -> Result {
     #if !canImport(FoundationEssentials) && !canImport(Foundation)

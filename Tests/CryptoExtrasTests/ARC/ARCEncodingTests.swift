@@ -18,7 +18,7 @@ import Crypto
 class ARCEncodingTests: XCTestCase {
     func assertServerPublicKeyEncoding() throws {
         let ciphersuite = P256._ARCV1.ciphersuite
-        let server = ARC.Server(ciphersuite: ciphersuite)
+        let server = try ARC.Server(ciphersuite: ciphersuite)
         let publicKey = server.serverPublicKey
 
         let publicKeyData = publicKey.serialize(ciphersuite: ciphersuite)
@@ -37,7 +37,7 @@ class ARCEncodingTests: XCTestCase {
 
     func assertRequestEncoding() throws {
         let ciphersuite = P256._ARCV1.ciphersuite
-        let server = ARC.Server(ciphersuite: ciphersuite)
+        let server = try ARC.Server(ciphersuite: ciphersuite)
         let requestContext = Data("test request context".utf8)
         let precredential = try ARC.Precredential(ciphersuite: ciphersuite, requestContext: requestContext, serverPublicKey: server.serverPublicKey)
         let request = precredential.credentialRequest
@@ -61,7 +61,7 @@ class ARCEncodingTests: XCTestCase {
 
     func assertResponseEncoding() throws {
         let ciphersuite = P256._ARCV1.ciphersuite
-        let server = ARC.Server(ciphersuite: ciphersuite)
+        let server = try ARC.Server(ciphersuite: ciphersuite)
         let requestContext = Data("test request context".utf8)
         let precredential = try ARC.Precredential(ciphersuite: ciphersuite, requestContext: requestContext, serverPublicKey: server.serverPublicKey)
         let request = precredential.credentialRequest
@@ -90,7 +90,7 @@ class ARCEncodingTests: XCTestCase {
 
     func assertCredentialEncoding() throws {
         let ciphersuite = P256._ARCV1.ciphersuite
-        let server = ARC.Server(ciphersuite: ciphersuite)
+        let server = try ARC.Server(ciphersuite: ciphersuite)
         let requestContext = Data("test request context".utf8)
         let precredential = try ARC.Precredential(ciphersuite: ciphersuite, requestContext: requestContext, serverPublicKey: server.serverPublicKey)
         let request = precredential.credentialRequest
@@ -120,7 +120,7 @@ class ARCEncodingTests: XCTestCase {
 
     func assertPresentationEncoding() throws {
         let ciphersuite = P256._ARCV1.ciphersuite
-        let server = ARC.Server(ciphersuite: ciphersuite)
+        let server = try ARC.Server(ciphersuite: ciphersuite)
         let requestContext = Data("test request context".utf8)
         let precredential = try ARC.Precredential(ciphersuite: ciphersuite, requestContext: requestContext, serverPublicKey: server.serverPublicKey)
         let request = precredential.credentialRequest

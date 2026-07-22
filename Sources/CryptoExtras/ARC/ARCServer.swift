@@ -62,9 +62,9 @@ extension ARC {
         let generatorH: Group.Element
 
         init(ciphersuite: Ciphersuite<H2G>, x0: Group.Scalar = Group.Scalar.random, x1: Group.Scalar = Group.Scalar.random, x2: Group.Scalar = Group.Scalar.random, x0Blinding: Group.Scalar = Group.Scalar.random
-        ) {
+        ) throws {
             self.ciphersuite = ciphersuite
-            (self.generatorG, self.generatorH) = ARC.getGenerators(suite: ciphersuite)
+            (self.generatorG, self.generatorH) = try ARC.getGenerators(suite: ciphersuite)
 
             self.serverPrivateKey = ServerPrivateKey(x0: x0, x1: x1, x2: x2, x0Blinding: x0Blinding)
             self.serverPublicKey = ServerPublicKey(serverPrivateKey: self.serverPrivateKey, generatorG: self.generatorG, generatorH: self.generatorH)

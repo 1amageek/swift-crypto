@@ -48,7 +48,7 @@ extension ARC {
             self.clientSecrets = ClientSecrets(m1: m1, m2: m2, r1: r1, r2: r2)
             self.serverPublicKey = serverPublicKey
             self.ciphersuite = ciphersuite
-            (self.generatorG, self.generatorH) = ARC.getGenerators(suite: ciphersuite)
+            (self.generatorG, self.generatorH) = try ARC.getGenerators(suite: ciphersuite)
             self.credentialRequest = try CredentialRequest(clientSecrets: self.clientSecrets, generatorG: generatorG, generatorH: generatorH, ciphersuite: ciphersuite)
         }
 

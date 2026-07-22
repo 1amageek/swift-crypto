@@ -148,7 +148,7 @@ extension MLKEM768 {
                 var symmetricKeyData = Data(repeating: 0, count: MLKEM.sharedSecretByteCount)
 
                 let rc: CInt = symmetricKeyData.withUnsafeMutableBytes { symmetricKeyDataPtr in
-                    return withCryptoDataProtocolUnsafeBytes(encapsulated) { encapsulatedPtr in
+                    return withContiguousBytes(of: encapsulated) { encapsulatedPtr in
                         CCryptoBoringSSL_MLKEM768_decap(
                             symmetricKeyDataPtr.baseAddress,
                             encapsulatedPtr.baseAddress,
@@ -221,7 +221,7 @@ extension MLKEM768 {
 
                 self.key = .init()
 
-                let parsed = withCryptoDataProtocolUnsafeBytes(rawRepresentation) { rawBuffer in
+                let parsed = withContiguousBytes(of: rawRepresentation) { rawBuffer in
                     rawBuffer.withMemoryRebound(to: UInt8.self) { buffer in
                         var cbs = CBS(data: buffer.baseAddress, len: buffer.count)
                         return CCryptoBoringSSL_MLKEM768_parse_public_key(&self.key, &cbs) == 1
@@ -405,7 +405,7 @@ extension MLKEM1024 {
                 var symmetricKeyData = Data(repeating: 0, count: MLKEM.sharedSecretByteCount)
 
                 let rc: CInt = symmetricKeyData.withUnsafeMutableBytes { symmetricKeyDataPtr in
-                    return withCryptoDataProtocolUnsafeBytes(encapsulated) { encapsulatedPtr in
+                    return withContiguousBytes(of: encapsulated) { encapsulatedPtr in
                         CCryptoBoringSSL_MLKEM1024_decap(
                             symmetricKeyDataPtr.baseAddress,
                             encapsulatedPtr.baseAddress,
@@ -478,7 +478,7 @@ extension MLKEM1024 {
 
                 self.key = .init()
 
-                let parsed = withCryptoDataProtocolUnsafeBytes(rawRepresentation) { rawBuffer in
+                let parsed = withContiguousBytes(of: rawRepresentation) { rawBuffer in
                     rawBuffer.withMemoryRebound(to: UInt8.self) { buffer in
                         var cbs = CBS(data: buffer.baseAddress, len: buffer.count)
                         return CCryptoBoringSSL_MLKEM1024_parse_public_key(&self.key, &cbs) == 1

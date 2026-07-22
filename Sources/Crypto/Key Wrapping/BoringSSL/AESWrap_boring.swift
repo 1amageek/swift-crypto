@@ -75,7 +75,7 @@ enum BoringSSLAESWRAPImpl {
     ) throws(CryptoKitMetaError) -> SymmetricKey {
         var unwrapResult: CInt = 0
         let unwrapped = try key.withUnsafeAESKEY(mode: .decrypting) { aesKey in
-            withCryptoUnsafeBytes(contiguousWrappedKey) { inPtr in
+            Crypto.withUnsafeBytes(of: contiguousWrappedKey) { inPtr in
                 [UInt8](unsafeUninitializedCapacity: inPtr.count) { outputPtr, count in
                     // Bind is safe: we cannot violate the aliasing rules here as we never call to arbitrary code.
                     let inPtr = inPtr.bindMemory(to: UInt8.self)

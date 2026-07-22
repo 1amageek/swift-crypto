@@ -160,7 +160,7 @@ class ARCTestVectors: XCTestCase {
 
         // Initialize server
         let ciphersuite = P256._ARCV1.ciphersuite
-        let server = ARC.Server(ciphersuite: ciphersuite, x0: x0, x1: x1, x2: x2, x0Blinding: xb)
+        let server = try ARC.Server(ciphersuite: ciphersuite, x0: x0, x1: x1, x2: x2, x0Blinding: xb)
         XCTAssertEqual(server.serverPublicKey.X0.oprfRepresentation.hexString, tv.ServerKey.X0)
         XCTAssertEqual(server.serverPublicKey.X1.oprfRepresentation.hexString, tv.ServerKey.X1)
         XCTAssertEqual(server.serverPublicKey.X2.oprfRepresentation.hexString, tv.ServerKey.X2)

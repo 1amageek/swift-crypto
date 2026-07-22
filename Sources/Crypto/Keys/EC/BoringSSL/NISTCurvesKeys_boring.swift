@@ -200,7 +200,7 @@ final class BoringSSLECPrivateKeyWrapper<Curve: OpenSSLSupportedNISTCurve>: @unc
         self.key = try group.makeUnsafeOwnedECKey()
 
         // The raw representation is just the bytes that make up k.
-        let k = try withCryptoUnsafeBytes(bytes) { (bytesPointer) throws(CryptoBoringWrapperError) in
+        let k = try Crypto.withUnsafeBytes(of: bytes) { (bytesPointer) throws(CryptoBoringWrapperError) in
             try ArbitraryPrecisionInteger(bytes: bytesPointer)
         }
 
@@ -358,7 +358,7 @@ final class BoringSSLECPublicKeyWrapper<Curve: OpenSSLSupportedNISTCurve>: @unch
 
         // The compact representation is simply the X coordinate: deserializing then requires us to do a little math,
         // as discussed in https://datatracker.ietf.org/doc/html/draft-jivsov-ecc-compact-05#section-4.1
-        var x = try withCryptoUnsafeBytes(bytes) { (bytesPointer) throws(CryptoBoringWrapperError) in
+        var x = try Crypto.withUnsafeBytes(of: bytes) { (bytesPointer) throws(CryptoBoringWrapperError) in
             try ArbitraryPrecisionInteger(bytes: bytesPointer)
         }
 
@@ -427,7 +427,7 @@ final class BoringSSLECPublicKeyWrapper<Curve: OpenSSLSupportedNISTCurve>: @unch
         self.key = try group.makeUnsafeOwnedECKey()
 
         // The raw representation is identical to the x963 representation, without the leading 0x4.
-        var (x, y): (ArbitraryPrecisionInteger, ArbitraryPrecisionInteger) = try withCryptoUnsafeBytes(bytes) { (bytesPtr) throws(CryptoBoringWrapperError) in
+        var (x, y): (ArbitraryPrecisionInteger, ArbitraryPrecisionInteger) = try Crypto.withUnsafeBytes(of: bytes) { (bytesPtr) throws(CryptoBoringWrapperError) in
             try readRawPublicNumbers(copyingBytes: bytesPtr)
         }
 
@@ -582,7 +582,7 @@ extension ContiguousBytes {
     ) {
         // The x9.63 private key format is a discriminator byte (0x4) concatenated with the X and Y points
         // of the public key, and the K value of the secret scalar. Let's load that in.
-        try withCryptoUnsafeBytes(self) { (bytesPtr) throws(CryptoBoringWrapperError) in
+        try Crypto.withUnsafeBytes(of: self) { (bytesPtr) throws(CryptoBoringWrapperError) in
             guard bytesPtr.first == 0x04 else {
                 throw CryptoBoringWrapperError.incorrectKeySize  // This is the same error CryptoKit throws on Apple platforms.
             }
@@ -609,7 +609,7 @@ extension ContiguousBytes {
     ) {
         // The x9.63 public key format is a discriminator byte (0x4) concatenated with the X and Y points
         // of the public key. Let's load that in.
-        try withCryptoUnsafeBytes(self) { (bytesPtr) throws(CryptoBoringWrapperError) in
+        try Crypto.withUnsafeBytes(of: self) { (bytesPtr) throws(CryptoBoringWrapperError) in
             guard bytesPtr.first == 0x04 else {
                 throw CryptoBoringWrapperError.incorrectKeySize  // This is the same error CryptoKit throws on Apple platforms.
             }
@@ -624,7 +624,7 @@ extension ContiguousBytes {
     func readx963CompressedPublicNumbers() throws(CryptoBoringWrapperError) -> (x: ArbitraryPrecisionInteger, yBit: Bool) {
         // The x9.63 compressed public key format is a discriminator byte (0x2 or 0x3) that signals which
         // of the possible two Y values is being used, concatenated with the X point of the key.
-        try withCryptoUnsafeBytes(self) { (bytesPtr) throws(CryptoBoringWrapperError) in
+        try Crypto.withUnsafeBytes(of: self) { (bytesPtr) throws(CryptoBoringWrapperError) in
             let yBit: Bool
 
             switch bytesPtr.first {

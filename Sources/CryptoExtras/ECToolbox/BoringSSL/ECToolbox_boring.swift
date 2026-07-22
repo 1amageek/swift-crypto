@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 import Crypto
 import CryptoBoringWrapper
+import Synchronization
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -25,7 +26,7 @@ import Foundation
 protocol HashToGroupCurve {
     associatedtype H: HashFunction
 
-    static var group: BoringSSLEllipticCurveGroup { get }
+    static func runtime() throws(CryptoBoringWrapperError) -> PrimeOrderCurveRuntime
 
     static var cofactor: Int { get }
 
@@ -40,9 +41,33 @@ protocol HashToGroupCurve {
     static func hashToGroup(
         _ data: UnsafeRawBufferPointer,
         domainSeparationString: UnsafeRawBufferPointer
-    ) -> EllipticCurvePoint
+    ) throws(CryptoBoringWrapperError) -> EllipticCurvePoint
 
-    static var arithmeticContext: FiniteFieldArithmeticContext { get }
+}
+
+@usableFromInline
+struct PrimeOrderCurveRuntime: Sendable {
+    @usableFromInline
+    let group: BoringSSLEllipticCurveGroup
+
+    @usableFromInline
+    let scalarArithmetic: FiniteFieldArithmeticContext
+
+    @usableFromInline
+    let fieldPrime: ArbitraryPrecisionInteger
+
+    @usableFromInline
+    init(
+        curve: BoringSSLEllipticCurveGroup.CurveName
+    ) throws(CryptoBoringWrapperError) {
+        let group = try BoringSSLEllipticCurveGroup(curve)
+        let scalarArithmetic = try FiniteFieldArithmeticContext(modulus: group.order)
+        let fieldPrime = group.weierstrassCoefficients.field
+
+        self.group = group
+        self.scalarArithmetic = scalarArithmetic
+        self.fieldPrime = fieldPrime
+    }
 }
 
 /// NOTE: This conformance applies to this type from the Crypto module even if it comes from the SDK.
@@ -50,9 +75,29 @@ extension P256: HashToGroupCurve {
     @usableFromInline
     typealias H = SHA256
 
+    private static let primeOrderCurveRuntime = Mutex<PrimeOrderCurveRuntime?>(nil)
+
     @usableFromInline
-    static let group = requireCryptographicInvariant("Unable to initialize the P-256 group") {
-        try BoringSSLEllipticCurveGroup(.p256)
+    static func runtime() throws(CryptoBoringWrapperError) -> PrimeOrderCurveRuntime {
+        let result: Result<PrimeOrderCurveRuntime, CryptoBoringWrapperError> =
+            primeOrderCurveRuntime.withLock { runtime in
+            if let runtime {
+                return .success(runtime)
+            }
+            do throws(CryptoBoringWrapperError) {
+                let initializedRuntime = try PrimeOrderCurveRuntime(curve: .p256)
+                runtime = initializedRuntime
+                return .success(initializedRuntime)
+            } catch let error {
+                return .failure(error)
+            }
+        }
+        switch result {
+        case .success(let runtime):
+            return runtime
+        case .failure(let error):
+            throw error
+        }
     }
 
     @inlinable
@@ -74,15 +119,13 @@ extension P256: HashToGroupCurve {
     static func hashToGroup(
         _ data: UnsafeRawBufferPointer,
         domainSeparationString: UnsafeRawBufferPointer
-    ) -> EllipticCurvePoint {
-        requireCryptographicInvariant("Unable to hash to the P-256 group") {
-            try EllipticCurvePoint(hashing: data, to: Self.group, domainSeparationTag: domainSeparationString)
-        }
-    }
-
-    @usableFromInline
-    static let arithmeticContext = requireCryptographicInvariant("Unable to initialize P-256 arithmetic") {
-        try FiniteFieldArithmeticContext(modulus: P256.group.order)
+    ) throws(CryptoBoringWrapperError) -> EllipticCurvePoint {
+        let runtime = try Self.runtime()
+        return try EllipticCurvePoint(
+            hashing: data,
+            to: runtime.group,
+            domainSeparationTag: domainSeparationString
+        )
     }
 }
 
@@ -91,9 +134,29 @@ extension P384: HashToGroupCurve {
     @usableFromInline
     typealias H = SHA384
 
+    private static let primeOrderCurveRuntime = Mutex<PrimeOrderCurveRuntime?>(nil)
+
     @usableFromInline
-    static let group = requireCryptographicInvariant("Unable to initialize the P-384 group") {
-        try BoringSSLEllipticCurveGroup(.p384)
+    static func runtime() throws(CryptoBoringWrapperError) -> PrimeOrderCurveRuntime {
+        let result: Result<PrimeOrderCurveRuntime, CryptoBoringWrapperError> =
+            primeOrderCurveRuntime.withLock { runtime in
+            if let runtime {
+                return .success(runtime)
+            }
+            do throws(CryptoBoringWrapperError) {
+                let initializedRuntime = try PrimeOrderCurveRuntime(curve: .p384)
+                runtime = initializedRuntime
+                return .success(initializedRuntime)
+            } catch let error {
+                return .failure(error)
+            }
+        }
+        switch result {
+        case .success(let runtime):
+            return runtime
+        case .failure(let error):
+            throw error
+        }
     }
 
     @inlinable
@@ -115,15 +178,13 @@ extension P384: HashToGroupCurve {
     static func hashToGroup(
         _ data: UnsafeRawBufferPointer,
         domainSeparationString: UnsafeRawBufferPointer
-    ) -> EllipticCurvePoint {
-        requireCryptographicInvariant("Unable to hash to the P-384 group") {
-            try EllipticCurvePoint(hashing: data, to: Self.group, domainSeparationTag: domainSeparationString)
-        }
-    }
-
-    @usableFromInline
-    static let arithmeticContext = requireCryptographicInvariant("Unable to initialize P-384 arithmetic") {
-        try FiniteFieldArithmeticContext(modulus: P384.group.order)
+    ) throws(CryptoBoringWrapperError) -> EllipticCurvePoint {
+        let runtime = try Self.runtime()
+        return try EllipticCurvePoint(
+            hashing: data,
+            to: runtime.group,
+            domainSeparationTag: domainSeparationString
+        )
     }
 }
 
@@ -140,7 +201,10 @@ struct PrimeOrderCurveScalar<C: HashToGroupCurve>: GroupScalar, CustomStringConv
             throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
         }
         let integer = try ArbitraryPrecisionInteger(cryptoBytes: canonicalRepresentation)
-        guard integer < C.group.order else {
+        let groupOrder = try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
+            try C.runtime().group.order
+        }
+        guard integer < groupOrder else {
             throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
         }
         self.init(integer)
@@ -152,11 +216,12 @@ struct PrimeOrderCurveScalar<C: HashToGroupCurve>: GroupScalar, CustomStringConv
     ) throws(CryptoKitMetaError) -> Self {
         let integer = try ArbitraryPrecisionInteger(cryptoBytes: uniformBytes)
         let reducedInteger = try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
+            let runtime = try C.runtime()
             switch modulus {
             case .groupOrder:
-                return try C.arithmeticContext.residue(integer)
+                return try runtime.scalarArithmetic.residue(integer)
             case .fieldPrime:
-                return try integer.modulo(C.group.weierstrassCoefficients.field, nonNegative: true)
+                return try integer.modulo(runtime.fieldPrime, nonNegative: true)
             }
         }
         return Self(reducedInteger)
@@ -164,7 +229,47 @@ struct PrimeOrderCurveScalar<C: HashToGroupCurve>: GroupScalar, CustomStringConv
 
     static var random: Self {
         requireCryptographicInvariant("Unable to generate a group scalar") {
-            try Self(.random(inclusiveMin: 1, exclusiveMax: C.group.order))
+            try Self.randomNonzero()
+        }
+    }
+
+    static func randomNonzero() throws(CryptoKitMetaError) -> Self {
+        try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
+            let runtime = try C.runtime()
+            return try Self(.random(inclusiveMin: 1, exclusiveMax: runtime.group.order))
+        }
+    }
+
+    consuming func adding(_ other: consuming Self) throws(CryptoKitMetaError) -> Self {
+        try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
+            let runtime = try C.runtime()
+            return try Self(runtime.scalarArithmetic.add(self.integer, other.integer))
+        }
+    }
+
+    consuming func subtracting(_ other: consuming Self) throws(CryptoKitMetaError) -> Self {
+        try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
+            let runtime = try C.runtime()
+            return try Self(runtime.scalarArithmetic.subtract(other.integer, from: self.integer))
+        }
+    }
+
+    consuming func multiplied(by other: consuming Self) throws(CryptoKitMetaError) -> Self {
+        try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
+            let runtime = try C.runtime()
+            return try Self(runtime.scalarArithmetic.multiply(self.integer, other.integer))
+        }
+    }
+
+    consuming func negated() throws(CryptoKitMetaError) -> Self {
+        try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
+            let runtime = try C.runtime()
+            return try Self(
+                runtime.scalarArithmetic.subtract(
+                    self.integer,
+                    from: ArbitraryPrecisionInteger.zero
+                )
+            )
         }
     }
 
@@ -174,19 +279,20 @@ struct PrimeOrderCurveScalar<C: HashToGroupCurve>: GroupScalar, CustomStringConv
 
     static func + (left: Self, right: Self) -> Self {
         requireCryptographicInvariant("Unable to add group scalars") {
-            try Self(C.arithmeticContext.add(left.integer, right.integer))
+            try left.adding(right)
         }
     }
 
     static func - (left: Self, right: Self) -> Self {
         requireCryptographicInvariant("Unable to subtract group scalars") {
-            try Self(C.arithmeticContext.subtract(right.integer, from: left.integer))
+            try left.subtracting(right)
         }
     }
 
     func inverted() throws(CryptoKitMetaError) -> Self {
         let inverse = try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
-            try C.arithmeticContext.inverse(self.integer)
+            let runtime = try C.runtime()
+            return try runtime.scalarArithmetic.inverse(self.integer)
         }
         guard let inverse else {
             throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
@@ -196,13 +302,13 @@ struct PrimeOrderCurveScalar<C: HashToGroupCurve>: GroupScalar, CustomStringConv
 
     static func * (left: Self, right: Self) -> Self {
         requireCryptographicInvariant("Unable to multiply group scalars") {
-            try Self(C.arithmeticContext.multiply(left.integer, right.integer))
+            try left.multiplied(by: right)
         }
     }
 
     static prefix func - (left: Self) -> Self {
         requireCryptographicInvariant("Unable to negate a group scalar") {
-            try Self(C.arithmeticContext.subtract(left.integer, from: ArbitraryPrecisionInteger.zero))
+            try left.negated()
         }
     }
 
@@ -242,49 +348,100 @@ struct PrimeOrderCurvePoint<C: HashToGroupCurve>: GroupElement {
         self.point = point
     }
 
-    static var generator: Self {
-        Self(point: C.group.generator)
+    static func generator() throws(CryptoKitMetaError) -> Self {
+        try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
+            Self(point: try C.runtime().group.generator)
+        }
     }
 
-    var isIdentity: Bool {
-        self.point.isIdentity(on: C.group)
+    func isIdentity() throws(CryptoKitMetaError) -> Bool {
+        try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
+            try self.point.isIdentity(on: C.runtime().group)
+        }
+    }
+
+    func isEqual(to other: Self) throws(CryptoKitMetaError) -> Bool {
+        try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
+            try self.point.isEqual(to: other.point, on: C.runtime().group)
+        }
     }
 
     static var random: Self {
-        let randomBytes = SystemRandomNumberGenerator.randomBytes(count: C.group.order.byteCount)
-        let dst = Data("Random EC Point Generation".utf8)
-        let point = requireCryptographicInvariant("Unable to generate a group element") {
-            try EllipticCurvePoint(hashing: randomBytes, to: C.group, domainSeparationTag: dst)
+        requireCryptographicInvariant("Unable to generate a group element") {
+            let runtime = try C.runtime()
+            let randomBytes = SystemRandomNumberGenerator.randomBytes(count: runtime.group.order.byteCount)
+            let dst = Data("Random EC Point Generation".utf8)
+            let point = try EllipticCurvePoint(
+                hashing: randomBytes,
+                to: runtime.group,
+                domainSeparationTag: dst
+            )
+            return Self(point: point)
         }
-        return Self(point: point)
     }
 
-    static func + (left: consuming Self, right: consuming Self) -> Self {
+    consuming func adding(_ other: consuming Self) throws(CryptoKitMetaError) -> Self {
+        try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
+            let runtime = try C.runtime()
+            return try Self(point: self.point.adding(other.point, on: runtime.group))
+        }
+    }
+
+    consuming func subtracting(_ other: consuming Self) throws(CryptoKitMetaError) -> Self {
+        try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
+            let runtime = try C.runtime()
+            return try Self(point: self.point.subtracting(other.point, on: runtime.group))
+        }
+    }
+
+    consuming func multiplied(by scalar: consuming Scalar) throws(CryptoKitMetaError) -> Self {
+        try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
+            let runtime = try C.runtime()
+            return try Self(
+                point: self.point.multiplying(
+                    by: scalar.integer,
+                    on: runtime.group,
+                    context: runtime.scalarArithmetic
+                )
+            )
+        }
+    }
+
+    consuming func negated() throws(CryptoKitMetaError) -> Self {
+        try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
+            let runtime = try C.runtime()
+            return try Self(point: self.point.inverting(on: runtime.group))
+        }
+    }
+
+    static func + (left: Self, right: Self) -> Self {
         requireCryptographicInvariant("Unable to add group elements") {
-            try Self(point: left.point.adding(right.point, on: C.group))
+            try left.adding(right)
         }
     }
 
-    static func - (left: consuming Self, right: consuming Self) -> Self {
+    static func - (left: Self, right: Self) -> Self {
         requireCryptographicInvariant("Unable to subtract group elements") {
-            try Self(point: left.point.subtracting(right.point, on: C.group))
+            try left.subtracting(right)
         }
     }
 
     static prefix func - (left: Self) -> Self {
         requireCryptographicInvariant("Unable to negate a group element") {
-            try Self(point: left.point.inverting(on: C.group))
+            try left.negated()
         }
     }
 
-    static func * (left: consuming Scalar, right: consuming Self) -> Self {
+    static func * (left: Scalar, right: Self) -> Self {
         requireCryptographicInvariant("Unable to multiply a group element") {
-            try Self(point: right.point.multiplying(by: left.integer, on: C.group, context: C.arithmeticContext))
+            try right.multiplied(by: left)
         }
     }
 
     static func == (left: Self, right: Self) -> Bool {
-        left.point.isEqual(to: right.point, on: C.group)
+        requireCryptographicInvariant("Unable to compare group elements") {
+            try left.isEqual(to: right)
+        }
     }
 }
 
@@ -292,10 +449,11 @@ extension PrimeOrderCurvePoint {
     var compressedRepresentation: Data {
         var representation = Data(count: C.compressedX962PointByteCount)
         requireCryptographicInvariant("Unable to serialize a group element") {
+            let runtime = try C.runtime()
             try representation.withUnsafeMutableBytes { buffer in
                 try self.point.writeX962Representation(
                     compressed: true,
-                    on: C.group,
+                    on: runtime.group,
                     into: buffer
                 )
             }
@@ -314,7 +472,12 @@ extension PrimeOrderCurvePoint: OPRFGroupElement {
             throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
         }
         let point = try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
-            try EllipticCurvePoint(x962Representation: data, on: C.group, context: C.arithmeticContext)
+            let runtime = try C.runtime()
+            return try EllipticCurvePoint(
+                x962Representation: data,
+                on: runtime.group,
+                context: runtime.scalarArithmetic
+            )
         }
         self.init(point: point)
     }
@@ -325,9 +488,10 @@ extension PrimeOrderCurvePoint: OPRFGroupElement {
         into destination: UnsafeMutableRawBufferPointer
     ) throws(CryptoKitMetaError) {
         do throws(CryptoBoringWrapperError) {
+            let runtime = try C.runtime()
             try self.point.writeX962Representation(
                 compressed: true,
-                on: C.group,
+                on: runtime.group,
                 into: destination
             )
         } catch {
@@ -366,18 +530,22 @@ struct CurveHashToGroup<C: HashToGroupCurve>: HashToGroup {
     static func hashToGroup<Bytes: Crypto.ContiguousBytes>(
         _ data: Bytes,
         domainSeparationString: Data
-    ) -> GE {
+    ) throws(CryptoKitMetaError) -> GE {
         precondition(G.cofactor == 1, "H2C doesn't have support for clearing co-factors.")
         precondition(!domainSeparationString.isEmpty, "DST must be non-empty.")
-        return data.withUnsafeBytes { dataBytes in
-            domainSeparationString.withUnsafeBytes { domainSeparationStringBytes in
-                PrimeOrderCurvePoint<C>(
-                    point: C.hashToGroup(
-                        dataBytes,
-                        domainSeparationString: domainSeparationStringBytes
+        do throws(CryptoBoringWrapperError) {
+            return try Crypto.withUnsafeBytes(of: data) { (dataBytes) throws(CryptoBoringWrapperError) in
+                try Crypto.withUnsafeBytes(of: domainSeparationString) { (domainSeparationStringBytes) throws(CryptoBoringWrapperError) in
+                    PrimeOrderCurvePoint<C>(
+                        point: try C.hashToGroup(
+                            dataBytes,
+                            domainSeparationString: domainSeparationStringBytes
+                        )
                     )
-                )
+                }
             }
+        } catch {
+            throw cryptoExtrasError(error)
         }
     }
 }

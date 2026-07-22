@@ -56,7 +56,7 @@ extension ARC {
                 )
             )
             let inverse = try (nonceScalar + credential.m1).inverted()
-            let T = H2G.hashToGroup(presentationContext, domainSeparationString: Data(("HashToGroup-" + credential.ciphersuite.domain + "Tag").utf8))
+            let T = try H2G.hashToGroup(presentationContext, domainSeparationString: Data(("HashToGroup-" + credential.ciphersuite.domain + "Tag").utf8))
             let tag = inverse * T
 
             // m1Tag is a helper element in the ZKP, and is needed to ensure the
@@ -110,7 +110,7 @@ extension ARC {
             let V = serverPrivateKey.x0 * self.U + serverPrivateKey.x1 * self.m1Commit + serverPrivateKey.x2 * m2 * self.U - self.UPrimeCommit
 
             // Recompute T = H2G(presentationContext)
-            let T = H2G.hashToGroup(presentationContext, domainSeparationString: Data(("HashToGroup-" + ciphersuite.domain + "Tag").utf8))
+            let T = try H2G.hashToGroup(presentationContext, domainSeparationString: Data(("HashToGroup-" + ciphersuite.domain + "Tag").utf8))
 
             // Recompute m1Tag = H2G(presentationContext) - nonce * tag
             var m1Tag = T

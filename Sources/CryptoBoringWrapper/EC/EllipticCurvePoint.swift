@@ -19,6 +19,20 @@ import Foundation
 internal import CCryptoBoringSSL
 internal import CCryptoBoringSSLShims
 
+private func isPointEncodingError(_ errorCode: UInt32) -> Bool {
+    switch CCryptoBoringSSL_ERR_GET_REASON(errorCode) {
+    case EC_R_COORDINATES_OUT_OF_RANGE,
+        EC_R_INVALID_COMPRESSED_POINT,
+        EC_R_INVALID_COMPRESSION_BIT,
+        EC_R_INVALID_ENCODING,
+        EC_R_INVALID_FORM,
+        EC_R_POINT_IS_NOT_ON_CURVE:
+        return true
+    default:
+        return false
+    }
+}
+
 
 /// A wrapper around BoringSSL's EC_POINT with some lifetime management and value semantics.
 @usableFromInline
@@ -227,16 +241,33 @@ package struct EllipticCurvePoint: @unchecked Sendable {
         to rhs: EllipticCurvePoint,
         on group: BoringSSLEllipticCurveGroup,
         context: FiniteFieldArithmeticContext? = nil
-    ) -> Bool {
-        self.backing.isEqual(to: rhs, on: group, context: context)
+    ) throws(CryptoBoringWrapperError) -> Bool {
+        try self.backing.isEqual(to: rhs, on: group, context: context)
     }
 
     @usableFromInline
-    package func isIdentity(on group: BoringSSLEllipticCurveGroup) -> Bool {
-        group.withUnsafeGroupPointer { groupPointer in
+    package func isIdentity(
+        on group: BoringSSLEllipticCurveGroup
+    ) throws(CryptoBoringWrapperError) -> Bool {
+        CCryptoBoringSSL_ERR_clear_error()
+        let result = group.withUnsafeGroupPointer { groupPointer in
             self.withPointPointer { pointPointer in
-                CCryptoBoringSSL_EC_POINT_is_at_infinity(groupPointer, pointPointer) == 1
+                CCryptoBoringSSL_EC_POINT_is_at_infinity(groupPointer, pointPointer)
             }
+        }
+        switch result {
+        case 0:
+            let errorCode = CCryptoBoringSSL_ERR_get_error()
+            guard errorCode == 0 else {
+                throw CryptoBoringWrapperError.underlyingCoreCryptoError(
+                    error: Int32(bitPattern: errorCode)
+                )
+            }
+            return false
+        case 1:
+            return true
+        default:
+            throw CryptoBoringWrapperError.internalBoringSSLError()
         }
     }
 
@@ -425,9 +456,9 @@ extension EllipticCurvePoint {
                 }
 
             try self.init(_pointAtInfinityOn: group)
-            try withCryptoBoringWrapperUnsafeBytes(msg) { (msgPtr) throws(CryptoBoringWrapperError) in
+            try withUnsafeBytes(of: msg) { (msgPtr) throws(CryptoBoringWrapperError) in
                 try group.withUnsafeGroupPointer { (groupPtr) throws(CryptoBoringWrapperError) in
-                    try withCryptoBoringWrapperUnsafeBytes(domainSeparationTag) { (dstPtr) throws(CryptoBoringWrapperError) in
+                    try withUnsafeBytes(of: domainSeparationTag) { (dstPtr) throws(CryptoBoringWrapperError) in
                         guard
                             hashToCurveFunction(
                                 groupPtr,
@@ -447,18 +478,21 @@ extension EllipticCurvePoint {
             to rhs: EllipticCurvePoint,
             on group: BoringSSLEllipticCurveGroup,
             context: FiniteFieldArithmeticContext? = nil
-        ) -> Bool {
-            self.withPointPointer { selfPtr in
+        ) throws(CryptoBoringWrapperError) -> Bool {
+            let result = self.withPointPointer { selfPtr in
                 group.withUnsafeGroupPointer { groupPtr in
                     rhs.withPointPointer { rhsPtr in
-                        switch CCryptoBoringSSL_EC_POINT_cmp(groupPtr, selfPtr, rhsPtr, nil) {
-                        case 0: return true
-                        case 1: return false
-                        default:
-                            preconditionFailure("Unable to compare elliptic-curve points")
-                        }
+                        CCryptoBoringSSL_EC_POINT_cmp(groupPtr, selfPtr, rhsPtr, nil)
                     }
                 }
+            }
+            switch result {
+            case 0:
+                return true
+            case 1:
+                return false
+            default:
+                throw CryptoBoringWrapperError.internalBoringSSLError()
             }
         }
 
@@ -468,6 +502,7 @@ extension EllipticCurvePoint {
             context: FiniteFieldArithmeticContext? = nil
         ) throws(CryptoBoringWrapperError) {
             try self.init(_pointAtInfinityOn: group)
+            CCryptoBoringSSL_ERR_clear_error()
             let returnCode = group.withUnsafeGroupPointer { groupPtr in
                 bytes.withUnsafeBytes { dataPtr in
                     withArithmeticWorkspace(from: context) { workspace in
@@ -482,7 +517,25 @@ extension EllipticCurvePoint {
                 }
             }
             guard returnCode == 1 else {
-                throw CryptoBoringWrapperError.invalidParameter
+                var errorCode = CCryptoBoringSSL_ERR_get_error()
+                var representativeErrorCode = errorCode
+                var hasEncodingError = false
+                var hasBackendError = errorCode == 0
+                while errorCode != 0 {
+                    if isPointEncodingError(errorCode) {
+                        hasEncodingError = true
+                    } else {
+                        hasBackendError = true
+                        representativeErrorCode = errorCode
+                    }
+                    errorCode = CCryptoBoringSSL_ERR_get_error()
+                }
+                if hasEncodingError && !hasBackendError {
+                    throw CryptoBoringWrapperError.invalidParameter
+                }
+                throw CryptoBoringWrapperError.underlyingCoreCryptoError(
+                    error: Int32(bitPattern: representativeErrorCode)
+                )
             }
         }
 

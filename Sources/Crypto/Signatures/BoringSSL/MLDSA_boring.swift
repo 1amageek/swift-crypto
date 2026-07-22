@@ -158,7 +158,7 @@ extension MLDSA65 {
                 var signature = Data(repeating: 0, count: MLDSA65.signatureByteCount)
 
                 let rc: CInt = signature.withUnsafeMutableBytes { signaturePtr in
-                    return withCryptoDataProtocolUnsafeBytes(data) { dataPtr in
+                    return withContiguousBytes(of: data) { dataPtr in
                         context.withUnsafeBytes { contextPtr in
                             CCryptoBoringSSL_MLDSA65_sign(
                                 signaturePtr.baseAddress,
@@ -259,7 +259,7 @@ extension MLDSA65 {
 
                 self.key = .init()
 
-                let parsed = withCryptoDataProtocolUnsafeBytes(rawRepresentation) { rawBuffer in
+                let parsed = withContiguousBytes(of: rawRepresentation) { rawBuffer in
                     rawBuffer.withMemoryRebound(to: UInt8.self) { buffer in
                         var cbs = CBS(data: buffer.baseAddress, len: buffer.count)
                         return CCryptoBoringSSL_MLDSA65_parse_public_key(&self.key, &cbs) == 1
@@ -293,8 +293,8 @@ extension MLDSA65 {
                 for data: D,
                 context: C?
             ) -> Bool {
-                return withCryptoDataProtocolUnsafeBytes(signature) { signaturePtr in
-                    let rc: CInt = withCryptoDataProtocolUnsafeBytes(data) { dataPtr in
+                return withContiguousBytes(of: signature) { signaturePtr in
+                    let rc: CInt = withContiguousBytes(of: data) { dataPtr in
                         context.withUnsafeBytes { contextPtr in
                             CCryptoBoringSSL_MLDSA65_verify(
                                 &self.key,
@@ -453,7 +453,7 @@ extension MLDSA87 {
                 var signature = Data(repeating: 0, count: MLDSA87.signatureByteCount)
 
                 let rc: CInt = signature.withUnsafeMutableBytes { signaturePtr in
-                    return withCryptoDataProtocolUnsafeBytes(data) { dataPtr in
+                    return withContiguousBytes(of: data) { dataPtr in
                         context.withUnsafeBytes { contextPtr in
                             CCryptoBoringSSL_MLDSA87_sign(
                                 signaturePtr.baseAddress,
@@ -554,7 +554,7 @@ extension MLDSA87 {
 
                 self.key = .init()
 
-                let parsed = withCryptoDataProtocolUnsafeBytes(rawRepresentation) { rawBuffer in
+                let parsed = withContiguousBytes(of: rawRepresentation) { rawBuffer in
                     rawBuffer.withMemoryRebound(to: UInt8.self) { buffer in
                         var cbs = CBS(data: buffer.baseAddress, len: buffer.count)
                         return CCryptoBoringSSL_MLDSA87_parse_public_key(&self.key, &cbs) == 1
@@ -588,8 +588,8 @@ extension MLDSA87 {
                 for data: D,
                 context: C?
             ) -> Bool {
-                return withCryptoDataProtocolUnsafeBytes(signature) { signaturePtr in
-                    let rc: CInt = withCryptoDataProtocolUnsafeBytes(data) { dataPtr in
+                return withContiguousBytes(of: signature) { signaturePtr in
+                    let rc: CInt = withContiguousBytes(of: data) { dataPtr in
                         context.withUnsafeBytes { contextPtr in
                             CCryptoBoringSSL_MLDSA87_verify(
                                 &self.key,

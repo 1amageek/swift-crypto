@@ -77,7 +77,7 @@ struct DLEQ<H2G: HashToGroup> {
         guard inputs.count <= Int(UInt16.max) + 1 else {
             throw cryptoExtrasError(OPRF.Errors.batchTooLarge)
         }
-        guard !publicKey.isIdentity else {
+        guard try !publicKey.isIdentity() else {
             throw cryptoExtrasError(OPRF.Errors.invalidProof)
         }
 
@@ -93,7 +93,7 @@ struct DLEQ<H2G: HashToGroup> {
         var inputComposite: GE?
         var outputComposite: GE?
         for (index, pair) in zip(inputs, outputs).enumerated() {
-            guard !pair.0.isIdentity, !pair.1.isIdentity else {
+            guard try !pair.0.isIdentity(), try !pair.1.isIdentity() else {
                 throw cryptoExtrasError(OPRF.Errors.invalidProof)
             }
             let coefficient = try H2G.hashToScalar(
@@ -111,23 +111,31 @@ struct DLEQ<H2G: HashToGroup> {
                 try update(&hasher, withTwoByteLengthPrefixed: pair.1)
                 hasher.update(data: dleqCompositeLabel)
             }
-            let weightedInput = coefficient * pair.0
-            inputComposite = inputComposite.map { weightedInput + $0 } ?? weightedInput
+            let weightedInput = try pair.0.multiplied(by: coefficient)
+            if let currentInputComposite = inputComposite {
+                inputComposite = try weightedInput.adding(currentInputComposite)
+            } else {
+                inputComposite = weightedInput
+            }
             if secretScalar == nil {
-                let weightedOutput = coefficient * pair.1
-                outputComposite = outputComposite.map { weightedOutput + $0 } ?? weightedOutput
+                let weightedOutput = try pair.1.multiplied(by: coefficient)
+                if let currentOutputComposite = outputComposite {
+                    outputComposite = try weightedOutput.adding(currentOutputComposite)
+                } else {
+                    outputComposite = weightedOutput
+                }
             }
         }
 
         guard let inputComposite else {
             throw cryptoExtrasError(OPRF.Errors.emptyBatch)
         }
-        guard !inputComposite.isIdentity else {
+        guard try !inputComposite.isIdentity() else {
             throw cryptoExtrasError(OPRF.Errors.invalidProof)
         }
         if let secretScalar {
-            let outputComposite = secretScalar * inputComposite
-            guard !outputComposite.isIdentity else {
+            let outputComposite = try inputComposite.multiplied(by: secretScalar)
+            guard try !outputComposite.isIdentity() else {
                 throw cryptoExtrasError(OPRF.Errors.invalidProof)
             }
             return (input: inputComposite, output: outputComposite)
@@ -135,7 +143,7 @@ struct DLEQ<H2G: HashToGroup> {
         guard let outputComposite else {
             throw cryptoExtrasError(OPRF.Errors.emptyBatch)
         }
-        guard !outputComposite.isIdentity else {
+        guard try !outputComposite.isIdentity() else {
             throw cryptoExtrasError(OPRF.Errors.invalidProof)
         }
         return (input: inputComposite, output: outputComposite)
@@ -151,11 +159,11 @@ struct DLEQ<H2G: HashToGroup> {
         compositeCommitment: GE
     ) throws(CryptoKitMetaError) -> GE.Scalar {
         guard
-            !publicKey.isIdentity,
-            !inputComposite.isIdentity,
-            !outputComposite.isIdentity,
-            !generatorCommitment.isIdentity,
-            !compositeCommitment.isIdentity
+            try !publicKey.isIdentity(),
+            try !inputComposite.isIdentity(),
+            try !outputComposite.isIdentity(),
+            try !generatorCommitment.isIdentity(),
+            try !compositeCommitment.isIdentity()
         else {
             throw cryptoExtrasError(OPRF.Errors.invalidProof)
         }
@@ -193,8 +201,8 @@ struct DLEQ<H2G: HashToGroup> {
             inputs: inputs,
             outputs: outputs
         )
-        let generatorCommitment = proofScalar * generator
-        let compositeCommitment = proofScalar * composites.input
+        let generatorCommitment = try generator.multiplied(by: proofScalar)
+        let compositeCommitment = try composites.input.multiplied(by: proofScalar)
         let challenge = try challenge(
             context: context,
             hashToScalarDomainSeparationTag: hashToScalarDomainSeparationTag,
@@ -204,7 +212,8 @@ struct DLEQ<H2G: HashToGroup> {
             generatorCommitment: generatorCommitment,
             compositeCommitment: compositeCommitment
         )
-        let response = proofScalar - challenge * secretScalar
+        let challengeProduct = try challenge.multiplied(by: secretScalar)
+        let response = try proofScalar.subtracting(challengeProduct)
         return DLEQProof(challenge: challenge, response: response)
     }
 
@@ -225,9 +234,12 @@ struct DLEQ<H2G: HashToGroup> {
             inputs: inputs,
             outputs: outputs
         )
-        let generatorCommitment = (proof.response * generator) + (proof.challenge * publicKey)
-        let compositeCommitment =
-            (proof.response * composites.input) + (proof.challenge * composites.output)
+        let responseGenerator = try generator.multiplied(by: proof.response)
+        let challengePublicKey = try publicKey.multiplied(by: proof.challenge)
+        let generatorCommitment = try responseGenerator.adding(challengePublicKey)
+        let responseInput = try composites.input.multiplied(by: proof.response)
+        let challengeOutput = try composites.output.multiplied(by: proof.challenge)
+        let compositeCommitment = try responseInput.adding(challengeOutput)
         let challenge = try challenge(
             context: context,
             hashToScalarDomainSeparationTag: hashToScalarDomainSeparationTag,

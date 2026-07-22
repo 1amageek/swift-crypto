@@ -13,9 +13,23 @@
 //===----------------------------------------------------------------------===//
 import Crypto
 import CryptoExtras  // NOTE: No @testable import, because we want to test the public API.
+#if canImport(Dispatch)
+import Dispatch
+#endif
 import XCTest
 
 final class VOPRFPublicAPITests: XCTestCase {
+
+    private func representation(
+        byteCount: Int,
+        write: (UnsafeMutableRawBufferPointer) throws -> Void
+    ) rethrows -> Data {
+        var result = Data(count: byteCount)
+        try result.withUnsafeMutableBytes { destination in
+            try write(destination)
+        }
+        return result
+    }
 
     private func assertVOPRFError(
         _ expectedError: VOPRFError,
@@ -47,7 +61,7 @@ final class VOPRFPublicAPITests: XCTestCase {
         let blindedInput = try publicKey.blind(privateInput)
 
         // [Client -> Server] Send the blinded element.
-        let blindedElementBytes = blindedInput.blindedElement.oprfRepresentation
+        let blindedElementBytes = try blindedInput.blindedElement.oprfRepresentation()
 
         // [Server] Receive the blinded element.
         let blindedElement = try P384._VOPRF.BlindedElement(oprfRepresentation: blindedElementBytes)
@@ -56,7 +70,7 @@ final class VOPRFPublicAPITests: XCTestCase {
         let blindEvaluation = try privateKey.evaluate(blindedElement)
 
         // [Server -> Client] Send the serialized blind evaluation.
-        let blindEvaluationBytes = blindEvaluation.rawRepresentation
+        let blindEvaluationBytes = try blindEvaluation.rawRepresentation()
 
         // [Client] Receive the blind evaluation.
         let deserializedBlindEvaluation = try P384._VOPRF.BlindEvaluation(rawRepresentation: blindEvaluationBytes)
@@ -84,8 +98,11 @@ final class VOPRFPublicAPITests: XCTestCase {
         let evaluatedElement = try Data(hexString: vector.evaluatedElements)
         let proof = try Data(hexString: XCTUnwrap(vector.proof).proof)
         let blindEvaluation = try P384._VOPRF.BlindEvaluation(rawRepresentation: evaluatedElement + proof)
-        XCTAssertEqual(blindEvaluation.evaluatedElement.oprfRepresentation, evaluatedElement)
-        XCTAssertEqual(blindEvaluation.proof.rawRepresentation, proof)
+        XCTAssertEqual(
+            try blindEvaluation.evaluatedElement.oprfRepresentation(),
+            evaluatedElement
+        )
+        XCTAssertEqual(try blindEvaluation.proof.rawRepresentation(), proof)
     }
 
     func testEndToEndPRF() throws {
@@ -101,6 +118,76 @@ final class VOPRFPublicAPITests: XCTestCase {
         XCTAssertEqual(firstOutput, secondOutput)
     }
 
+    func testCallerOwnedRepresentationsMatchAllocatingConveniences() throws {
+        let privateKey = try P384._VOPRF.PrivateKey()
+        let publicKey = privateKey.publicKey
+        let blindedInput = try publicKey.blind(Data("serialization".utf8))
+        let blindEvaluation = try privateKey.evaluate(blindedInput.blindedElement)
+
+        XCTAssertEqual(
+            try representation(byteCount: P384._VOPRF.PrivateKey.rawRepresentationByteCount) {
+                try privateKey.writeRawRepresentation(into: $0)
+            },
+            try privateKey.rawRepresentation()
+        )
+        XCTAssertEqual(
+            try representation(byteCount: P384._VOPRF.PublicKey.oprfRepresentationByteCount) {
+                try publicKey.writeOPRFRepresentation(into: $0)
+            },
+            try publicKey.oprfRepresentation()
+        )
+        XCTAssertEqual(
+            try representation(byteCount: P384._VOPRF.BlindedElement.oprfRepresentationByteCount) {
+                try blindedInput.blindedElement.writeOPRFRepresentation(into: $0)
+            },
+            try blindedInput.blindedElement.oprfRepresentation()
+        )
+        XCTAssertEqual(
+            try representation(byteCount: P384._VOPRF.EvaluatedElement.oprfRepresentationByteCount) {
+                try blindEvaluation.evaluatedElement.writeOPRFRepresentation(into: $0)
+            },
+            try blindEvaluation.evaluatedElement.oprfRepresentation()
+        )
+        XCTAssertEqual(
+            try representation(byteCount: P384._VOPRF.Proof.rawRepresentationByteCount) {
+                try blindEvaluation.proof.writeRawRepresentation(into: $0)
+            },
+            try blindEvaluation.proof.rawRepresentation()
+        )
+        XCTAssertEqual(
+            try representation(byteCount: P384._VOPRF.BlindEvaluation.rawRepresentationByteCount) {
+                try blindEvaluation.writeRawRepresentation(into: $0)
+            },
+            try blindEvaluation.rawRepresentation()
+        )
+    }
+
+    func testCallerOwnedRepresentationRejectsWrongSize() throws {
+        let privateKey = try P384._VOPRF.PrivateKey()
+        var destination = Data(
+            count: P384._VOPRF.PrivateKey.rawRepresentationByteCount - 1
+        )
+
+        assertVOPRFError(.internalFailure) {
+            try destination.withUnsafeMutableBytes {
+                try privateKey.writeRawRepresentation(into: $0)
+            }
+        }
+    }
+
+    #if canImport(Dispatch)
+    func testDirectEvaluationAcceptsDiscontiguousInput() throws {
+        let privateKey = try P384._VOPRF.PrivateKey()
+        let input = Data("discontiguous VOPRF input".utf8)
+        let (_, discontiguousInput) = Array(input).asDataProtocols(splitAt: 7)
+
+        XCTAssertEqual(
+            try privateKey.evaluate(input),
+            try privateKey.evaluate(discontiguousInput)
+        )
+    }
+    #endif
+
     func testZeroProofIsRejectedWithoutTerminating() throws {
         let privateKey = try P384._VOPRF.PrivateKey()
         let publicKey = privateKey.publicKey
@@ -109,10 +196,10 @@ final class VOPRFPublicAPITests: XCTestCase {
         let validEvaluation = try privateKey.evaluate(blindedInput.blindedElement)
         let zeroProof = Data(
             repeating: 0,
-            count: validEvaluation.proof.rawRepresentation.count
+            count: try validEvaluation.proof.rawRepresentation().count
         )
         let maliciousEvaluation = try P384._VOPRF.BlindEvaluation(
-            rawRepresentation: validEvaluation.evaluatedElement.oprfRepresentation + zeroProof
+            rawRepresentation: try validEvaluation.evaluatedElement.oprfRepresentation() + zeroProof
         )
 
         assertVOPRFError(.invalidProof) {
@@ -123,10 +210,14 @@ final class VOPRFPublicAPITests: XCTestCase {
     func testPublicInputFailuresReturnTypedErrors() throws {
         let invalidCompressedPoint = Data(repeating: 0, count: 49)
         let invalidUncompressedPoint = Data(repeating: 0, count: 97)
+        let zeroPrivateScalar = Data(
+            repeating: 0,
+            count: P384._VOPRF.PrivateKey.rawRepresentationByteCount
+        )
 
         assertVOPRFError(.invalidPublicKey) {
             _ = try P384._VOPRF.PublicKey(
-                compressedRepresentation: invalidCompressedPoint
+                oprfRepresentation: invalidCompressedPoint
             )
         }
         assertVOPRFError(.invalidElement) {
@@ -141,6 +232,11 @@ final class VOPRFPublicAPITests: XCTestCase {
         }
         assertVOPRFError(.invalidEncoding) {
             _ = try P384._VOPRF.BlindEvaluation(rawRepresentation: Data())
+        }
+        assertVOPRFError(.invalidPrivateKey) {
+            _ = try P384._VOPRF.PrivateKey(
+                rawRepresentation: zeroPrivateScalar
+            )
         }
     }
 
@@ -175,9 +271,9 @@ final class VOPRFPublicAPITests: XCTestCase {
             keyInfo: Data(hexString: suite.keyInfo)
         )
 
-        XCTAssertEqual(privateKey.rawRepresentation.hexString, suite.privateKey)
+        XCTAssertEqual(try privateKey.rawRepresentation().hexString, suite.privateKey)
         XCTAssertEqual(
-            privateKey.publicKey.oprfRepresentation.hexString,
+            try privateKey.publicKey.oprfRepresentation().hexString,
             try XCTUnwrap(suite.publicKey)
         )
     }

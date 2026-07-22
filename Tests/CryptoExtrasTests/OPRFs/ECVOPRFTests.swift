@@ -520,7 +520,7 @@ final class ECVOPRFTests: XCTestCase {
         )
 
         let secretScalar = HashToGroup.G.Scalar.random
-        let point = HashToGroup.G.Element.generator
+        let point = try HashToGroup.G.Element.generator()
         let oversizedBatch = repeatElement(point, count: Int(UInt16.max) + 2)
         XCTAssertThrowsError(
             try DLEQ<HashToGroup>.prove(
@@ -545,8 +545,8 @@ final class ECVOPRFTests: XCTestCase {
         XCTAssertThrowsError(
             try DLEQ<HashToGroup>.prove(
                 secretScalar: secretScalar,
-                generator: HashToGroup.G.Element.generator,
-                publicKey: secretScalar * HashToGroup.G.Element.generator,
+                generator: HashToGroup.G.Element.generator(),
+                publicKey: secretScalar * HashToGroup.G.Element.generator(),
                 inputs: [HashToGroup.G.Element](),
                 outputs: [HashToGroup.G.Element](),
                 context: Data(),
@@ -590,7 +590,7 @@ final class ECVOPRFTests: XCTestCase {
     func testDLEQProof() throws {
         typealias HashToGroup = CurveHashToGroup<P256>
         let secretScalar = HashToGroup.G.Scalar.random
-        let generator = HashToGroup.G.Element.generator
+        let generator = try HashToGroup.G.Element.generator()
         let publicKey = secretScalar * generator
         let input = HashToGroup.G.Element.random
         let output = secretScalar * input

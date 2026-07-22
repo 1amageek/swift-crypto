@@ -30,16 +30,37 @@ extension OPRF {
         let hashToScalarDomainSeparationTag: Data
         
         init(
+            ciphersuite: Ciphersuite<H2G>
+        ) throws(CryptoKitMetaError) {
+            try self.init(
+                mode: .base,
+                ciphersuite: ciphersuite,
+                privateKey: G.Scalar.randomNonzero()
+            )
+        }
+
+        init(
             ciphersuite: Ciphersuite<H2G>,
-            privateKey: G.Scalar = G.Scalar.random
+            privateKey: G.Scalar
         ) throws(CryptoKitMetaError) {
             try self.init(mode: .base, ciphersuite: ciphersuite, privateKey: privateKey)
+        }
+
+        internal init(
+            mode: Mode,
+            ciphersuite: Ciphersuite<H2G>
+        ) throws(CryptoKitMetaError) {
+            try self.init(
+                mode: mode,
+                ciphersuite: ciphersuite,
+                privateKey: G.Scalar.randomNonzero()
+            )
         }
         
         internal init(
             mode: Mode,
             ciphersuite: Ciphersuite<H2G>,
-            privateKey: G.Scalar = G.Scalar.random
+            privateKey: G.Scalar
         ) throws(CryptoKitMetaError) {
             guard privateKey != .zero else {
                 throw cryptoExtrasError(OPRF.Errors.invalidScalar)
@@ -47,7 +68,7 @@ extension OPRF {
             self.mode = mode
             self.ciphersuite = ciphersuite
             self.privateKey = privateKey
-            self.publicKey = privateKey * G.Element.generator
+            self.publicKey = try G.Element.generator().multiplied(by: privateKey)
             let context = protocolContext(mode: mode, ciphersuite: ciphersuite)
             self.context = context
             self.hashToGroupDomainSeparationTag = H2G.hashToGroupDomainSeparationTag(
@@ -58,18 +79,35 @@ extension OPRF {
             )
         }
         
-        func evaluate(blindedElement: G.Element, info: Data? = nil, proofScalar: G.Scalar = G.Scalar.random) throws(CryptoKitMetaError) ->
+        func evaluate(
+            blindedElement: G.Element,
+            info: Data? = nil
+        ) throws(CryptoKitMetaError) -> (G.Element, DLEQProof<G.Scalar>?) {
+            let proofScalar: G.Scalar =
+                self.mode == .base ? .zero : try G.Scalar.randomNonzero()
+            return try self.evaluate(
+                blindedElement: blindedElement,
+                info: info,
+                proofScalar: proofScalar
+            )
+        }
+
+        func evaluate(
+            blindedElement: G.Element,
+            info: Data? = nil,
+            proofScalar: G.Scalar
+        ) throws(CryptoKitMetaError) ->
         (G.Element, DLEQProof<H2G.G.Element.Scalar>?) {
             if mode != .partiallyOblivious, info != nil {
                 throw cryptoExtrasError(OPRF.Errors.invalidModeForInfo)
             }
             if mode == .base || mode == .verifiable {
-                let evaluatedElement = self.privateKey * blindedElement
+                let evaluatedElement = try blindedElement.multiplied(by: self.privateKey)
                 if mode == .base { return (evaluatedElement, nil) }
 
                 let proof = try DLEQ<H2G>.prove(
                     secretScalar: self.privateKey,
-                    generator: G.Element.generator,
+                    generator: G.Element.generator(),
                     publicKey: self.publicKey,
                     inputs: CollectionOfOne(blindedElement),
                     outputs: CollectionOfOne(evaluatedElement),
@@ -88,15 +126,16 @@ extension OPRF {
                 domainSeparationTag: hashToScalarDomainSeparationTag,
                 using: H2G.self
             )
-            let tweakedKey = privateKey + infoScalar
+            let tweakedKey = try privateKey.adding(infoScalar)
             guard tweakedKey != .zero else {
                 throw cryptoExtrasError(OPRF.Errors.invalidScalar)
             }
-            let evaluatedElement = try tweakedKey.inverted() * blindedElement
+            let evaluatedElement = try blindedElement.multiplied(by: tweakedKey.inverted())
+            let tweakedPublicKey = try G.Element.generator().multiplied(by: tweakedKey)
             let proof = try DLEQ<H2G>.prove(
                 secretScalar: tweakedKey,
-                generator: G.Element.generator,
-                publicKey: tweakedKey * G.Element.generator,
+                generator: G.Element.generator(),
+                publicKey: tweakedPublicKey,
                 inputs: CollectionOfOne(evaluatedElement),
                 outputs: CollectionOfOne(blindedElement),
                 context: context,
@@ -108,8 +147,21 @@ extension OPRF {
 
         func evaluate(
             blindedElements: [G.Element],
+            info: Data? = nil
+        ) throws(CryptoKitMetaError) -> ([G.Element], DLEQProof<G.Scalar>?) {
+            let proofScalar: G.Scalar =
+                self.mode == .base ? .zero : try G.Scalar.randomNonzero()
+            return try self.evaluate(
+                blindedElements: blindedElements,
+                info: info,
+                proofScalar: proofScalar
+            )
+        }
+
+        func evaluate(
+            blindedElements: [G.Element],
             info: Data? = nil,
-            proofScalar: G.Scalar = G.Scalar.random
+            proofScalar: G.Scalar
         ) throws(CryptoKitMetaError) -> ([G.Element], DLEQProof<G.Scalar>?) {
             guard !blindedElements.isEmpty else {
                 throw cryptoExtrasError(OPRF.Errors.emptyBatch)
@@ -121,7 +173,9 @@ extension OPRF {
                 var evaluatedElements: [G.Element] = []
                 evaluatedElements.reserveCapacity(blindedElements.count)
                 for blindedElement in blindedElements {
-                    evaluatedElements.append(privateKey * blindedElement)
+                    evaluatedElements.append(
+                        try blindedElement.multiplied(by: privateKey)
+                    )
                 }
                 if mode == .base {
                     return (evaluatedElements, nil)
@@ -129,7 +183,7 @@ extension OPRF {
 
                 let proof = try DLEQ<H2G>.prove(
                     secretScalar: privateKey,
-                    generator: G.Element.generator,
+                    generator: G.Element.generator(),
                     publicKey: publicKey,
                     inputs: blindedElements,
                     outputs: evaluatedElements,
@@ -148,7 +202,7 @@ extension OPRF {
                 domainSeparationTag: hashToScalarDomainSeparationTag,
                 using: H2G.self
             )
-            let tweakedKey = privateKey + infoScalar
+            let tweakedKey = try privateKey.adding(infoScalar)
             guard tweakedKey != .zero else {
                 throw cryptoExtrasError(OPRF.Errors.invalidScalar)
             }
@@ -156,12 +210,15 @@ extension OPRF {
             var evaluatedElements: [G.Element] = []
             evaluatedElements.reserveCapacity(blindedElements.count)
             for blindedElement in blindedElements {
-                evaluatedElements.append(inverseTweakedKey * blindedElement)
+                evaluatedElements.append(
+                    try blindedElement.multiplied(by: inverseTweakedKey)
+                )
             }
+            let tweakedPublicKey = try G.Element.generator().multiplied(by: tweakedKey)
             let proof = try DLEQ<H2G>.prove(
                 secretScalar: tweakedKey,
-                generator: G.Element.generator,
-                publicKey: tweakedKey * G.Element.generator,
+                generator: G.Element.generator(),
+                publicKey: tweakedPublicKey,
                 inputs: evaluatedElements,
                 outputs: blindedElements,
                 context: context,
@@ -176,7 +233,7 @@ extension OPRF {
             output: Data,
             info: Data?
         ) throws(CryptoKitMetaError) -> Bool {
-            let inputElement: H2G.G.Element = H2G.hashToGroup(
+            let inputElement: H2G.G.Element = try H2G.hashToGroup(
                 message,
                 domainSeparationString: hashToGroupDomainSeparationTag
             )

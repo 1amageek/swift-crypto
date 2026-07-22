@@ -24,7 +24,7 @@ final class EllipticCurvePointTests: XCTestCase {
         try copy.multiply(by: 2, on: Self.p256)
         try copy.multiply(by: 2, on: Self.p256)
 
-        XCTAssertTrue(!copy.isEqual(to: point, on: Self.p256))
+        XCTAssertTrue(try !copy.isEqual(to: point, on: Self.p256))
         XCTAssertTrue(try copy.isEqual(to: point.multiplying(by: 4, on: Self.p256), on: Self.p256))
     }
 
@@ -33,7 +33,7 @@ final class EllipticCurvePointTests: XCTestCase {
         var other = point
         try other.add(point, on: Self.p256)
 
-        XCTAssertTrue(!other.isEqual(to: point, on: Self.p256))
+        XCTAssertTrue(try !other.isEqual(to: point, on: Self.p256))
         XCTAssertTrue(try other.isEqual(to: point.adding(point, on: Self.p256), on: Self.p256))
     }
 
@@ -45,7 +45,7 @@ final class EllipticCurvePointTests: XCTestCase {
         var other = point
         try other.invert(on: Self.p256)
 
-        XCTAssertTrue(!other.isEqual(to: point, on: Self.p256))
+        XCTAssertTrue(try !other.isEqual(to: point, on: Self.p256))
         XCTAssertTrue(try other.isEqual(to: point.inverting(on: Self.p256), on: Self.p256))
     }
 
@@ -54,7 +54,23 @@ final class EllipticCurvePointTests: XCTestCase {
         var other = point
         try other.subtract(point, on: Self.p256)
 
-        XCTAssertTrue(!other.isEqual(to: point, on: Self.p256))
+        XCTAssertTrue(try !other.isEqual(to: point, on: Self.p256))
         XCTAssertTrue(try other.isEqual(to: point.subtracting(point, on: Self.p256), on: Self.p256))
+    }
+
+    func testIdentityCheckRejectsMismatchedGroup() throws {
+        let p384 = try BoringSSLEllipticCurveGroup(.p384)
+
+        XCTAssertThrowsError(try Self.p256.generator.isIdentity(on: p384)) { error in
+            guard let wrapperError = error as? CryptoBoringWrapperError else {
+                XCTFail("Expected an underlying BoringSSL error, received \(error)")
+                return
+            }
+            guard case .underlyingCoreCryptoError(let errorCode) = wrapperError else {
+                XCTFail("Expected an underlying BoringSSL error, received \(error)")
+                return
+            }
+            XCTAssertNotEqual(errorCode, 0)
+        }
     }
 }

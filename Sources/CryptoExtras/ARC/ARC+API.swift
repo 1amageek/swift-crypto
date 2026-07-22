@@ -41,8 +41,8 @@ extension P256._ARCV1 {
         fileprivate var backing: ARC.Server<H2G>
 
         /// Creates a random private key for ARC(P-256).
-        public init() {
-            self.backing = ARC.Server(ciphersuite: P256._ARCV1.ciphersuite)
+        public init() throws {
+            self.backing = try ARC.Server(ciphersuite: P256._ARCV1.ciphersuite)
         }
 
         // The spec does not define a serialization of the private key since, unlike the public key, it is not an
@@ -73,7 +73,7 @@ extension P256._ARCV1 {
             bytes.removeFirst(P256.orderByteCount)
             assert(bytes.isEmpty)
 
-            self.backing = ARC.Server(ciphersuite: P256._ARCV1.ciphersuite, x0: x0, x1: x1, x2: x2, x0Blinding: x0Blinding)
+            self.backing = try ARC.Server(ciphersuite: P256._ARCV1.ciphersuite, x0: x0, x1: x1, x2: x2, x0Blinding: x0Blinding)
         }
 
         // The spec does not define a serialization of the private key since, unlike the public key, it is not an

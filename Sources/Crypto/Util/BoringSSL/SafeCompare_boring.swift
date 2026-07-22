@@ -27,8 +27,8 @@ internal func openSSLSafeCompare<LHS: ContiguousBytes, RHS: ContiguousBytes>(
 )
     -> Bool
 {
-    withCryptoUnsafeBytes(lhs) { lhsPtr in
-        withCryptoUnsafeBytes(rhs) { rhsPtr in
+    Crypto.withUnsafeBytes(of: lhs) { lhsPtr in
+        Crypto.withUnsafeBytes(of: rhs) { rhsPtr in
             constantTimeCompare(lhsPtr, rhsPtr)
         }
     }

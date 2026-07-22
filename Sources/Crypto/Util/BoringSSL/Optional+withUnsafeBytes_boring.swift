@@ -22,7 +22,7 @@ extension Optional where Wrapped: DataProtocol {
 #if hasFeature(Embedded)
     func withUnsafeBytes<ReturnValue, E: Error>(_ body: (UnsafeRawBufferPointer) throws(E) -> ReturnValue) throws(E) -> ReturnValue {
         if let self {
-            return try withCryptoDataProtocolUnsafeBytes(self, body)
+            return try withContiguousBytes(of: self, body)
         } else {
             return try body(UnsafeRawBufferPointer(start: nil, count: 0))
         }
