@@ -188,8 +188,10 @@ extension P384: HashToGroupCurve {
     }
 }
 
-struct PrimeOrderCurveScalar<C: HashToGroupCurve>: GroupScalar, CustomStringConvertible {
+struct PrimeOrderCurveScalar<C: HashToGroupCurve>: GroupScalar {
     var integer: ArbitraryPrecisionInteger
+
+    static var rawRepresentationByteCount: Int { C.orderByteCount }
 
     init(_ integer: ArbitraryPrecisionInteger) {
         self.integer = integer
@@ -291,16 +293,6 @@ struct PrimeOrderCurveScalar<C: HashToGroupCurve>: GroupScalar, CustomStringConv
         left.integer == right.integer
     }
 
-    var rawRepresentation: Data {
-        var representation = Data(count: C.orderByteCount)
-        requireCryptographicInvariant("Unable to serialize a group scalar") {
-            try representation.withUnsafeMutableBytes { destination in
-                try self.writeRawRepresentation(into: destination)
-            }
-        }
-        return representation
-    }
-
     func writeRawRepresentation(
         into destination: UnsafeMutableRawBufferPointer
     ) throws(CryptoKitMetaError) {
@@ -310,9 +302,6 @@ struct PrimeOrderCurveScalar<C: HashToGroupCurve>: GroupScalar, CustomStringConv
         )
     }
 
-    var description: String {
-        self.rawRepresentation.hexString
-    }
 }
 
 struct PrimeOrderCurvePoint<C: HashToGroupCurve>: GroupElement {
@@ -377,23 +366,6 @@ struct PrimeOrderCurvePoint<C: HashToGroupCurve>: GroupElement {
 
 }
 
-extension PrimeOrderCurvePoint {
-    var compressedRepresentation: Data {
-        var representation = Data(count: C.compressedX962PointByteCount)
-        requireCryptographicInvariant("Unable to serialize a group element") {
-            let runtime = try C.runtime()
-            try representation.withUnsafeMutableBytes { buffer in
-                try self.point.writeX962Representation(
-                    compressed: true,
-                    on: runtime.group,
-                    into: buffer
-                )
-            }
-        }
-        return representation
-    }
-}
-
 extension PrimeOrderCurvePoint: OPRFGroupElement {
     static var oprfRepresentationByteCount: Int {
         C.compressedX962PointByteCount
@@ -415,8 +387,6 @@ extension PrimeOrderCurvePoint: OPRFGroupElement {
         }
         self.init(point: point)
     }
-
-    var oprfRepresentation: Data { self.compressedRepresentation }
 
     func writeOPRFRepresentation(
         into destination: UnsafeMutableRawBufferPointer
@@ -481,17 +451,5 @@ struct CurveHashToGroup<C: HashToGroupCurve>: HashToGroup {
         } catch {
             throw cryptoExtrasError(error)
         }
-    }
-}
-
-@usableFromInline
-func requireCryptographicInvariant<Result>(
-    _ message: StaticString,
-    _ operation: () throws -> Result
-) -> Result {
-    do {
-        return try operation()
-    } catch {
-        preconditionFailure("\(message)")
     }
 }

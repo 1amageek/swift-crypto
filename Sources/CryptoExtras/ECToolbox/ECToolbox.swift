@@ -94,6 +94,11 @@ enum ScalarReductionModulus {
 }
 
 protocol GroupScalar: Sendable, Equatable {
+    /// The byte count of the canonical representation.
+    static var rawRepresentationByteCount: Int { get }
+
+    /// Creates a scalar by borrowing a canonical representation for this call.
+    /// The initializer must not retain the pointer.
     init(
         canonicalRepresentation: UnsafeRawBufferPointer
     ) throws(CryptoKitMetaError)
@@ -103,8 +108,8 @@ protocol GroupScalar: Sendable, Equatable {
         modulo modulus: ScalarReductionModulus
     ) throws(CryptoKitMetaError) -> Self
 
-    var rawRepresentation: Data { get }
-
+    /// Writes the canonical representation into borrowed caller-owned storage.
+    /// The implementation must not retain the pointer.
     func writeRawRepresentation(
         into destination: UnsafeMutableRawBufferPointer
     ) throws(CryptoKitMetaError)

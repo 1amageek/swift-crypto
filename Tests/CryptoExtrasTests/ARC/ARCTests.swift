@@ -24,7 +24,7 @@ class ARCTests: XCTestCase {
 
     func assertEndToEndWorkflow() throws {
         let ciphersuite = P256._ARCV1.ciphersuite
-        let (generatorG, generatorH) = try ARC.getGenerators(suite: ciphersuite)
+        let (generatorG, generatorH) = try ARC.deriveGenerators(for: ciphersuite)
 
         // Create a server, passing in the server keys and key blinding.
         let x0 = try Group.Scalar.randomNonzero()
@@ -135,7 +135,10 @@ class ARCTests: XCTestCase {
 
         // Test that two presentations with the same presentationContext and privateAttribute,
         // but difference nonces, have different tag elements
-        XCTAssertNotEqual(presentation1.tag.compressedRepresentation, presentation2.tag.compressedRepresentation)
+        XCTAssertNotEqual(
+            try oprfRepresentation(of: presentation1.tag),
+            try oprfRepresentation(of: presentation2.tag)
+        )
 
         // Server verifies Presentation3 with its server keys.
         XCTAssert(try server.verify(presentation: presentation3, requestContext: requestContext, presentationContext: newPresentationContext, presentationLimit: presentationLimit, nonce: nonce3))
@@ -247,6 +250,8 @@ class ARCTests: XCTestCase {
         // Test that using an incorrect presentationLimit throws an error
         XCTAssertThrowsError(try smallPresentationState.update(presentationContext: context2, presentationLimit: 9), error: ARC.Errors.invalidPresentationLimit)
         XCTAssertThrowsError(try smallPresentationState.update(presentationContext: Data("context 4".utf8), presentationLimit: 0), error: ARC.Errors.invalidPresentationLimit)
+        XCTAssertThrowsError(try smallPresentationState.update(presentationContext: Data("context 4".utf8), presentationLimit: 4, optionalNonce: -1), error: ARC.Errors.invalidPresentationLimit)
+        XCTAssertThrowsError(try smallPresentationState.update(presentationContext: Data("context 4".utf8), presentationLimit: 4, optionalNonce: 4), error: ARC.Errors.invalidPresentationLimit)
 
         var largePresentationState = ARC.PresentationState()
         for presentationLimit in 1..<100 {

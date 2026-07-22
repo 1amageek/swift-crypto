@@ -68,11 +68,15 @@ internal func cryptoExtrasError(_ error: OPRF.Errors) -> CryptoKitMetaError {
 
 /// Defines the IETF Serializations for OPRFs
 protocol OPRFGroupElement: GroupElement {
+    /// The byte count of the RFC 9497 group-element representation.
     static var oprfRepresentationByteCount: Int { get }
+    /// Creates an element by borrowing an RFC 9497 representation for this call.
+    /// The initializer must not retain the pointer.
     init(
         oprfRepresentation: UnsafeRawBufferPointer
     ) throws(CryptoKitMetaError)
-    var oprfRepresentation: Data { get }
+    /// Writes the RFC 9497 representation into borrowed caller-owned storage.
+    /// The implementation must not retain the pointer.
     func writeOPRFRepresentation(
         into destination: UnsafeMutableRawBufferPointer
     ) throws(CryptoKitMetaError)

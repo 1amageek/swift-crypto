@@ -87,7 +87,7 @@ extension ARC {
             x0Blinding: Group.Scalar
         ) throws {
             self.ciphersuite = ciphersuite
-            (self.generatorG, self.generatorH) = try ARC.getGenerators(suite: ciphersuite)
+            (self.generatorG, self.generatorH) = try ARC.deriveGenerators(for: ciphersuite)
 
             self.serverPrivateKey = ServerPrivateKey(x0: x0, x1: x1, x2: x2, x0Blinding: x0Blinding)
             self.serverPublicKey = try ServerPublicKey(

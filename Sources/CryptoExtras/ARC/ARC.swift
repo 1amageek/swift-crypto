@@ -24,7 +24,7 @@ import Foundation
 enum ARC {}
 
 extension ARC {
-    enum Errors: Error {
+    enum Errors: Error, Equatable, Sendable {
         case invalidProof
         case invalidPresentationLimit
         case presentationLimitExceeded
@@ -36,33 +36,52 @@ extension ARC {
         case incorrectServerCommitmentsSize
         case incorrectPrivateKeyDataSize
         case incorrectPublicKeyDataSize
+        case insufficientOutputCapacity
+        case invalidEncoding
+        case internalFailure
     }
 
     /// Ciphersuites for Anonymous Rate-Limited Credentials (ARC)
     struct Ciphersuite<H2G: HashToGroup> {
         let suiteID: Int
         let domain: String
-        let scalarByteCount: Int
-        let pointByteCount: Int
 
         private init(
             suiteID: Int,
-            domain: String,
-            scalarByteCount: Int,
-            pointByteCount: Int
+            domain: String
         ) {
             self.suiteID = suiteID
             self.domain = domain
-            self.scalarByteCount = scalarByteCount
-            self.pointByteCount = pointByteCount
         }
+
+        var scalarByteCount: Int { H2G.G.Scalar.rawRepresentationByteCount }
+        var pointByteCount: Int { H2G.G.Element.oprfRepresentationByteCount }
     }
 
-    static func getGenerators<H2G: HashToGroup>(suite: Ciphersuite<H2G>) throws(CryptoKitMetaError) -> (
+    static func deriveGenerators<H2G: HashToGroup>(for suite: Ciphersuite<H2G>) throws(CryptoKitMetaError) -> (
         generatorG: H2G.G.Element, generatorH: H2G.G.Element
     ) {
         let generatorG = try H2G.G.Element.generator()
-        let generatorH = try H2G.hashToGroup(generatorG.oprfRepresentation, domainSeparationString: Data(("HashToGroup-" + suite.domain + "generatorH").utf8))
+        let representationByteCount = H2G.G.Element.oprfRepresentationByteCount
+        guard
+            representationByteCount > 0,
+            representationByteCount <= Int(UInt16.max)
+        else {
+            throw cryptoExtrasError(OPRF.Errors.transcriptElementTooLong)
+        }
+        let generatorH = try withUnsafeTemporaryAllocation(
+            byteCount: representationByteCount,
+            alignment: 1
+        ) {
+            (representation: UnsafeMutableRawBufferPointer) throws(CryptoKitMetaError) in
+            try generatorG.writeOPRFRepresentation(into: representation)
+            return try H2G.hashToGroup(
+                UnsafeRawBufferPointer(representation),
+                domainSeparationString: Data(
+                    ("HashToGroup-" + suite.domain + "generatorH").utf8
+                )
+            )
+        }
         return (generatorG, generatorH)
     }
 }
@@ -70,9 +89,7 @@ extension ARC {
 extension ARC.Ciphersuite where H2G == CurveHashToGroup<P256> {
     static let arcV1 = Self(
         suiteID: 3,
-        domain: "ARCV1-P256",
-        scalarByteCount: P256.orderByteCount,
-        pointByteCount: P256.compressedX962PointByteCount
+        domain: "ARCV1-P256"
     )
 }
 

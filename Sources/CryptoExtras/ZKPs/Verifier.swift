@@ -51,7 +51,6 @@ struct Verifier<H2G: HashToGroup>: ProofParticipant {
         // Example: if the constraint is A=x*B, compute ABlind=challenge*A + xResponse*B
         // Example: if the constraint is A=x*B+y*C, compute ABlind=challenge*A + xResponse*B + yResponse*C
         var blindedPoints: [Group.Element] = []
-        var blindedPointsLabels: [String] = []
         for (constraintPoint, linearCombination) in self.constraints {
             guard !linearCombination.isEmpty else {
                 throw cryptoExtrasError(ZKPErrors.invalidProofFields)
@@ -81,11 +80,14 @@ struct Verifier<H2G: HashToGroup>: ProofParticipant {
             }
 
             blindedPoints.append(blindedPoint)
-            blindedPointsLabels.append(self.pointLabels[constraintPoint.index] + "-blind")
         }
 
         // Obtain a scalar challenge.
-        let challenge = try Proof<H2G>.composeChallenge(label: self.label, points: self.points, pointLabels: self.pointLabels, blindedPoints: blindedPoints, blindedPointsLabels: blindedPointsLabels, scalarLabels: self.scalarLabels)
+        let challenge = try Proof<H2G>.composeChallenge(
+            label: self.label,
+            points: self.points,
+            blindedPoints: blindedPoints
+        )
 
         return challenge == proof.challenge
     }

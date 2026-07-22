@@ -22,7 +22,7 @@ final class ARCPublicAPITests: XCTestCase {
         let privateKey = try P256._ARCV1.PrivateKey()
 
         // [Issuer] Serialize public key to share with client (other serializations may be available).
-        let publicKeyBytes = privateKey.publicKey.rawRepresentation
+        let publicKeyBytes = try privateKey.publicKey.rawRepresentation()
 
         // [Issuer] Define a request context to share with the client.
         let requestContext = Data("shared request context".utf8)
@@ -40,7 +40,7 @@ final class ARCPublicAPITests: XCTestCase {
         let precredential = try publicKey.prepareCredentialRequest(requestContext: requestContext)
 
         // [Client -> Issuer] Send the credential request.
-        let credentialRequestBytes = precredential.credentialRequest.rawRepresentation
+        let credentialRequestBytes = try precredential.credentialRequest.rawRepresentation()
 
         // [Issuer] Receive the credential request.
         let credentialRequest = try P256._ARCV1.CredentialRequest(rawRepresentation: credentialRequestBytes)
@@ -49,7 +49,7 @@ final class ARCPublicAPITests: XCTestCase {
         let credentialResponse = try privateKey.issue(credentialRequest)
 
         // [Issuer -> Client] Send the credential response.
-        let credentialResponseBytes = credentialResponse.rawRepresentation
+        let credentialResponseBytes = try credentialResponse.rawRepresentation()
 
         // [Client] Receive the credential response.
         let _ = try P256._ARCV1.CredentialResponse(rawRepresentation: credentialResponseBytes)
@@ -57,6 +57,11 @@ final class ARCPublicAPITests: XCTestCase {
         // [Client] Generate a credential.
         // NOTE: This is a var because it enforces the presentation limits for each presentation prefix.
         var credential = try publicKey.finalize(credentialResponse, for: precredential)
+
+        // [Client] Persist and restore the credential, including its local rate-limit state.
+        credential = try P256._ARCV1.Credential(
+            rawRepresentation: credential.rawRepresentation()
+        )
 
         // [Client] Make a presentation from the credential for a presentation prefix.
         // NOTE: On first presentation, the presentation limit provided is now set, and enforced going forward.
@@ -66,7 +71,7 @@ final class ARCPublicAPITests: XCTestCase {
         )
 
         // [Client -> Verifier] Send the presentation.
-        let presentationBytes = presentation.rawRepresentation
+        let presentationBytes = try presentation.rawRepresentation()
 
         // [Verifier] Receive the presentation.
         let _ = try P256._ARCV1.Presentation(rawRepresentation: presentationBytes)
@@ -85,7 +90,7 @@ final class ARCPublicAPITests: XCTestCase {
         _ = (presentation.tag, presentationContext, presentationLimit)
     }
 
-    func testCrendentialEnforcesPresentationLimitLocally() throws {
+    func testCredentialEnforcesPresentationLimitLocally() throws {
         let privateKey = try P256._ARCV1.PrivateKey()
         let publicKey = privateKey.publicKey
         let requestContext = Data("shared request context".utf8)
@@ -97,7 +102,13 @@ final class ARCPublicAPITests: XCTestCase {
         var credential = try publicKey.finalize(credentialResponse, for: precredential)
 
         for _ in 0..<presentationLimit {
-            _ = try credential.makePresentation(context: presentationContext, presentationLimit: presentationLimit)
+            _ = try credential.makePresentation(
+                context: presentationContext,
+                presentationLimit: presentationLimit
+            )
+            credential = try P256._ARCV1.Credential(
+                rawRepresentation: credential.rawRepresentation()
+            )
         }
 
         XCTAssertThrowsError(

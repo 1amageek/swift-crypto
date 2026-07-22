@@ -152,9 +152,15 @@ final class ECVOPRFTests: XCTestCase {
             mode: mode,
             ciphersuite: ciphersuite
         )
-        XCTAssertEqual(derivedKeyPair.privateKey.rawRepresentation.hexString, suite.privateKey)
+        XCTAssertEqual(
+            try canonicalRepresentation(of: derivedKeyPair.privateKey).hexString,
+            suite.privateKey
+        )
         if let publicKey = suite.publicKey {
-            XCTAssertEqual(derivedKeyPair.publicKey.oprfRepresentation.hexString, publicKey)
+            XCTAssertEqual(
+                try oprfRepresentation(of: derivedKeyPair.publicKey).hexString,
+                publicKey
+            )
         }
         switch mode {
         case .base:
@@ -209,7 +215,10 @@ final class ECVOPRFTests: XCTestCase {
                 let expectedBlind = try Group.Scalar(canonicalRepresentation: blinds[index])
                 let result = try client.blindMessage(inputs[index], blind: expectedBlind)
                 XCTAssertEqual(result.blind, expectedBlind)
-                XCTAssertEqual(result.blindedElement.oprfRepresentation, expectedBlindedElements[index])
+                XCTAssertEqual(
+                    try oprfRepresentation(of: result.blindedElement),
+                    expectedBlindedElements[index]
+                )
                 blindScalars.append(result.blind)
                 blindedElements.append(result.blindedElement)
             }
@@ -218,7 +227,10 @@ final class ECVOPRFTests: XCTestCase {
             XCTAssertNil(evaluation.1)
             XCTAssertEqual(evaluation.0.count, vector.batchSize)
             for index in inputs.indices {
-                XCTAssertEqual(evaluation.0[index].oprfRepresentation, expectedEvaluatedElements[index])
+                XCTAssertEqual(
+                    try oprfRepresentation(of: evaluation.0[index]),
+                    expectedEvaluatedElements[index]
+                )
                 let output = try client.finalize(
                     message: inputs[index],
                     info: nil,
@@ -259,7 +271,10 @@ final class ECVOPRFTests: XCTestCase {
             try Data(hexString: suite.groupDomainSeparationTag),
             Self.hashToGroupDomainSeparationTag(mode: mode, ciphersuite: ciphersuite)
         )
-        XCTAssertEqual(server.publicKey.oprfRepresentation, try Data(hexString: XCTUnwrap(suite.publicKey)))
+        XCTAssertEqual(
+            try oprfRepresentation(of: server.publicKey),
+            try Data(hexString: XCTUnwrap(suite.publicKey))
+        )
 
         for vector in suite.vectors {
             let proofVector = try XCTUnwrap(vector.proof)
@@ -292,7 +307,10 @@ final class ECVOPRFTests: XCTestCase {
                 let expectedBlind = try Group.Scalar(canonicalRepresentation: blinds[index])
                 let result = try client.blindMessage(inputs[index], blind: expectedBlind)
                 XCTAssertEqual(result.blind, expectedBlind)
-                XCTAssertEqual(result.blindedElement.oprfRepresentation, expectedBlindedElements[index])
+                XCTAssertEqual(
+                    try oprfRepresentation(of: result.blindedElement),
+                    expectedBlindedElements[index]
+                )
                 blindScalars.append(result.blind)
                 blindedElements.append(result.blindedElement)
             }
@@ -305,7 +323,10 @@ final class ECVOPRFTests: XCTestCase {
             )
             XCTAssertEqual(evaluation.0.count, vector.batchSize)
             for index in inputs.indices {
-                XCTAssertEqual(evaluation.0[index].oprfRepresentation, expectedEvaluatedElements[index])
+                XCTAssertEqual(
+                    try oprfRepresentation(of: evaluation.0[index]),
+                    expectedEvaluatedElements[index]
+                )
             }
 
             let expectedProof = try proof(from: proofVector, curve: curve)

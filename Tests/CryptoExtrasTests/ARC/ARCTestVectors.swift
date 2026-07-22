@@ -161,9 +161,9 @@ class ARCTestVectors: XCTestCase {
         // Initialize server
         let ciphersuite = P256._ARCV1.ciphersuite
         let server = try ARC.Server(ciphersuite: ciphersuite, x0: x0, x1: x1, x2: x2, x0Blinding: xb)
-        XCTAssertEqual(server.serverPublicKey.X0.oprfRepresentation.hexString, tv.ServerKey.X0)
-        XCTAssertEqual(server.serverPublicKey.X1.oprfRepresentation.hexString, tv.ServerKey.X1)
-        XCTAssertEqual(server.serverPublicKey.X2.oprfRepresentation.hexString, tv.ServerKey.X2)
+        XCTAssertEqual(try oprfRepresentation(of: server.serverPublicKey.X0).hexString, tv.ServerKey.X0)
+        XCTAssertEqual(try oprfRepresentation(of: server.serverPublicKey.X1).hexString, tv.ServerKey.X1)
+        XCTAssertEqual(try oprfRepresentation(of: server.serverPublicKey.X2).hexString, tv.ServerKey.X2)
 
         // Initialize precredential, make a credential request
         let requestContext = try Data(hexString: tv.CredentialRequest.request_context)
@@ -172,38 +172,44 @@ class ARCTestVectors: XCTestCase {
         let r1 = try p256Scalar(from: tv.CredentialRequest.r1)
         let r2 = try p256Scalar(from: tv.CredentialRequest.r2)
         let precredential = try ARC.Precredential(ciphersuite: ciphersuite, m1: m1, requestContext: requestContext, r1: r1, r2: r2, serverPublicKey: server.serverPublicKey)
-        XCTAssertEqual(precredential.credentialRequest.m1Enc.oprfRepresentation.hexString, tv.CredentialRequest.m1_enc)
-        XCTAssertEqual(precredential.credentialRequest.m2Enc.oprfRepresentation.hexString, tv.CredentialRequest.m2_enc)
-        XCTAssertEqual(precredential.clientSecrets.m2.rawRepresentation.hexString, tv.CredentialRequest.m2)
+        XCTAssertEqual(try oprfRepresentation(of: precredential.credentialRequest.m1Enc).hexString, tv.CredentialRequest.m1_enc)
+        XCTAssertEqual(try oprfRepresentation(of: precredential.credentialRequest.m2Enc).hexString, tv.CredentialRequest.m2_enc)
+        XCTAssertEqual(try canonicalRepresentation(of: precredential.clientSecrets.m2).hexString, tv.CredentialRequest.m2)
 
         // Verify request proof, by creating a new request with the
         // tv.CredentialRequest.proof scalars and verifying it.
-        let requestProof = try p256Proof(from: tv.CredentialRequest.proof, scalarCount: ARC.CredentialRequest<CurveHashToGroup<P256>>.getScalarCount())
+        let requestProof = try p256Proof(
+            from: tv.CredentialRequest.proof,
+            scalarCount: ARC.CredentialRequest<CurveHashToGroup<P256>>.proofScalarCount
+        )
         let newRequest = ARC.CredentialRequest(m1Enc: precredential.credentialRequest.m1Enc, m2Enc: precredential.credentialRequest.m2Enc, proof: requestProof)
         XCTAssert(try newRequest.verify(generatorG: precredential.generatorG, generatorH: precredential.generatorH, ciphersuite: ciphersuite))
 
         // Make a credential response, passing in randomness b
         let b = try p256Scalar(from: tv.CredentialResponse.b)
         let response = try server.respond(credentialRequest: precredential.credentialRequest, b: b)
-        XCTAssertEqual(response.HAux.oprfRepresentation.hexString, tv.CredentialResponse.H_aux)
-        XCTAssertEqual(response.U.oprfRepresentation.hexString, tv.CredentialResponse.U)
-        XCTAssertEqual(response.X0Aux.oprfRepresentation.hexString, tv.CredentialResponse.X0_aux)
-        XCTAssertEqual(response.X1Aux.oprfRepresentation.hexString, tv.CredentialResponse.X1_aux)
-        XCTAssertEqual(response.X2Aux.oprfRepresentation.hexString, tv.CredentialResponse.X2_aux)
-        XCTAssertEqual(response.encUPrime.oprfRepresentation.hexString, tv.CredentialResponse.enc_U_prime)
+        XCTAssertEqual(try oprfRepresentation(of: response.HAux).hexString, tv.CredentialResponse.H_aux)
+        XCTAssertEqual(try oprfRepresentation(of: response.U).hexString, tv.CredentialResponse.U)
+        XCTAssertEqual(try oprfRepresentation(of: response.X0Aux).hexString, tv.CredentialResponse.X0_aux)
+        XCTAssertEqual(try oprfRepresentation(of: response.X1Aux).hexString, tv.CredentialResponse.X1_aux)
+        XCTAssertEqual(try oprfRepresentation(of: response.X2Aux).hexString, tv.CredentialResponse.X2_aux)
+        XCTAssertEqual(try oprfRepresentation(of: response.encUPrime).hexString, tv.CredentialResponse.enc_U_prime)
 
         // Verify response proof, by creating a new response with the
         // tv.CredentialResponse.proof scalars and verifying it.
-        let responseProof = try p256Proof(from: tv.CredentialResponse.proof, scalarCount: ARC.CredentialResponse<CurveHashToGroup<P256>>.getScalarCount())
+        let responseProof = try p256Proof(
+            from: tv.CredentialResponse.proof,
+            scalarCount: ARC.CredentialResponse<CurveHashToGroup<P256>>.proofScalarCount
+        )
         let newResponse = ARC.CredentialResponse(U: response.U, encUPrime: response.encUPrime, X0Aux: response.X0Aux, X1Aux: response.X1Aux, X2Aux: response.X2Aux, HAux: response.HAux, proof: responseProof)
         XCTAssert(try newResponse.verify(request: precredential.credentialRequest, serverPublicKey: server.serverPublicKey, generatorG: server.generatorG, generatorH: server.generatorH, ciphersuite: ciphersuite))
 
         // Make a credential from the response
         var credential = try precredential.makeCredential(credentialResponse: response)
-        XCTAssertEqual(credential.U.oprfRepresentation.hexString, tv.Credential.U)
-        XCTAssertEqual(credential.UPrime.oprfRepresentation.hexString, tv.Credential.U_prime)
-        XCTAssertEqual(credential.X1.oprfRepresentation.hexString, tv.Credential.X1)
-        XCTAssertEqual(credential.m1.rawRepresentation.hexString, tv.Credential.m1)
+        XCTAssertEqual(try oprfRepresentation(of: credential.U).hexString, tv.Credential.U)
+        XCTAssertEqual(try oprfRepresentation(of: credential.UPrime).hexString, tv.Credential.U_prime)
+        XCTAssertEqual(try oprfRepresentation(of: credential.X1).hexString, tv.Credential.X1)
+        XCTAssertEqual(try canonicalRepresentation(of: credential.m1).hexString, tv.Credential.m1)
 
         // Make a first presentation from the credential, passing in randomness a, r, z
         let presentationContext1 = try Data(hexString: tv.Presentation1.presentation_context)
@@ -213,14 +219,17 @@ class ARCTestVectors: XCTestCase {
         let nonce1 = Int(tv.Presentation1.nonce.replacingOccurrences(of: "0x", with: ""), radix: 16)!
         let (presentation1, returnedNonce1) = try credential.makePresentation(presentationContext: presentationContext1, presentationLimit: 2, a: a1, r: r1Presentation, z: z1, optionalNonce: nonce1)
         XCTAssertEqual(nonce1, returnedNonce1)
-        XCTAssertEqual(presentation1.U.oprfRepresentation.hexString, tv.Presentation1.U)
-        XCTAssertEqual(presentation1.UPrimeCommit.oprfRepresentation.hexString, tv.Presentation1.U_prime_commit)
-        XCTAssertEqual(presentation1.m1Commit.oprfRepresentation.hexString, tv.Presentation1.m1_commit)
-        XCTAssertEqual(presentation1.tag.oprfRepresentation.hexString, tv.Presentation1.tag)
+        XCTAssertEqual(try oprfRepresentation(of: presentation1.U).hexString, tv.Presentation1.U)
+        XCTAssertEqual(try oprfRepresentation(of: presentation1.UPrimeCommit).hexString, tv.Presentation1.U_prime_commit)
+        XCTAssertEqual(try oprfRepresentation(of: presentation1.m1Commit).hexString, tv.Presentation1.m1_commit)
+        XCTAssertEqual(try oprfRepresentation(of: presentation1.tag).hexString, tv.Presentation1.tag)
 
         // Verify presentation1 proof, by creating a new presentation with the
         // tv.Presentation1.proof scalars and verifying it.
-        let presentation1Proof = try p256Proof(from: tv.Presentation1.proof, scalarCount: ARC.Presentation<CurveHashToGroup<P256>>.getScalarCount())
+        let presentation1Proof = try p256Proof(
+            from: tv.Presentation1.proof,
+            scalarCount: ARC.Presentation<CurveHashToGroup<P256>>.proofScalarCount
+        )
         let newPresentation1 = ARC.Presentation(U: presentation1.U, UPrimeCommit: presentation1.UPrimeCommit, m1Commit: presentation1.m1Commit, tag: presentation1.tag, proof: presentation1Proof)
         XCTAssert(try newPresentation1.verify(serverPrivateKey: server.serverPrivateKey, X1: server.serverPublicKey.X1, m2: m2, presentationContext: presentationContext1, presentationLimit: 2, nonce: nonce1, generatorG: credential.generatorG, generatorH: credential.generatorH, ciphersuite: ciphersuite))
 
@@ -232,14 +241,17 @@ class ARCTestVectors: XCTestCase {
         let nonce2 = Int(tv.Presentation2.nonce.replacingOccurrences(of: "0x", with: ""), radix: 16)!
         let (presentation2, returnedNonce2) = try credential.makePresentation(presentationContext: presentationContext1, presentationLimit: 2, a: a2, r: r2Presentation, z: z2, optionalNonce: nonce2)
         XCTAssertEqual(nonce2, returnedNonce2)
-        XCTAssertEqual(presentation2.U.oprfRepresentation.hexString, tv.Presentation2.U)
-        XCTAssertEqual(presentation2.UPrimeCommit.oprfRepresentation.hexString, tv.Presentation2.U_prime_commit)
-        XCTAssertEqual(presentation2.m1Commit.oprfRepresentation.hexString, tv.Presentation2.m1_commit)
-        XCTAssertEqual(presentation2.tag.oprfRepresentation.hexString, tv.Presentation2.tag)
+        XCTAssertEqual(try oprfRepresentation(of: presentation2.U).hexString, tv.Presentation2.U)
+        XCTAssertEqual(try oprfRepresentation(of: presentation2.UPrimeCommit).hexString, tv.Presentation2.U_prime_commit)
+        XCTAssertEqual(try oprfRepresentation(of: presentation2.m1Commit).hexString, tv.Presentation2.m1_commit)
+        XCTAssertEqual(try oprfRepresentation(of: presentation2.tag).hexString, tv.Presentation2.tag)
 
         // Verify presentation2 proof, by creating a new presentation with the
         // tv.Presentation2.proof scalars and verifying it.
-        let presentation2Proof = try p256Proof(from: tv.Presentation2.proof, scalarCount: ARC.Presentation<CurveHashToGroup<P256>>.getScalarCount())
+        let presentation2Proof = try p256Proof(
+            from: tv.Presentation2.proof,
+            scalarCount: ARC.Presentation<CurveHashToGroup<P256>>.proofScalarCount
+        )
         let newPresentation2 = ARC.Presentation(U: presentation2.U, UPrimeCommit: presentation2.UPrimeCommit, m1Commit: presentation2.m1Commit, tag: presentation2.tag, proof: presentation2Proof)
         XCTAssert(try newPresentation2.verify(serverPrivateKey: server.serverPrivateKey, X1: server.serverPublicKey.X1, m2: m2, presentationContext: presentationContext2, presentationLimit: 2, nonce: nonce2, generatorG: credential.generatorG, generatorH: credential.generatorH, ciphersuite: ciphersuite))
 

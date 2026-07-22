@@ -27,13 +27,15 @@ class ARCEncodingTests: XCTestCase {
         let server = try ARC.Server(ciphersuite: ciphersuite)
         let publicKey = server.serverPublicKey
 
-        let publicKeyData = publicKey.serialize(ciphersuite: ciphersuite)
-        let publicKey2 = try ARC.ServerPublicKey.deserialize(serverPublicKeyData: publicKeyData, ciphersuite: ciphersuite)
+        let publicKeyData = try publicKey.serialize()
+        let publicKey2 = try ARC.ServerPublicKey<CurveHashToGroup<P256>>.deserialize(
+            serverPublicKeyData: publicKeyData
+        )
         try self.assertEqual(publicKey.X0, publicKey2.X0)
         try self.assertEqual(publicKey.X1, publicKey2.X1)
         try self.assertEqual(publicKey.X2, publicKey2.X2)
 
-        let publicKeyData2 = publicKey2.serialize(ciphersuite: ciphersuite)
+        let publicKeyData2 = try publicKey2.serialize()
         XCTAssertEqual(publicKeyData, publicKeyData2)
     }
 
@@ -48,8 +50,10 @@ class ARCEncodingTests: XCTestCase {
         let precredential = try ARC.Precredential(ciphersuite: ciphersuite, requestContext: requestContext, serverPublicKey: server.serverPublicKey)
         let request = precredential.credentialRequest
 
-        let requestData = request.serialize(ciphersuite: ciphersuite)
-        let request2 = try ARC.CredentialRequest.deserialize(requestData: requestData, ciphersuite: ciphersuite)
+        let requestData = try request.serialize()
+        let request2 = try ARC.CredentialRequest<CurveHashToGroup<P256>>.deserialize(
+            requestData: requestData
+        )
         try self.assertEqual(request.m1Enc, request2.m1Enc)
         try self.assertEqual(request.m2Enc, request2.m2Enc)
         XCTAssert(request.proof.challenge == request2.proof.challenge)
@@ -57,7 +61,7 @@ class ARCEncodingTests: XCTestCase {
             XCTAssert(response == request2.proof.responses[index])
         }
 
-        let requestData2 = request2.serialize(ciphersuite: ciphersuite)
+        let requestData2 = try request2.serialize()
         XCTAssertEqual(requestData, requestData2)
     }
 
@@ -73,8 +77,10 @@ class ARCEncodingTests: XCTestCase {
         let request = precredential.credentialRequest
         let response = try server.respond(credentialRequest: request)
 
-        let responseData = response.serialize(ciphersuite: ciphersuite)
-        let response2 = try ARC.CredentialResponse.deserialize(responseData: responseData, ciphersuite: ciphersuite)
+        let responseData = try response.serialize()
+        let response2 = try ARC.CredentialResponse<CurveHashToGroup<P256>>.deserialize(
+            responseData: responseData
+        )
         try self.assertEqual(response.U, response2.U)
         try self.assertEqual(response.encUPrime, response2.encUPrime)
         try self.assertEqual(response.X0Aux, response2.X0Aux)
@@ -86,7 +92,7 @@ class ARCEncodingTests: XCTestCase {
             XCTAssert(response == response2.proof.responses[index])
         }
 
-        let responseData2 = response2.serialize(ciphersuite: ciphersuite)
+        let responseData2 = try response2.serialize()
         XCTAssertEqual(responseData, responseData2)
     }
 
@@ -103,7 +109,7 @@ class ARCEncodingTests: XCTestCase {
         let response = try server.respond(credentialRequest: request)
         let credential = try precredential.makeCredential(credentialResponse: response)
 
-        let credentialData = try credential.serialize(ciphersuite: ciphersuite)
+        let credentialData = try credential.serialize()
         let credential2 = try ARC.Credential.deserialize(credentialData: credentialData, ciphersuite: ciphersuite)
         XCTAssert(credential.m1 == credential2.m1)
         try self.assertEqual(credential.U, credential2.U)
@@ -116,7 +122,7 @@ class ARCEncodingTests: XCTestCase {
             XCTAssertEqual(value.1, credential2.presentationState.state[key]?.1)
         }
 
-        let credentialData2 = try credential2.serialize(ciphersuite: ciphersuite)
+        let credentialData2 = try credential2.serialize()
         XCTAssertEqual(credentialData, credentialData2)
     }
 
@@ -134,8 +140,10 @@ class ARCEncodingTests: XCTestCase {
         var credential = try precredential.makeCredential(credentialResponse: response)
         let (presentation, _) = try credential.makePresentation(presentationContext: Data("test presentation context".utf8), presentationLimit: 1)
 
-        let presentationData = presentation.serialize(ciphersuite: ciphersuite)
-        let presentation2 = try ARC.Presentation.deserialize(presentationData: presentationData, ciphersuite: ciphersuite)
+        let presentationData = try presentation.serialize()
+        let presentation2 = try ARC.Presentation<CurveHashToGroup<P256>>.deserialize(
+            presentationData: presentationData
+        )
         try self.assertEqual(presentation.U, presentation2.U)
         try self.assertEqual(presentation.UPrimeCommit, presentation2.UPrimeCommit)
         try self.assertEqual(presentation.m1Commit, presentation2.m1Commit)
@@ -145,7 +153,7 @@ class ARCEncodingTests: XCTestCase {
             XCTAssert(response == presentation2.proof.responses[index])
         }
 
-        let presentationData2 = presentation2.serialize(ciphersuite: ciphersuite)
+        let presentationData2 = try presentation2.serialize()
         XCTAssertEqual(presentationData, presentationData2)
     }
 
@@ -173,6 +181,105 @@ class ARCEncodingTests: XCTestCase {
             for (key, value) in state.state {
                 XCTAssertEqual(value.0, deserializedState.state[key]?.0)
                 XCTAssertEqual(value.1, deserializedState.state[key]?.1)
+            }
+        }
+    }
+
+    func testPresentationStateRejectsMalformedRepresentations() throws {
+        let invalidIdentifier = Data(repeating: 0, count: 8)
+        let missingEntry = try ARC.RepresentationWriter.representation(
+            byteCount: 8
+        ) { writer in
+            try writer.writeUInt32(0x4152_4301)
+            try writer.writeUInt32(1)
+        }
+        let zeroLimit = try ARC.RepresentationWriter.representation(
+            byteCount: 18
+        ) { writer in
+            try writer.writeUInt32(0x4152_4301)
+            try writer.writeUInt32(1)
+            try writer.writeUInt16(0)
+            try writer.writeUInt32(0)
+            try writer.writeUInt32(0)
+        }
+        let outOfRangeNonce = try ARC.RepresentationWriter.representation(
+            byteCount: 22
+        ) { writer in
+            try writer.writeUInt32(0x4152_4301)
+            try writer.writeUInt32(1)
+            try writer.writeUInt16(0)
+            try writer.writeUInt32(2)
+            try writer.writeUInt32(1)
+            try writer.writeUInt32(2)
+        }
+        let duplicateNonce = try ARC.RepresentationWriter.representation(
+            byteCount: 26
+        ) { writer in
+            try writer.writeUInt32(0x4152_4301)
+            try writer.writeUInt32(1)
+            try writer.writeUInt16(0)
+            try writer.writeUInt32(3)
+            try writer.writeUInt32(2)
+            try writer.writeUInt32(1)
+            try writer.writeUInt32(1)
+        }
+
+        for representation in [
+            invalidIdentifier,
+            missingEntry,
+            zeroLimit,
+            outOfRangeNonce,
+            duplicateNonce,
+        ] {
+            XCTAssertThrowsError(
+                try ARC.PresentationState.deserialize(
+                    presentationStateData: representation
+                )
+            ) { error in
+                XCTAssertEqual(error as? ARC.Errors, .invalidEncoding)
+            }
+        }
+    }
+
+    func testPresentationStateRepresentationIsCanonical() throws {
+        let firstContext = Data("a".utf8)
+        let secondContext = Data("b".utf8)
+        let first = ARC.PresentationState(
+            state: [
+                secondContext: (4, [3, 1]),
+                firstContext: (3, [2, 0]),
+            ]
+        )
+        let second = ARC.PresentationState(
+            state: [
+                firstContext: (3, [0, 2]),
+                secondContext: (4, [1, 3]),
+            ]
+        )
+        XCTAssertEqual(try first.serialize(), try second.serialize())
+    }
+
+    func testPublicErrorsArePreservedAcrossARCErrorBoundary() {
+        let errors: [ARCError] = [
+            .invalidPrivateKey,
+            .invalidPublicKey,
+            .invalidCredentialRequest,
+            .invalidCredentialResponse,
+            .invalidCredential,
+            .invalidPresentation,
+            .invalidProof,
+            .invalidPresentationLimit,
+            .presentationLimitExceeded,
+            .insufficientOutputCapacity,
+            .internalFailure,
+        ]
+        for expectedError in errors {
+            XCTAssertThrowsError(
+                try withARCError(fallback: .internalFailure) {
+                    throw expectedError
+                }
+            ) { error in
+                XCTAssertEqual(error as? ARCError, expectedError)
             }
         }
     }

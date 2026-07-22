@@ -51,7 +51,10 @@ class HashToCurveTests: XCTestCase {
 
             let point = try h2c.hashToGroup(msg, domainSeparationString: Data(dst.utf8))
 
-            XCTAssert(point.oprfRepresentation.hexString.dropFirst(2) == vector.P.x.dropFirst(2))
+            XCTAssert(
+                try oprfRepresentation(of: point).hexString.dropFirst(2)
+                    == vector.P.x.dropFirst(2)
+            )
         }
     }
 
@@ -70,7 +73,7 @@ class HashToCurveTests: XCTestCase {
                                                         outputSize: 48, reductionModulus: .groupOrder).first!
 
         let tv = try! Data(hexString: "5561bc4e7322a640b2ff6cb6aad96d1021f423233b858343caefa05abde7ef85")
-        XCTAssert(scalar.rawRepresentation == tv)
+        XCTAssert(try canonicalRepresentation(of: scalar) == tv)
     }
 
     func testExpandMessageXMD() throws {
@@ -101,7 +104,7 @@ class HashToCurveTests: XCTestCase {
 
         let scalar = try PrimeOrderCurveGroup<P256>.Scalar(canonicalRepresentation: serialized)
 
-        XCTAssertEqual(scalar.rawRepresentation, serialized)
+        XCTAssertEqual(try canonicalRepresentation(of: scalar), serialized)
     }
 
     func testHash2Field() throws {
@@ -119,7 +122,13 @@ class HashToCurveTests: XCTestCase {
         let u0 = elements.first!
         let u1 = elements.last!
 
-        XCTAssertEqual(u0.rawRepresentation.hexString, "afe47f2ea2b10465cc26ac403194dfb68b7f5ee865cda61e9f3e07a537220af1")
-        XCTAssertEqual(u1.rawRepresentation.hexString, "379a27833b0bfe6f7bdca08e1e83c760bf9a338ab335542704edcd69ce9e46e0")
+        XCTAssertEqual(
+            try canonicalRepresentation(of: u0).hexString,
+            "afe47f2ea2b10465cc26ac403194dfb68b7f5ee865cda61e9f3e07a537220af1"
+        )
+        XCTAssertEqual(
+            try canonicalRepresentation(of: u1).hexString,
+            "379a27833b0bfe6f7bdca08e1e83c760bf9a338ab335542704edcd69ce9e46e0"
+        )
     }
 }

@@ -118,6 +118,9 @@ extension ARC {
             // Otherwise, generate a random nonce that has not yet been used.
             var nonce: Int
             if let optionalNonce {
+                guard optionalNonce >= 0, optionalNonce < presentationLimit else {
+                    throw ARC.Errors.invalidPresentationLimit
+                }
                 nonce = optionalNonce
             } else {
                 nonce = Int.random(in: 0..<presentationLimit)

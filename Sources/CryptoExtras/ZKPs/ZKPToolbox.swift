@@ -48,23 +48,60 @@ struct Proof<H2G: HashToGroup> {
     public let challenge: Group.Scalar
     public let responses: [Group.Scalar]
 
-    static func composeChallenge(label: String, points: [Group.Element], pointLabels: [String], blindedPoints: [Group.Element], blindedPointsLabels: [String], scalarLabels: [String]) throws(CryptoKitMetaError) -> Group.Scalar {
-        var challengeInput = Data()
-
-        // Pass the public points into the transcript.
-        for point in points {
-            let serializedPoint = point.oprfRepresentation
-            challengeInput.append(I2OSP(value: serializedPoint.count, outputByteCount: 2) + serializedPoint)
+    static func composeChallenge(
+        label: String,
+        points: [Group.Element],
+        blindedPoints: [Group.Element]
+    ) throws(CryptoKitMetaError) -> Group.Scalar {
+        let representationByteCount = Group.Element.oprfRepresentationByteCount
+        guard
+            representationByteCount > 0,
+            representationByteCount <= Int(UInt16.max)
+        else {
+            throw cryptoExtrasError(OPRF.Errors.transcriptElementTooLong)
         }
-
-        // Pass the computed blinded points into the transcript.
-        for point in blindedPoints {
-            let serializedPoint = point.oprfRepresentation
-            challengeInput.append(I2OSP(value: serializedPoint.count, outputByteCount: 2) + serializedPoint)
+        let domainSeparationTag = H2G.hashToScalarDomainSeparationTag(
+            context: Data(label.utf8)
+        )
+        return try H2G.hashToScalar(
+            domainSeparationTag: domainSeparationTag
+        ) { (hasher: inout H2G.H) throws(CryptoKitMetaError) in
+            for point in points {
+                try Self.update(
+                    &hasher,
+                    with: point,
+                    representationByteCount: representationByteCount
+                )
+            }
+            for point in blindedPoints {
+                try Self.update(
+                    &hasher,
+                    with: point,
+                    representationByteCount: representationByteCount
+                )
+            }
         }
+    }
 
-        // Get the challenge output from the transcript.
-        return try H2G.hashToScalar(challengeInput, domainSeparationContext: Data(label.utf8))
+    private static func update(
+        _ hasher: inout H2G.H,
+        with point: Group.Element,
+        representationByteCount: Int
+    ) throws(CryptoKitMetaError) {
+        try OPRF.update(
+            &hasher,
+            withTwoByteInteger: representationByteCount
+        )
+        try withUnsafeTemporaryAllocation(
+            byteCount: representationByteCount,
+            alignment: 1
+        ) {
+            (representation: UnsafeMutableRawBufferPointer) throws(CryptoKitMetaError) in
+            try point.writeOPRFRepresentation(into: representation)
+            hasher.update(
+                bufferPointer: UnsafeRawBufferPointer(representation)
+            )
+        }
     }
 }
 

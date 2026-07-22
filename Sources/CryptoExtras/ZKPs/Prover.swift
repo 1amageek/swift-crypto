@@ -76,7 +76,6 @@ struct Prover<H2G: HashToGroup>: ProofParticipant {
         // Example: if the constraint is A=x*B, compute ABlind=xBlind*B for blinding scalar xBlind.
         // Example: if the constraint is A=x*B+y*C, compute ABlind=xBlind*B + yBlind*C for blinding scalars xBlind, yBlind.
         var blindedPoints: [Group.Element] = []
-        var blindedPointsLabels: [String] = []
         for (constraintPoint, linearCombination) in self.constraints {
             // Check that all PointVar and ScalarVar variables in the constraint have been correctly allocated.
             if !(0..<self.points.count).contains(constraintPoint.index) {
@@ -103,11 +102,14 @@ struct Prover<H2G: HashToGroup>: ProofParticipant {
             }
 
             blindedPoints.append(blindedPoint)
-            blindedPointsLabels.append(self.pointLabels[constraintPoint.index] + "-blind")
         }
 
         // Obtain a scalar challenge.
-        let challenge = try Proof<H2G>.composeChallenge(label: self.label, points: self.points, pointLabels: self.pointLabels, blindedPoints: blindedPoints, blindedPointsLabels: blindedPointsLabels, scalarLabels: self.scalarLabels)
+        let challenge = try Proof<H2G>.composeChallenge(
+            label: self.label,
+            points: self.points,
+            blindedPoints: blindedPoints
+        )
 
         // Compute response scalars from the challenge, scalars, and blindings.
         // Example: if the scalar is m, compute mResponse = mBlind - challenge * m for blinding scalar xBlind.

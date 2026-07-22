@@ -20,248 +20,562 @@ import Foundation
 import Crypto
 
 extension ARC.CredentialRequest {
-    static func getScalarCount() -> Int { return 5 }
-    static func getSerializedByteCount(_ ciphersuite: ARC.Ciphersuite<H2G>) -> Int {
-        return 2 * ciphersuite.pointByteCount + Self.getScalarCount() * ciphersuite.scalarByteCount
+    static var proofScalarCount: Int { 5 }
+
+    static func serializedByteCount() throws -> Int {
+        try ARC.RepresentationLayout<H2G>(
+            pointCount: 2,
+            scalarCount: Self.proofScalarCount
+        ).byteCount
     }
 
-    func serialize(ciphersuite: ARC.Ciphersuite<H2G>) -> Data {
-        var result = Data(capacity: Self.getSerializedByteCount(ciphersuite))
-        result.append(self.m1Enc.oprfRepresentation)
-        result.append(self.m2Enc.oprfRepresentation)
-        result.append(self.proof.serialize(ciphersuite: ciphersuite))
-        return result
+    func writeSerializedRepresentation(
+        into destination: UnsafeMutableRawBufferPointer
+    ) throws {
+        var writer = try ARC.RepresentationWriter(
+            destination: destination,
+            requiredByteCount: Self.serializedByteCount()
+        )
+        try writer.writeElement(self.m1Enc)
+        try writer.writeElement(self.m2Enc)
+        try self.proof.writeRepresentation(
+            to: &writer,
+            scalarCount: Self.proofScalarCount
+        )
+        try writer.finish()
     }
 
-    static func deserialize<D: DataProtocol>(requestData: D, ciphersuite: ARC.Ciphersuite<H2G>) throws -> ARC.CredentialRequest<H2G> {
-        guard requestData.count == Self.getSerializedByteCount(ciphersuite) else {
+    func serialize() throws -> Data {
+        try ARC.RepresentationWriter.representation(
+            byteCount: Self.serializedByteCount()
+        ) { writer in
+            try writer.writeElement(self.m1Enc)
+            try writer.writeElement(self.m2Enc)
+            try self.proof.writeRepresentation(
+                to: &writer,
+                scalarCount: Self.proofScalarCount
+            )
+        }
+    }
+
+    static func deserialize<D: DataProtocol>(
+        requestData: D
+    ) throws -> Self {
+        let expectedByteCount = try Self.serializedByteCount()
+        guard requestData.count == expectedByteCount else {
             throw ARC.Errors.incorrectRequestDataSize
         }
-
-        var bytes = Data(requestData)
-
-        let m1Enc = try H2G.G.Element(oprfRepresentation: bytes.popFirst(ciphersuite.pointByteCount))
-        let m2Enc = try H2G.G.Element(oprfRepresentation: bytes.popFirst(ciphersuite.pointByteCount))
-        let proof = try Proof<H2G>.deserialize(proofData: bytes, scalarCount: Self.getScalarCount(), ciphersuite: ciphersuite)
-
-        return ARC.CredentialRequest(m1Enc: m1Enc, m2Enc: m2Enc, proof: proof)
+        return try Crypto.withContiguousBytes(of: requestData) { bytes in
+            var reader = ARC.RepresentationReader(source: bytes)
+            let m1Enc = try reader.readElement(H2G.G.Element.self)
+            let m2Enc = try reader.readElement(H2G.G.Element.self)
+            let proof = try Proof<H2G>.readRepresentation(
+                from: &reader,
+                scalarCount: Self.proofScalarCount
+            )
+            try reader.finish()
+            return Self(m1Enc: m1Enc, m2Enc: m2Enc, proof: proof)
+        }
     }
 }
 
 extension ARC.CredentialResponse {
-    static func getScalarCount() -> Int { return 8 }
-    static func getSerializedByteCount(_ ciphersuite: ARC.Ciphersuite<H2G>) -> Int {
-        return 6 * ciphersuite.pointByteCount + Self.getScalarCount() * ciphersuite.scalarByteCount
+    static var proofScalarCount: Int { 8 }
+
+    static func serializedByteCount() throws -> Int {
+        try ARC.RepresentationLayout<H2G>(
+            pointCount: 6,
+            scalarCount: Self.proofScalarCount
+        ).byteCount
     }
 
-    func serialize(ciphersuite: ARC.Ciphersuite<H2G>) -> Data {
-        var result = Data(capacity: Self.getSerializedByteCount(ciphersuite))
-
-        result.append(self.U.oprfRepresentation)
-        result.append(self.encUPrime.oprfRepresentation)
-        result.append(self.X0Aux.oprfRepresentation)
-        result.append(self.X1Aux.oprfRepresentation)
-        result.append(self.X2Aux.oprfRepresentation)
-        result.append(self.HAux.oprfRepresentation)
-        result.append(self.proof.serialize(ciphersuite: ciphersuite))
-
-        return result
+    func writeSerializedRepresentation(
+        into destination: UnsafeMutableRawBufferPointer
+    ) throws {
+        var writer = try ARC.RepresentationWriter(
+            destination: destination,
+            requiredByteCount: Self.serializedByteCount()
+        )
+        try self.writeRepresentation(to: &writer)
+        try writer.finish()
     }
 
-    static func deserialize<D: DataProtocol>(responseData: D, ciphersuite: ARC.Ciphersuite<H2G>) throws -> ARC.CredentialResponse<H2G> {
-        guard responseData.count == self.getSerializedByteCount(ciphersuite) else {
+    func serialize() throws -> Data {
+        try ARC.RepresentationWriter.representation(
+            byteCount: Self.serializedByteCount()
+        ) { writer in
+            try self.writeRepresentation(to: &writer)
+        }
+    }
+
+    private func writeRepresentation(
+        to writer: inout ARC.RepresentationWriter
+    ) throws {
+        try writer.writeElement(self.U)
+        try writer.writeElement(self.encUPrime)
+        try writer.writeElement(self.X0Aux)
+        try writer.writeElement(self.X1Aux)
+        try writer.writeElement(self.X2Aux)
+        try writer.writeElement(self.HAux)
+        try self.proof.writeRepresentation(
+            to: &writer,
+            scalarCount: Self.proofScalarCount
+        )
+    }
+
+    static func deserialize<D: DataProtocol>(
+        responseData: D
+    ) throws -> Self {
+        let expectedByteCount = try Self.serializedByteCount()
+        guard responseData.count == expectedByteCount else {
             throw ARC.Errors.incorrectResponseDataSize
         }
-
-        var bytes = Data(responseData)
-
-        let U = try H2G.G.Element(oprfRepresentation: bytes.popFirst(ciphersuite.pointByteCount))
-        let encUPrime = try H2G.G.Element(oprfRepresentation: bytes.popFirst(ciphersuite.pointByteCount))
-        let X0Aux = try H2G.G.Element(oprfRepresentation: bytes.popFirst(ciphersuite.pointByteCount))
-        let X1Aux = try H2G.G.Element(oprfRepresentation: bytes.popFirst(ciphersuite.pointByteCount))
-        let X2Aux = try H2G.G.Element(oprfRepresentation: bytes.popFirst(ciphersuite.pointByteCount))
-        let HAux = try H2G.G.Element(oprfRepresentation: bytes.popFirst(ciphersuite.pointByteCount))
-
-        let proof = try Proof<H2G>.deserialize(proofData: bytes, scalarCount: Self.getScalarCount(), ciphersuite: ciphersuite)
-
-        return ARC.CredentialResponse(U: U, encUPrime: encUPrime, X0Aux: X0Aux, X1Aux: X1Aux, X2Aux: X2Aux, HAux: HAux, proof: proof)
+        return try Crypto.withContiguousBytes(of: responseData) { bytes in
+            var reader = ARC.RepresentationReader(source: bytes)
+            let U = try reader.readElement(H2G.G.Element.self)
+            let encUPrime = try reader.readElement(H2G.G.Element.self)
+            let X0Aux = try reader.readElement(H2G.G.Element.self)
+            let X1Aux = try reader.readElement(H2G.G.Element.self)
+            let X2Aux = try reader.readElement(H2G.G.Element.self)
+            let HAux = try reader.readElement(H2G.G.Element.self)
+            let proof = try Proof<H2G>.readRepresentation(
+                from: &reader,
+                scalarCount: Self.proofScalarCount
+            )
+            try reader.finish()
+            return Self(
+                U: U,
+                encUPrime: encUPrime,
+                X0Aux: X0Aux,
+                X1Aux: X1Aux,
+                X2Aux: X2Aux,
+                HAux: HAux,
+                proof: proof
+            )
+        }
     }
 }
 
 extension ARC.Presentation {
-    static func getScalarCount() -> Int { return 5 }
-    static func getPointCount() -> Int { return 4 }
-    static func getSerializedByteCount(_ ciphersuite: ARC.Ciphersuite<H2G>) -> Int {
-        return Self.getPointCount() * ciphersuite.pointByteCount + Self.getScalarCount() * ciphersuite.scalarByteCount
+    static var proofScalarCount: Int { 5 }
+
+    static func serializedByteCount() throws -> Int {
+        try ARC.RepresentationLayout<H2G>(
+            pointCount: 4,
+            scalarCount: Self.proofScalarCount
+        ).byteCount
     }
 
-    func serialize(ciphersuite: ARC.Ciphersuite<H2G>) -> Data {
-        var result = Data(capacity: Self.getSerializedByteCount(ciphersuite))
-
-        result.append(self.U.oprfRepresentation)
-        result.append(self.UPrimeCommit.oprfRepresentation)
-        result.append(self.m1Commit.oprfRepresentation)
-        result.append(self.tag.oprfRepresentation)
-        result.append(self.proof.serialize(ciphersuite: ciphersuite))
-
-        return result
+    func writeSerializedRepresentation(
+        into destination: UnsafeMutableRawBufferPointer
+    ) throws {
+        var writer = try ARC.RepresentationWriter(
+            destination: destination,
+            requiredByteCount: Self.serializedByteCount()
+        )
+        try self.writeRepresentation(to: &writer)
+        try writer.finish()
     }
 
-    static func deserialize<D: DataProtocol>(presentationData: D, ciphersuite: ARC.Ciphersuite<H2G>) throws -> ARC.Presentation<H2G> {
-        guard presentationData.count == self.getSerializedByteCount(ciphersuite) else {
+    func serialize() throws -> Data {
+        try ARC.RepresentationWriter.representation(
+            byteCount: Self.serializedByteCount()
+        ) { writer in
+            try self.writeRepresentation(to: &writer)
+        }
+    }
+
+    private func writeRepresentation(
+        to writer: inout ARC.RepresentationWriter
+    ) throws {
+        try writer.writeElement(self.U)
+        try writer.writeElement(self.UPrimeCommit)
+        try writer.writeElement(self.m1Commit)
+        try writer.writeElement(self.tag)
+        try self.proof.writeRepresentation(
+            to: &writer,
+            scalarCount: Self.proofScalarCount
+        )
+    }
+
+    static func deserialize<D: DataProtocol>(
+        presentationData: D
+    ) throws -> Self {
+        let expectedByteCount = try Self.serializedByteCount()
+        guard presentationData.count == expectedByteCount else {
             throw ARC.Errors.incorrectPresentationDataSize
         }
-
-        var bytes = Data(presentationData)
-
-        let U = try H2G.G.Element(oprfRepresentation: bytes.popFirst(ciphersuite.pointByteCount))
-        let UPrimeCommit = try H2G.G.Element(oprfRepresentation: bytes.popFirst(ciphersuite.pointByteCount))
-        let m1Commit = try H2G.G.Element(oprfRepresentation: bytes.popFirst(ciphersuite.pointByteCount))
-        let tag = try H2G.G.Element(oprfRepresentation: bytes.popFirst(ciphersuite.pointByteCount))
-        let presentationProof = try Proof<H2G>.deserialize(proofData: bytes, scalarCount: Self.getScalarCount(), ciphersuite: ciphersuite)
-
-        return ARC.Presentation(U: U, UPrimeCommit: UPrimeCommit, m1Commit: m1Commit, tag: tag, proof: presentationProof)
+        return try Crypto.withContiguousBytes(of: presentationData) { bytes in
+            var reader = ARC.RepresentationReader(source: bytes)
+            let U = try reader.readElement(H2G.G.Element.self)
+            let UPrimeCommit = try reader.readElement(H2G.G.Element.self)
+            let m1Commit = try reader.readElement(H2G.G.Element.self)
+            let tag = try reader.readElement(H2G.G.Element.self)
+            let proof = try Proof<H2G>.readRepresentation(
+                from: &reader,
+                scalarCount: Self.proofScalarCount
+            )
+            try reader.finish()
+            return Self(
+                U: U,
+                UPrimeCommit: UPrimeCommit,
+                m1Commit: m1Commit,
+                tag: tag,
+                proof: proof
+            )
+        }
     }
 }
 
 extension ARC.ServerPublicKey {
-    static func getSerializedByteCount(_ ciphersuite: ARC.Ciphersuite<H2G>) -> Int {
-        return 3 * ciphersuite.pointByteCount
+    static func serializedByteCount() throws -> Int {
+        try ARC.RepresentationLayout<H2G>(
+            pointCount: 3,
+            scalarCount: 0
+        ).byteCount
     }
 
-    func serialize(ciphersuite: ARC.Ciphersuite<H2G>) -> Data {
-        var result = Data(capacity: Self.getSerializedByteCount(ciphersuite))
-
-        result.append(self.X0.oprfRepresentation)
-        result.append(self.X1.oprfRepresentation)
-        result.append(self.X2.oprfRepresentation)
-
-        return result
+    func writeSerializedRepresentation(
+        into destination: UnsafeMutableRawBufferPointer
+    ) throws {
+        var writer = try ARC.RepresentationWriter(
+            destination: destination,
+            requiredByteCount: Self.serializedByteCount()
+        )
+        try writer.writeElement(self.X0)
+        try writer.writeElement(self.X1)
+        try writer.writeElement(self.X2)
+        try writer.finish()
     }
 
-    static func deserialize<D: DataProtocol>(serverPublicKeyData: D, ciphersuite: ARC.Ciphersuite<H2G>) throws -> ARC.ServerPublicKey<H2G> {
-        guard serverPublicKeyData.count == self.getSerializedByteCount(ciphersuite) else {
+    func serialize() throws -> Data {
+        try ARC.RepresentationWriter.representation(
+            byteCount: Self.serializedByteCount()
+        ) { writer in
+            try writer.writeElement(self.X0)
+            try writer.writeElement(self.X1)
+            try writer.writeElement(self.X2)
+        }
+    }
+
+    static func deserialize<D: DataProtocol>(
+        serverPublicKeyData: D
+    ) throws -> Self {
+        let expectedByteCount = try Self.serializedByteCount()
+        guard serverPublicKeyData.count == expectedByteCount else {
             throw ARC.Errors.incorrectServerCommitmentsSize
         }
-
-        var bytes = Data(serverPublicKeyData)
-
-        let X0 = try H2G.G.Element(oprfRepresentation: bytes.popFirst(ciphersuite.pointByteCount))
-        let X1 = try H2G.G.Element(oprfRepresentation: bytes.popFirst(ciphersuite.pointByteCount))
-        let X2 = try H2G.G.Element(oprfRepresentation: bytes.popFirst(ciphersuite.pointByteCount))
-
-        return ARC.ServerPublicKey(X0: X0, X1: X1, X2: X2)
+        return try Crypto.withContiguousBytes(of: serverPublicKeyData) { bytes in
+            var reader = ARC.RepresentationReader(source: bytes)
+            let X0 = try reader.readElement(H2G.G.Element.self)
+            let X1 = try reader.readElement(H2G.G.Element.self)
+            let X2 = try reader.readElement(H2G.G.Element.self)
+            try reader.finish()
+            return Self(X0: X0, X1: X1, X2: X2)
+        }
     }
 }
 
 extension Proof {
-    func serialize(ciphersuite: ARC.Ciphersuite<H2G>) -> Data {
-        let scalarCount = self.responses.count + 1
-        var result = Data(capacity: scalarCount * ciphersuite.scalarByteCount)
-
-        // Serialize challenge
-        result.append(self.challenge.rawRepresentation)
-        // Serialize responses
-        for response in self.responses {
-            result.append(response.rawRepresentation)
+    fileprivate func writeRepresentation(
+        to writer: inout ARC.RepresentationWriter,
+        scalarCount: Int
+    ) throws {
+        guard scalarCount > 0, self.responses.count == scalarCount - 1 else {
+            throw ARC.Errors.internalFailure
         }
-        return result
+        try writer.writeScalar(self.challenge)
+        for response in self.responses {
+            try writer.writeScalar(response)
+        }
     }
 
-    static func deserialize<D: DataProtocol>(proofData: D, scalarCount: Int, ciphersuite: ARC.Ciphersuite<H2G>) throws -> Proof<H2G> {
-        guard proofData.count == scalarCount * ciphersuite.scalarByteCount else {
-            throw ARC.Errors.incorrectProofDataSize
+    fileprivate static func readRepresentation(
+        from reader: inout ARC.RepresentationReader,
+        scalarCount: Int
+    ) throws -> Self {
+        guard scalarCount > 0 else {
+            throw ARC.Errors.invalidEncoding
         }
-
-        var bytes = Data(proofData)
-
-        // Deserialize challenge
-        let challenge = try H2G.G.Scalar(
-            canonicalRepresentation: bytes.popFirst(ciphersuite.scalarByteCount)
-        )
-
-        // Deserialize responses
+        let challenge = try reader.readScalar(H2G.G.Scalar.self)
         var responses: [H2G.G.Scalar] = []
         responses.reserveCapacity(scalarCount - 1)
-        for _ in (0..<scalarCount-1) {
-            let response = try H2G.G.Scalar(
-                canonicalRepresentation: bytes.popFirst(ciphersuite.scalarByteCount)
-            )
-            responses.append(response)
+        for _ in 1..<scalarCount {
+            responses.append(try reader.readScalar(H2G.G.Scalar.self))
         }
-
-        return Proof(challenge: challenge, responses: responses)
+        return Self(challenge: challenge, responses: responses)
     }
 }
 
-// Serialize a ARC credential, to save and restore client state.
-// This will only be called client-side, and never be sent over the wire.
+// This representation is client-side credential persistence and is not an ARC wire message.
 extension ARC.Credential {
-    static func getScalarCount() -> Int { return 1 }
-    static func getPointCount() -> Int { return 5 }
-    static func getSerializedByteCountExcludingPresentationState(_ ciphersuite: ARC.Ciphersuite<H2G>) -> Int {
-        return Self.getPointCount() * ciphersuite.pointByteCount + Self.getScalarCount() * ciphersuite.scalarByteCount
+    private static func fixedRepresentationByteCount() throws -> Int {
+        try ARC.RepresentationLayout<H2G>(
+            pointCount: 3,
+            scalarCount: 1
+        ).byteCount
     }
 
-    func serialize(ciphersuite: ARC.Ciphersuite<H2G>) throws -> Data {
-        let presentationStateBytes = try self.presentationState.serialize()
-        var result = Data(capacity: Self.getSerializedByteCountExcludingPresentationState(ciphersuite) + presentationStateBytes.count)
-
-        result.append(self.m1.rawRepresentation)
-        result.append(self.U.oprfRepresentation)
-        result.append(self.UPrime.oprfRepresentation)
-        result.append(self.X1.oprfRepresentation)
-        result.append(self.generatorG.oprfRepresentation)
-        result.append(self.generatorH.oprfRepresentation)
-        result.append(presentationStateBytes)
-
-        return result
+    func serializedByteCount() throws -> Int {
+        let fixedByteCount = try Self.fixedRepresentationByteCount()
+        let stateByteCount = try self.presentationState.serializedByteCount()
+        let totalByteCount = fixedByteCount.addingReportingOverflow(
+            stateByteCount
+        )
+        guard !totalByteCount.overflow else {
+            throw ARC.Errors.internalFailure
+        }
+        return totalByteCount.partialValue
     }
 
-    static func deserialize<D: DataProtocol>(credentialData: D, ciphersuite: ARC.Ciphersuite<H2G>) throws -> ARC.Credential<H2G> {
-        guard credentialData.count - Self.getSerializedByteCountExcludingPresentationState(ciphersuite) >= 0 else {
+    func writeSerializedRepresentation(
+        into destination: UnsafeMutableRawBufferPointer
+    ) throws {
+        var writer = try ARC.RepresentationWriter(
+            destination: destination,
+            requiredByteCount: self.serializedByteCount()
+        )
+        try self.writeRepresentation(to: &writer)
+        try writer.finish()
+    }
+
+    func serialize() throws -> Data {
+        return try ARC.RepresentationWriter.representation(
+            byteCount: self.serializedByteCount()
+        ) { writer in
+            try self.writeRepresentation(to: &writer)
+        }
+    }
+
+    private func writeRepresentation(
+        to writer: inout ARC.RepresentationWriter
+    ) throws {
+        try writer.writeScalar(self.m1)
+        try writer.writeElement(self.U)
+        try writer.writeElement(self.UPrime)
+        try writer.writeElement(self.X1)
+        try self.presentationState.writeRepresentation(to: &writer)
+    }
+
+    static func deserialize<D: DataProtocol>(
+        credentialData: D,
+        ciphersuite: ARC.Ciphersuite<H2G>
+    ) throws -> Self {
+        let fixedByteCount = try Self.fixedRepresentationByteCount()
+        let minimumByteCount = fixedByteCount.addingReportingOverflow(
+            ARC.PresentationState.minimumRepresentationByteCount
+        )
+        guard
+            !minimumByteCount.overflow,
+            credentialData.count >= minimumByteCount.partialValue,
+            credentialData.count - fixedByteCount
+                <= ARC.PresentationState.maximumRepresentationByteCount
+        else {
             throw ARC.Errors.incorrectCredentialDataSize
         }
-        let credentialData = Data(credentialData)
-
-        var bytes = Data(credentialData)
-
-        let m1 = try H2G.G.Scalar(
-            canonicalRepresentation: bytes.popFirst(ciphersuite.scalarByteCount)
-        )
-        let U = try H2G.G.Element(oprfRepresentation: bytes.popFirst(ciphersuite.pointByteCount))
-        let UPrime = try H2G.G.Element(oprfRepresentation: bytes.popFirst(ciphersuite.pointByteCount))
-        let X1 = try H2G.G.Element(oprfRepresentation: bytes.popFirst(ciphersuite.pointByteCount))
-        let genG = try H2G.G.Element(oprfRepresentation: bytes.popFirst(ciphersuite.pointByteCount))
-        let genH = try H2G.G.Element(oprfRepresentation: bytes.popFirst(ciphersuite.pointByteCount))
-
-        // Deserialize presentationState from remaining bytes.
-        let presentationState = try ARC.PresentationState.deserialize(presentationStateData: bytes)
-
-        return ARC.Credential(m1: m1, U: U, UPrime: UPrime, X1: X1, ciphersuite: ciphersuite, generatorG: genG, generatorH: genH, presentationState: presentationState)
+        return try Crypto.withContiguousBytes(of: credentialData) { bytes in
+            var reader = ARC.RepresentationReader(source: bytes)
+            let m1 = try reader.readScalar(H2G.G.Scalar.self)
+            guard m1 != .zero else {
+                throw ARC.Errors.invalidEncoding
+            }
+            let U = try reader.readElement(H2G.G.Element.self)
+            let UPrime = try reader.readElement(H2G.G.Element.self)
+            let X1 = try reader.readElement(H2G.G.Element.self)
+            let presentationState = try ARC.PresentationState.readRepresentation(
+                from: &reader
+            )
+            try reader.finish()
+            let generators = try ARC.deriveGenerators(
+                for: ciphersuite
+            )
+            return Self(
+                m1: m1,
+                U: U,
+                UPrime: UPrime,
+                X1: X1,
+                ciphersuite: ciphersuite,
+                generatorG: generators.generatorG,
+                generatorH: generators.generatorH,
+                presentationState: presentationState
+            )
+        }
     }
 }
 
-// Serialize a ARC PresentationState, to help save and restore a credential.
-// This will only be called client-side, and never be sent over the wire.
+// This representation is client-side state and is not an ARC wire message.
 extension ARC.PresentationState {
-    func serialize() throws -> Data {
-        let encoder = PropertyListEncoder()
-        encoder.outputFormat = .binary
-
-        // Convert (Int, Set<Int>) to Array<Int> for encoding
-        let dictForEncoding = self.state.mapValues { [$0.0] + Array($0.1) }
-        return try encoder.encode(dictForEncoding)
+    static var minimumRepresentationByteCount: Int { 8 }
+    static var maximumRepresentationByteCount: Int { 1_024 * 1_024 }
+    private static var representationIdentifier: UInt32 { 0x4152_4301 }
+    private static var maximumEntryCount: Int { 4_096 }
+    private static var maximumContextByteCount: Int { Int(UInt16.max) }
+    private static var maximumNonceCount: Int {
+        Self.maximumRepresentationByteCount / MemoryLayout<UInt32>.size
     }
 
-    static func deserialize<D: DataProtocol>(presentationStateData: D) throws -> ARC.PresentationState {
-        let decoder = PropertyListDecoder()
+    func serializedByteCount() throws -> Int {
+        guard self.state.count <= Self.maximumEntryCount else {
+            throw ARC.Errors.internalFailure
+        }
+        var byteCount = Self.minimumRepresentationByteCount
+        for (context, value) in self.state {
+            let (presentationLimit, nonces) = value
+            guard
+                context.count <= Self.maximumContextByteCount,
+                UInt32(exactly: presentationLimit) != nil,
+                presentationLimit > 0,
+                nonces.count <= presentationLimit,
+                nonces.count <= Self.maximumNonceCount,
+                nonces.allSatisfy({
+                    $0 >= 0
+                        && $0 < presentationLimit
+                        && UInt32(exactly: $0) != nil
+                })
+            else {
+                throw ARC.Errors.internalFailure
+            }
 
-        let stateIntList = try decoder.decode([Data: [Int]].self, from: Data(presentationStateData))
-        // Convert [Int] to (Int, Set<Int>) for decoding
-        let state = stateIntList.mapValues { value in (value[0], Set(value[1...])) }
+            let nonceBytes = nonces.count.multipliedReportingOverflow(
+                by: MemoryLayout<UInt32>.size
+            )
+            let fixedEntryBytes = 2 + context.count + 4 + 4
+            let entryBytes = fixedEntryBytes.addingReportingOverflow(
+                nonceBytes.partialValue
+            )
+            let totalBytes = byteCount.addingReportingOverflow(
+                entryBytes.partialValue
+            )
+            guard
+                !nonceBytes.overflow,
+                !entryBytes.overflow,
+                !totalBytes.overflow,
+                totalBytes.partialValue <= Self.maximumRepresentationByteCount
+            else {
+                throw ARC.Errors.internalFailure
+            }
+            byteCount = totalBytes.partialValue
+        }
+        return byteCount
+    }
 
-        return ARC.PresentationState(state: state)
+    func writeSerializedRepresentation(
+        into destination: UnsafeMutableRawBufferPointer
+    ) throws {
+        var writer = try ARC.RepresentationWriter(
+            destination: destination,
+            requiredByteCount: self.serializedByteCount()
+        )
+        try self.writeRepresentation(to: &writer)
+        try writer.finish()
+    }
+
+    func serialize() throws -> Data {
+        try ARC.RepresentationWriter.representation(
+            byteCount: self.serializedByteCount()
+        ) { writer in
+            try self.writeRepresentation(to: &writer)
+        }
+    }
+
+    fileprivate func writeRepresentation(
+        to writer: inout ARC.RepresentationWriter
+    ) throws {
+        _ = try self.serializedByteCount()
+        try writer.writeUInt32(Self.representationIdentifier)
+        try writer.writeUInt32(UInt32(self.state.count))
+        for context in self.state.keys.sorted(by: { left, right in
+            left.lexicographicallyPrecedes(right)
+        }) {
+            guard let value = self.state[context] else {
+                throw ARC.Errors.internalFailure
+            }
+            try writer.writeUInt16(UInt16(context.count))
+            try context.withUnsafeBytes { contextBytes in
+                try writer.copyBytes(from: contextBytes)
+            }
+            try writer.writeUInt32(UInt32(value.0))
+            try writer.writeUInt32(UInt32(value.1.count))
+            for nonce in value.1.sorted() {
+                try writer.writeUInt32(UInt32(nonce))
+            }
+        }
+    }
+
+    static func deserialize<D: DataProtocol>(
+        presentationStateData: D
+    ) throws -> Self {
+        guard
+            presentationStateData.count >= Self.minimumRepresentationByteCount,
+            presentationStateData.count <= Self.maximumRepresentationByteCount
+        else {
+            throw ARC.Errors.invalidEncoding
+        }
+        return try Crypto.withContiguousBytes(of: presentationStateData) { bytes in
+            var reader = ARC.RepresentationReader(source: bytes)
+            let result = try Self.readRepresentation(from: &reader)
+            try reader.finish()
+            return result
+        }
+    }
+
+    fileprivate static func readRepresentation(
+        from reader: inout ARC.RepresentationReader
+    ) throws -> Self {
+        guard try reader.readUInt32() == Self.representationIdentifier else {
+            throw ARC.Errors.invalidEncoding
+        }
+        let entryCountValue = try reader.readUInt32()
+        guard
+            let entryCount = Int(exactly: entryCountValue),
+            entryCount <= Self.maximumEntryCount
+        else {
+            throw ARC.Errors.invalidEncoding
+        }
+
+        var state: [Data: (Int, Set<Int>)] = [:]
+        state.reserveCapacity(entryCount)
+        var previousContext: Data?
+        for _ in 0..<entryCount {
+            let contextByteCount = Int(try reader.readUInt16())
+            let context = try reader.readData(byteCount: contextByteCount)
+            if let previousContext {
+                guard previousContext.lexicographicallyPrecedes(context) else {
+                    throw ARC.Errors.invalidEncoding
+                }
+            }
+            previousContext = context
+
+            let presentationLimitValue = try reader.readUInt32()
+            let nonceCountValue = try reader.readUInt32()
+            guard
+                let presentationLimit = Int(exactly: presentationLimitValue),
+                presentationLimit > 0,
+                let nonceCount = Int(exactly: nonceCountValue),
+                nonceCount <= presentationLimit,
+                nonceCount <= Self.maximumNonceCount
+            else {
+                throw ARC.Errors.invalidEncoding
+            }
+
+            var nonces: Set<Int> = []
+            nonces.reserveCapacity(nonceCount)
+            var previousNonce: Int?
+            for _ in 0..<nonceCount {
+                let nonceValue = try reader.readUInt32()
+                guard
+                    let nonce = Int(exactly: nonceValue),
+                    nonce < presentationLimit,
+                    previousNonce.map({ $0 < nonce }) ?? true
+                else {
+                    throw ARC.Errors.invalidEncoding
+                }
+                nonces.insert(nonce)
+                previousNonce = nonce
+            }
+            state[context] = (presentationLimit, nonces)
+        }
+        return Self(state: state)
     }
 }
 

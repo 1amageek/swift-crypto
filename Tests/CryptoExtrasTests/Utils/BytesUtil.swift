@@ -16,11 +16,33 @@ import FoundationEssentials
 #else
 import Foundation
 #endif
+import Crypto
+@testable import CryptoExtras
 import XCTest
 
 enum ByteHexEncodingErrors: Error {
     case incorrectHexValue
     case incorrectString
+}
+
+func canonicalRepresentation<Scalar: GroupScalar>(
+    of scalar: Scalar
+) throws -> Data {
+    var representation = Data(count: Scalar.rawRepresentationByteCount)
+    try representation.withUnsafeMutableBytes { destination in
+        try scalar.writeRawRepresentation(into: destination)
+    }
+    return representation
+}
+
+func oprfRepresentation<Element: OPRFGroupElement>(
+    of element: Element
+) throws -> Data {
+    var representation = Data(count: Element.oprfRepresentationByteCount)
+    try representation.withUnsafeMutableBytes { destination in
+        try element.writeOPRFRepresentation(into: destination)
+    }
+    return representation
 }
 
 let charA = UInt8(UnicodeScalar("a").value)

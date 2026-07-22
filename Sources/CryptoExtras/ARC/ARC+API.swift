@@ -38,42 +38,18 @@ extension P256 {
 extension P256._ARCV1 {
     /// The server secrets used to issue and verify credentials.
     public struct PrivateKey: Sendable {
+        /// The byte count of the canonical private-key representation.
+        public static var rawRepresentationByteCount: Int {
+            4 * P256.orderByteCount
+        }
+
         fileprivate var backing: ARC.Server<H2G>
 
         /// Creates a random private key for ARC(P-256).
-        public init() throws {
-            self.backing = try ARC.Server(ciphersuite: P256._ARCV1.ciphersuite)
-        }
-
-        // The spec does not define a serialization of the private key since, unlike the public key, it is not an
-        // interop concern.
-        //
-        // This initializer expects a concatenation of the binary representations of the private scalars:
-        //
-        //     struct {
-        //       uint8 x0[Ne];
-        //       uint8 x1[Ne];
-        //       uint8 x2[Ne];
-        //       uint8 x0Blinding[Ne];
-        //     } ServerPrivateKey;
-        //
-        public init<D: DataProtocol>(rawRepresentation: D) throws {
-            guard rawRepresentation.count == 4 * P256.orderByteCount else {
-                throw ARC.Errors.incorrectPrivateKeyDataSize
+        public init() throws(ARCError) {
+            self.backing = try withARCError(fallback: .internalFailure) {
+                try ARC.Server(ciphersuite: P256._ARCV1.ciphersuite)
             }
-
-            var bytes = Data(rawRepresentation)[...]
-            let x0 = try  H2G.G.Scalar(canonicalRepresentation: bytes[..<bytes.startIndex.advanced(by: P256.orderByteCount)])
-            bytes.removeFirst(P256.orderByteCount)
-            let x1 = try  H2G.G.Scalar(canonicalRepresentation: bytes[..<bytes.startIndex.advanced(by: P256.orderByteCount)])
-            bytes.removeFirst(P256.orderByteCount)
-            let x2 = try  H2G.G.Scalar(canonicalRepresentation: bytes[..<bytes.startIndex.advanced(by: P256.orderByteCount)])
-            bytes.removeFirst(P256.orderByteCount)
-            let x0Blinding = try  H2G.G.Scalar(canonicalRepresentation: bytes[..<bytes.startIndex.advanced(by: P256.orderByteCount)])
-            bytes.removeFirst(P256.orderByteCount)
-            assert(bytes.isEmpty)
-
-            self.backing = try ARC.Server(ciphersuite: P256._ARCV1.ciphersuite, x0: x0, x1: x1, x2: x2, x0Blinding: x0Blinding)
         }
 
         // The spec does not define a serialization of the private key since, unlike the public key, it is not an
@@ -88,17 +64,84 @@ extension P256._ARCV1 {
         //       uint8 x0Blinding[Ns];
         //     } ServerPrivateKey;
         //
-        public var rawRepresentation: Data {
-            let serializedByteCount = 4 * P256.orderByteCount
-            var result = Data(capacity: serializedByteCount)
+        public init<D: DataProtocol>(
+            rawRepresentation: D
+        ) throws(ARCError) {
+            self.backing = try withARCError(fallback: .invalidPrivateKey) {
+                guard rawRepresentation.count == Self.rawRepresentationByteCount else {
+                    throw ARC.Errors.incorrectPrivateKeyDataSize
+                }
+                let scalars = try Crypto.withContiguousBytes(
+                    of: rawRepresentation
+                ) { bytes in
+                    var reader = ARC.RepresentationReader(source: bytes)
+                    let x0 = try reader.readScalar(H2G.G.Scalar.self)
+                    let x1 = try reader.readScalar(H2G.G.Scalar.self)
+                    let x2 = try reader.readScalar(H2G.G.Scalar.self)
+                    let x0Blinding = try reader.readScalar(H2G.G.Scalar.self)
+                    try reader.finish()
+                    return (x0, x1, x2, x0Blinding)
+                }
+                guard
+                    scalars.0 != .zero,
+                    scalars.1 != .zero,
+                    scalars.2 != .zero,
+                    scalars.3 != .zero
+                else {
+                    throw ARC.Errors.invalidEncoding
+                }
+                return try ARC.Server(
+                    ciphersuite: P256._ARCV1.ciphersuite,
+                    x0: scalars.0,
+                    x1: scalars.1,
+                    x2: scalars.2,
+                    x0Blinding: scalars.3
+                )
+            }
+        }
 
-            result.append(self.backing.serverPrivateKey.x0.rawRepresentation)
-            result.append(self.backing.serverPrivateKey.x1.rawRepresentation)
-            result.append(self.backing.serverPrivateKey.x2.rawRepresentation)
-            result.append(self.backing.serverPrivateKey.x0Blinding.rawRepresentation)
-            assert(result.count == serializedByteCount)
+        // The spec does not define a serialization of the private key since, unlike the public key, it is not an
+        // interop concern.
+        //
+        // This initializer expects a concatenation of the binary representations of the private scalars:
+        //
+        //     struct {
+        //       uint8 x0[Ns];
+        //       uint8 x1[Ns];
+        //       uint8 x2[Ns];
+        //       uint8 x0Blinding[Ns];
+        //     } ServerPrivateKey;
+        //
+        /// Writes exactly the required prefix without retaining the destination.
+        /// Extra capacity remains unchanged; insufficient capacity fails before writing.
+        public func writeRawRepresentation(
+            into destination: UnsafeMutableRawBufferPointer
+        ) throws(ARCError) {
+            try withARCError(fallback: .internalFailure) {
+                var writer = try ARC.RepresentationWriter(
+                    destination: destination,
+                    requiredByteCount: Self.rawRepresentationByteCount
+                )
+                try writer.writeScalar(self.backing.serverPrivateKey.x0)
+                try writer.writeScalar(self.backing.serverPrivateKey.x1)
+                try writer.writeScalar(self.backing.serverPrivateKey.x2)
+                try writer.writeScalar(self.backing.serverPrivateKey.x0Blinding)
+                try writer.finish()
+            }
+        }
 
-            return result
+        /// Returns the canonical private-key representation.
+        public func rawRepresentation() throws(ARCError) -> Data {
+            try withARCError(fallback: .internalFailure) {
+                try ARC.RepresentationWriter.representation(
+                    byteCount: Self.rawRepresentationByteCount
+                ) { writer in
+                    try writer.writeScalar(self.backing.serverPrivateKey.x0)
+                    try writer.writeScalar(self.backing.serverPrivateKey.x1)
+                    try writer.writeScalar(self.backing.serverPrivateKey.x2)
+                    try writer.writeScalar(self.backing.serverPrivateKey.x0Blinding)
+                }
+            }
         }
 
         public var publicKey: P256._ARCV1.PublicKey {
@@ -108,14 +151,17 @@ extension P256._ARCV1 {
 
     /// The server public key, used by clients to create anonymous credentials in conjunction with the server.
     public struct PublicKey: Sendable {
+        /// The byte count of the ARC public-key representation.
+        public static var rawRepresentationByteCount: Int {
+            3 * P256.compressedX962PointByteCount
+        }
+
         fileprivate var backing: ARC.ServerPublicKey<H2G>
 
         fileprivate init(backing: ARC.ServerPublicKey<H2G>) {
             self.backing = backing
         }
 
-        fileprivate static var serializedByteCount: Int { 3 * P256.compressedX962PointByteCount }
-
         // The spec defines this serialization of the public key:
         //
         //     struct {
@@ -124,19 +170,17 @@ extension P256._ARCV1 {
         //       uint8 X2[Ne];
         //     } ServerPublicKey;
         //
-        public init<D: DataProtocol>(rawRepresentation: D) throws {
-            guard rawRepresentation.count == Self.serializedByteCount else { throw ARC.Errors.incorrectPublicKeyDataSize }
-
-            var bytes = Data(rawRepresentation)[...]
-            let X0 = try H2G.G.Element(oprfRepresentation: bytes[..<bytes.startIndex.advanced(by: P256.compressedX962PointByteCount)])
-            bytes.removeFirst(P256.compressedX962PointByteCount)
-            let X1 = try H2G.G.Element(oprfRepresentation: bytes[..<bytes.startIndex.advanced(by: P256.compressedX962PointByteCount)])
-            bytes.removeFirst(P256.compressedX962PointByteCount)
-            let X2 = try H2G.G.Element(oprfRepresentation: bytes[..<bytes.startIndex.advanced(by: P256.compressedX962PointByteCount)])
-            bytes.removeFirst(P256.compressedX962PointByteCount)
-            assert(bytes.isEmpty)
-
-            self.backing = ARC.ServerPublicKey(X0: X0, X1: X1, X2: X2)
+        public init<D: DataProtocol>(
+            rawRepresentation: D
+        ) throws(ARCError) {
+            self.backing = try withARCError(fallback: .invalidPublicKey) {
+                guard rawRepresentation.count == Self.rawRepresentationByteCount else {
+                    throw ARC.Errors.incorrectPublicKeyDataSize
+                }
+                return try ARC.ServerPublicKey.deserialize(
+                    serverPublicKeyData: rawRepresentation
+                )
+            }
         }
 
         // The spec defines this serialization of the public key:
@@ -147,15 +191,21 @@ extension P256._ARCV1 {
         //       uint8 X2[Ne];
         //     } ServerPublicKey;
         //
-        public var rawRepresentation: Data {
-            var result = Data(capacity: Self.serializedByteCount)
+        /// Writes exactly the required prefix without retaining the destination.
+        /// Extra capacity remains unchanged; insufficient capacity fails before writing.
+        public func writeRawRepresentation(
+            into destination: UnsafeMutableRawBufferPointer
+        ) throws(ARCError) {
+            try withARCError(fallback: .internalFailure) {
+                try self.backing.writeSerializedRepresentation(into: destination)
+            }
+        }
 
-            result.append(self.backing.X0.oprfRepresentation)
-            result.append(self.backing.X1.oprfRepresentation)
-            result.append(self.backing.X2.oprfRepresentation)
-            assert(result.count == Self.serializedByteCount)
-
-            return result
+        /// Returns the ARC public-key representation.
+        public func rawRepresentation() throws(ARCError) -> Data {
+            try withARCError(fallback: .internalFailure) {
+                try self.backing.serialize()
+            }
         }
     }
 
@@ -165,18 +215,42 @@ extension P256._ARCV1 {
     ///
     /// Servers should reconstruct values of this type from the serialized bytes sent by the client.
     public struct CredentialRequest: Sendable {
+        /// The byte count of an ARC credential-request representation.
+        public static var rawRepresentationByteCount: Int {
+            2 * P256.compressedX962PointByteCount + 5 * P256.orderByteCount
+        }
+
         var backing: ARC.CredentialRequest<H2G>
 
         fileprivate init(backing: ARC.CredentialRequest<H2G>) {
             self.backing = backing
         }
 
-        public init<D: DataProtocol>(rawRepresentation: D) throws {
-            self.backing = try ARC.CredentialRequest.deserialize(requestData: rawRepresentation, ciphersuite: P256._ARCV1.ciphersuite)
+        public init<D: DataProtocol>(
+            rawRepresentation: D
+        ) throws(ARCError) {
+            self.backing = try withARCError(fallback: .invalidCredentialRequest) {
+                try ARC.CredentialRequest.deserialize(
+                    requestData: rawRepresentation
+                )
+            }
         }
 
-        public var rawRepresentation: Data {
-            self.backing.serialize(ciphersuite: P256._ARCV1.ciphersuite)
+        /// Writes exactly the required prefix without retaining the destination.
+        /// Extra capacity remains unchanged; insufficient capacity fails before writing.
+        public func writeRawRepresentation(
+            into destination: UnsafeMutableRawBufferPointer
+        ) throws(ARCError) {
+            try withARCError(fallback: .internalFailure) {
+                try self.backing.writeSerializedRepresentation(into: destination)
+            }
+        }
+
+        /// Returns the ARC credential-request representation.
+        public func rawRepresentation() throws(ARCError) -> Data {
+            try withARCError(fallback: .internalFailure) {
+                try self.backing.serialize()
+            }
         }
     }
 
@@ -200,18 +274,42 @@ extension P256._ARCV1 {
     ///
     /// Clients should reconstruct values of this type from the serialized bytes sent by the server.
     public struct CredentialResponse: Sendable {
+        /// The byte count of an ARC credential-response representation.
+        public static var rawRepresentationByteCount: Int {
+            6 * P256.compressedX962PointByteCount + 8 * P256.orderByteCount
+        }
+
         var backing: ARC.CredentialResponse<H2G>
 
         fileprivate init(backing: ARC.CredentialResponse<H2G>) {
             self.backing = backing
         }
 
-        public init<D: DataProtocol>(rawRepresentation: D) throws {
-            self.backing = try ARC.CredentialResponse.deserialize(responseData: rawRepresentation, ciphersuite: P256._ARCV1.ciphersuite)
+        public init<D: DataProtocol>(
+            rawRepresentation: D
+        ) throws(ARCError) {
+            self.backing = try withARCError(fallback: .invalidCredentialResponse) {
+                try ARC.CredentialResponse.deserialize(
+                    responseData: rawRepresentation
+                )
+            }
         }
 
-        public var rawRepresentation: Data {
-            self.backing.serialize(ciphersuite: P256._ARCV1.ciphersuite)
+        /// Writes exactly the required prefix without retaining the destination.
+        /// Extra capacity remains unchanged; insufficient capacity fails before writing.
+        public func writeRawRepresentation(
+            into destination: UnsafeMutableRawBufferPointer
+        ) throws(ARCError) {
+            try withARCError(fallback: .internalFailure) {
+                try self.backing.writeSerializedRepresentation(into: destination)
+            }
+        }
+
+        /// Returns the ARC credential-response representation.
+        public func rawRepresentation() throws(ARCError) -> Data {
+            try withARCError(fallback: .internalFailure) {
+                try self.backing.serialize()
+            }
         }
     }
 
@@ -225,28 +323,131 @@ extension P256._ARCV1 {
         fileprivate init(backing: ARC.Credential<H2G>) {
             self.backing = backing
         }
+
+        /// Restores a credential and its local presentation-limit state.
+        public init<D: DataProtocol>(
+            rawRepresentation: D
+        ) throws(ARCError) {
+            self.backing = try withARCError(fallback: .invalidCredential) {
+                try ARC.Credential.deserialize(
+                    credentialData: rawRepresentation,
+                    ciphersuite: P256._ARCV1.ciphersuite
+                )
+            }
+        }
+
+        /// Returns the byte count required to persist this credential.
+        public func rawRepresentationByteCount() throws(ARCError) -> Int {
+            try withARCError(fallback: .internalFailure) {
+                try self.backing.serializedByteCount()
+            }
+        }
+
+        /// Writes exactly the required credential prefix without retaining the destination.
+        /// Extra capacity remains unchanged; insufficient capacity fails before writing.
+        public func writeRawRepresentation(
+            into destination: UnsafeMutableRawBufferPointer
+        ) throws(ARCError) {
+            try withARCError(fallback: .internalFailure) {
+                try self.backing.writeSerializedRepresentation(
+                    into: destination
+                )
+            }
+        }
+
+        /// Returns a representation that persists this credential and its local presentation-limit state.
+        public func rawRepresentation() throws(ARCError) -> Data {
+            try withARCError(fallback: .internalFailure) {
+                try self.backing.serialize()
+            }
+        }
+    }
+
+    /// A rate-limit tag carried by an ARC presentation.
+    public struct Tag: Sendable {
+        /// The byte count of the tag's group-element representation.
+        public static var rawRepresentationByteCount: Int {
+            P256.compressedX962PointByteCount
+        }
+
+        fileprivate var backing: H2G.G.Element
+
+        fileprivate init(backing: H2G.G.Element) {
+            self.backing = backing
+        }
+
+        /// Writes exactly the required tag prefix without retaining the destination.
+        /// Extra capacity remains unchanged; insufficient capacity fails before writing.
+        /// Writes exactly the required prefix without retaining the destination.
+        /// Extra capacity remains unchanged; insufficient capacity fails before writing.
+        public func writeRawRepresentation(
+            into destination: UnsafeMutableRawBufferPointer
+        ) throws(ARCError) {
+            try withARCError(fallback: .internalFailure) {
+                var writer = try ARC.RepresentationWriter(
+                    destination: destination,
+                    requiredByteCount: Self.rawRepresentationByteCount
+                )
+                try writer.writeElement(self.backing)
+                try writer.finish()
+            }
+        }
+
+        /// Returns the tag's group-element representation.
+        public func rawRepresentation() throws(ARCError) -> Data {
+            try withARCError(fallback: .internalFailure) {
+                try ARC.RepresentationWriter.representation(
+                    byteCount: Self.rawRepresentationByteCount
+                ) { writer in
+                    try writer.writeElement(self.backing)
+                }
+            }
+        }
     }
 
     /// A presentation, created by the client from a credential, to be sent to the server to verify.
     ///
     /// Users cannot create values of this type manually; they are created using the present method on the credential.
     public struct Presentation: Sendable {
+        /// The byte count of an ARC presentation representation.
+        public static var rawRepresentationByteCount: Int {
+            4 * P256.compressedX962PointByteCount + 5 * P256.orderByteCount
+        }
+
         internal var backing: ARC.Presentation<H2G>
 
         fileprivate init(backing: ARC.Presentation<H2G>) {
             self.backing = backing
         }
 
-        public init<D: DataProtocol>(rawRepresentation: D) throws {
-            self.backing = try ARC.Presentation.deserialize(presentationData: rawRepresentation, ciphersuite: P256._ARCV1.ciphersuite)
+        public init<D: DataProtocol>(
+            rawRepresentation: D
+        ) throws(ARCError) {
+            self.backing = try withARCError(fallback: .invalidPresentation) {
+                try ARC.Presentation.deserialize(
+                    presentationData: rawRepresentation
+                )
+            }
         }
 
-        public var rawRepresentation: Data {
-            self.backing.serialize(ciphersuite: P256._ARCV1.ciphersuite)
+        public func writeRawRepresentation(
+            into destination: UnsafeMutableRawBufferPointer
+        ) throws(ARCError) {
+            try withARCError(fallback: .internalFailure) {
+                try self.backing.writeSerializedRepresentation(into: destination)
+            }
         }
 
-        public var tag: Data {
-            self.backing.tag.compressedRepresentation
+        /// Returns the ARC presentation representation.
+        public func rawRepresentation() throws(ARCError) -> Data {
+            try withARCError(fallback: .internalFailure) {
+                try self.backing.serialize()
+            }
+        }
+
+        /// The rate-limit tag carried by this presentation.
+        public var tag: Tag {
+            Tag(backing: self.backing.tag)
         }
     }
 }
@@ -277,13 +478,15 @@ extension P256._ARCV1.PublicKey {
     /// - Returns: A precredential containing the client secrets, and request to be sent to the server.
     public func prepareCredentialRequest<D: DataProtocol>(
         requestContext: D
-    ) throws -> P256._ARCV1.Precredential {
-        try self.prepareCredentialRequest(
-            requestContext: requestContext,
-            m1: .randomNonzero(),
-            r1: .randomNonzero(),
-            r2: .randomNonzero()
-        )
+    ) throws(ARCError) -> P256._ARCV1.Precredential {
+        try withARCError(fallback: .internalFailure) {
+            try self.prepareCredentialRequest(
+                requestContext: requestContext,
+                m1: .randomNonzero(),
+                r1: .randomNonzero(),
+                r2: .randomNonzero()
+            )
+        }
     }
 }
 
@@ -297,8 +500,12 @@ extension P256._ARCV1.PrivateKey {
     }
 
     /// Generate a credential response from a credential request.
-    public func issue(_ credentialRequest: P256._ARCV1.CredentialRequest) throws -> P256._ARCV1.CredentialResponse {
-        try self.issue(credentialRequest, b: .randomNonzero())
+    public func issue(
+        _ credentialRequest: P256._ARCV1.CredentialRequest
+    ) throws(ARCError) -> P256._ARCV1.CredentialResponse {
+        try withARCError(fallback: .internalFailure) {
+            try self.issue(credentialRequest, b: .randomNonzero())
+        }
     }
 }
 
@@ -307,9 +514,13 @@ extension P256._ARCV1.PublicKey {
     public func finalize(
         _ credentialResponse: P256._ARCV1.CredentialResponse,
         for precredential: P256._ARCV1.Precredential
-    ) throws -> P256._ARCV1.Credential {
-        let credential = try precredential.backing.makeCredential(credentialResponse: credentialResponse.backing)
-        return P256._ARCV1.Credential(backing: credential)
+    ) throws(ARCError) -> P256._ARCV1.Credential {
+        try withARCError(fallback: .internalFailure) {
+            let credential = try precredential.backing.makeCredential(
+                credentialResponse: credentialResponse.backing
+            )
+            return P256._ARCV1.Credential(backing: credential)
+        }
     }
 }
 
@@ -345,15 +556,20 @@ extension P256._ARCV1.Credential {
     public mutating func makePresentation<D: DataProtocol>(
         context: D,
         presentationLimit: Int
-    ) throws -> (presentation: P256._ARCV1.Presentation, nonce: Int) {
-        try self.makePresentation(
-            context: context,
-            presentationLimit: presentationLimit,
-            fixedNonce: nil,
-            a: .randomNonzero(),
-            r: .randomNonzero(),
-            z: .randomNonzero()
-        )
+    ) throws(ARCError) -> (
+        presentation: P256._ARCV1.Presentation,
+        nonce: Int
+    ) {
+        try withARCError(fallback: .internalFailure) {
+            try self.makePresentation(
+                context: context,
+                presentationLimit: presentationLimit,
+                fixedNonce: nil,
+                a: .randomNonzero(),
+                r: .randomNonzero(),
+                z: .randomNonzero()
+            )
+        }
     }
 }
 
@@ -380,14 +596,16 @@ extension P256._ARCV1.PrivateKey {
         presentationContext: D2,
         presentationLimit: Int,
         nonce: Int
-    ) throws -> Bool {
-        try self.backing.verify(
-            presentation: presentation.backing,
-            requestContext: Data(requestContext),
-            presentationContext: Data(presentationContext),
-            presentationLimit: presentationLimit,
-            nonce: nonce
-        )
+    ) throws(ARCError) -> Bool {
+        try withARCError(fallback: .internalFailure) {
+            try self.backing.verify(
+                presentation: presentation.backing,
+                requestContext: Data(requestContext),
+                presentationContext: Data(presentationContext),
+                presentationLimit: presentationLimit,
+                nonce: nonce
+            )
+        }
     }
 }
 
