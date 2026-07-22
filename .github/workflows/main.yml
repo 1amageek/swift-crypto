@@ -14,40 +14,55 @@ jobs:
     name: Unit tests
     uses: apple/swift-nio/.github/workflows/unit_tests.yml@main
     with:
-      linux_5_10_arguments_override: "--explicit-target-dependency-import-check error"
-      linux_6_1_arguments_override: "--explicit-target-dependency-import-check error"
-      linux_6_2_arguments_override: "--explicit-target-dependency-import-check error"
-      linux_6_3_arguments_override: "--explicit-target-dependency-import-check error"
-      linux_nightly_next_arguments_override: "--explicit-target-dependency-import-check error"
+      minimum_swift_version: "6.4"
+      linux_6_0_enabled: false
+      linux_6_1_enabled: false
+      linux_6_2_enabled: false
+      linux_6_3_enabled: false
+      linux_nightly_next_enabled: false
+      linux_nightly_main_enabled: true
       linux_nightly_main_arguments_override: "--explicit-target-dependency-import-check error"
-      windows_6_1_enabled: true
-      windows_6_2_enabled: true
-      windows_6_3_enabled: true
-      windows_nightly_next_enabled: true
+      windows_6_1_enabled: false
+      windows_6_2_enabled: false
+      windows_6_3_enabled: false
+      windows_nightly_next_enabled: false
       windows_nightly_main_enabled: true
-      windows_6_1_arguments_override: "--explicit-target-dependency-import-check error"
-      windows_6_2_arguments_override: "--explicit-target-dependency-import-check error"
-      windows_6_3_arguments_override: "--explicit-target-dependency-import-check error"
-      windows_nightly_next_arguments_override: "--explicit-target-dependency-import-check error"
       windows_nightly_main_arguments_override: "--explicit-target-dependency-import-check error"
 
   release-builds:
     name: Release builds
     uses: apple/swift-nio/.github/workflows/release_builds.yml@main
     with:
-      windows_6_1_enabled: true
-      windows_6_2_enabled: true
-      windows_6_3_enabled: true
-      windows_nightly_next_enabled: true
+      minimum_swift_version: "6.4"
+      linux_6_0_enabled: false
+      linux_6_1_enabled: false
+      linux_6_2_enabled: false
+      linux_6_3_enabled: false
+      linux_nightly_next_enabled: false
+      linux_nightly_main_enabled: true
+      windows_6_1_enabled: false
+      windows_6_2_enabled: false
+      windows_6_3_enabled: false
+      windows_nightly_next_enabled: false
       windows_nightly_main_enabled: true
 
   cxx-interop:
     name: Cxx interop
     uses: apple/swift-nio/.github/workflows/cxx_interop.yml@main
+    with:
+      minimum_swift_version: "6.4"
+      linux_6_0_enabled: false
+      linux_6_1_enabled: false
+      linux_6_2_enabled: false
+      linux_6_3_enabled: false
+      linux_nightly_next_enabled: false
+      linux_nightly_main_enabled: true
 
-  static-sdk:
-    name: Static SDK
-    uses: apple/swift-nio/.github/workflows/static_sdk.yml@main
+  platform-validation:
+    name: Platform validation
+    uses: ./.github/workflows/platform_validation.yml
+    with:
+      extended: ${{ github.event_name == 'schedule' }}
 
   macos-tests:
     name: macOS tests
@@ -56,3 +71,7 @@ jobs:
       runner_pool: nightly
       build_scheme: swift-crypto-Package
       swift_6_1_enabled: false
+      swift_6_2_enabled: false
+      swift_6_3_enabled: false
+      xcode_26_2_enabled: false
+      xcode_latest_beta_enabled: true

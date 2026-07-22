@@ -1,0 +1,109 @@
+name: Platform validation
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+on:
+  workflow_call:
+    inputs:
+      extended:
+        type: boolean
+        description: Run scheduled static Linux validation.
+        default: false
+
+jobs:
+  cmake:
+    name: CMake with Swift 6.4
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: swiftlang/swift:nightly-6.4.x-jammy
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          submodules: true
+      - name: Install build dependencies
+        run: apt-get update -q && apt-get install -y -q ca-certificates curl ninja-build
+      - name: Build with CMake 3.29
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 https://raw.githubusercontent.com/apple/swift-nio/main/scripts/cmake-build.sh \
+            | CMAKE_VERSION=3.29.9 TARGET_DIRECTORY=. bash
+
+  wasm:
+    name: Standard and Embedded WebAssembly
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container:
+      image: swiftlang/swift:nightly-6.4.x-jammy
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          submodules: true
+      - name: Install Swift 6.4 WebAssembly SDK
+        run: |
+          set -euo pipefail
+          apt-get update -q
+          apt-get install -y -q ca-certificates curl jq
+          snapshot="$(curl -fsSL --retry 3 https://www.swift.org/api/v1/install/dev/main/ubuntu2204.json \
+            | jq -r '.x86_64[0].dir')"
+          test -n "$snapshot"
+          sdk_archive="/tmp/${snapshot}_wasm.artifactbundle.tar.gz"
+          curl -fsSL --retry 3 \
+            "https://download.swift.org/development/wasm-sdk/${snapshot}/${snapshot}_wasm.artifactbundle.tar.gz" \
+            -o "$sdk_archive"
+          swift sdk install --swift-sdks-path /tmp/swiftsdks "$sdk_archive"
+          swift --version
+      - name: Run WebAssembly validators
+        run: |
+          set -euo pipefail
+          standard_sdk="$(swift sdk list --swift-sdks-path /tmp/swiftsdks | grep '_wasm$' | head -n 1)"
+          embedded_sdk="$(swift sdk list --swift-sdks-path /tmp/swiftsdks | grep '_wasm-embedded$' | head -n 1)"
+          test -n "$standard_sdk"
+          test -n "$embedded_sdk"
+          swift run --swift-sdk "$standard_sdk" --swift-sdks-path /tmp/swiftsdks crypto-digest-validation
+          swift run --swift-sdk "$standard_sdk" --swift-sdks-path /tmp/swiftsdks crypto-capability-validation
+          swift run --swift-sdk "$embedded_sdk" --swift-sdks-path /tmp/swiftsdks crypto-digest-validation
+          swift run --swift-sdk "$embedded_sdk" --swift-sdks-path /tmp/swiftsdks crypto-capability-validation
+
+  static-linux:
+    name: Static Linux
+    if: inputs.extended
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container:
+      image: swiftlang/swift:nightly-6.4.x-jammy
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          submodules: true
+      - name: Install Swift 6.4 static Linux SDK
+        run: |
+          set -euo pipefail
+          apt-get update -q
+          apt-get install -y -q ca-certificates curl jq
+          snapshot="$(curl -fsSL --retry 3 https://www.swift.org/api/v1/install/dev/main/ubuntu2204.json \
+            | jq -r '.x86_64[0].dir')"
+          test -n "$snapshot"
+          sdk_archive="/tmp/${snapshot}_static-linux-0.1.0.artifactbundle.tar.gz"
+          curl -fsSL --retry 3 \
+            "https://download.swift.org/development/static-sdk/${snapshot}/${snapshot}_static-linux-0.1.0.artifactbundle.tar.gz" \
+            -o "$sdk_archive"
+          swift sdk install --swift-sdks-path /tmp/swiftsdks "$sdk_archive"
+          swift --version
+      - name: Run static Linux validator
+        run: |
+          set -euo pipefail
+          sdk="$(swift sdk list --swift-sdks-path /tmp/swiftsdks | grep '_static-linux' | head -n 1)"
+          test -n "$sdk"
+          swift run --swift-sdk "$sdk" --swift-sdks-path /tmp/swiftsdks crypto-capability-validation
