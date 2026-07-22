@@ -16,42 +16,10 @@ internal import CCryptoBoringSSL
 internal import CCryptoBoringSSLShims
 import Crypto
 
-#if os(Windows)
-import ucrt
-#elseif canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#elseif canImport(Musl)
-import Musl
-#elseif canImport(Android)
-import Android
-#elseif canImport(WASILibc)
-import WASILibc
-#endif
-
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #elseif canImport(Foundation)
 import Foundation
-#endif
-
-#if canImport(Android)
-import Android
-#endif
-
-#if os(Windows)
-import WinSDK
-
-private func getPageSize() -> Int {
-    var info = SYSTEM_INFO()
-    GetSystemInfo(&info)
-    return Int(info.dwPageSize)
-}
-#else
-private func getPageSize() -> Int {
-    Int(sysconf(Int32(_SC_PAGESIZE)))
-}
 #endif
 
 internal struct BoringSSLScrypt {
@@ -74,38 +42,132 @@ internal struct BoringSSLScrypt {
         parallelism: Int,
         maxMemory: Int? = nil
     ) throws(CryptoKitMetaError) -> SymmetricKey {
-        // This should be SecureBytes, but we can't use that here.
+        guard
+            outputByteCount > 0,
+            outputByteCount <= Int.max / 8,
+            rounds >= 2,
+            rounds.isPowerOfTwo,
+            UInt64(rounds) <= UInt64(1) << 32,
+            blockSize > 0,
+            parallelism > 0,
+            parallelism <= ((1 << 30) - 1) / blockSize,
+            blockSize > 3 || UInt64(rounds) < UInt64(1) << UInt64(16 * blockSize)
+        else {
+            throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
+        }
+
+        let requiredMemory = try self.requiredMemory(
+            rounds: rounds,
+            blockSize: blockSize,
+            parallelism: parallelism
+        )
+        let memoryLimit = maxMemory ?? requiredMemory
+        guard memoryLimit >= requiredMemory else {
+            throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
+        }
+
+        #if canImport(CryptoKit)
+        // The supported Apple 26 CryptoKit API has no caller-owned output initializer. This small,
+        // explicitly zeroized handoff is the required copy at the system API boundary.
         var derivedKeyData = Data(count: outputByteCount)
+        defer {
+            derivedKeyData.withUnsafeMutableBytes { bytes in
+                CCryptoBoringSSL_OPENSSL_cleanse(bytes.baseAddress, bytes.count)
+            }
+        }
+        try derivedKeyData.withUnsafeMutableBytes { output in
+            try self.deriveKeyBytes(
+                from: password,
+                salt: salt,
+                rounds: rounds,
+                blockSize: blockSize,
+                parallelism: parallelism,
+                memoryLimit: memoryLimit,
+                output: output
+            )
+        }
+        return SymmetricKey(data: derivedKeyData)
+        #else
+        return try SymmetricKey(
+            unsafeUninitializedCapacity: outputByteCount
+        ) {
+            (
+                output: inout UnsafeMutableRawBufferPointer,
+                initializedByteCount: inout Int
+            ) throws(CryptoKitMetaError) in
+            try self.deriveKeyBytes(
+                from: password,
+                salt: salt,
+                rounds: rounds,
+                blockSize: blockSize,
+                parallelism: parallelism,
+                memoryLimit: memoryLimit,
+                output: output
+            )
+            initializedByteCount = outputByteCount
+        }
+        #endif
+    }
 
-        // This computes the maximum amount of memory that will be used by the scrypt algorithm with an additional memory page to spare. This value will be used by the BoringSSL as the memory limit for the algorithm.
-        // An additional memory page is added to the computed value (using POSIX specification) to ensure that the memory limit is not too tight.
-        let maxMemory = maxMemory ?? (128 * rounds * blockSize * parallelism + getPageSize())
-
-        let result = derivedKeyData.withUnsafeMutableBytes { derivedKeyBytes -> Int32 in
-            let saltBytes = Data(salt)
-            return saltBytes.withUnsafeBytes { saltBytes -> Int32 in
-                let passwordBytes = Data(password)
-                return passwordBytes.withUnsafeBytes { passwordBytes -> Int32 in
-                    CCryptoBoringSSL_EVP_PBE_scrypt(
-                        passwordBytes.baseAddress!,
-                        passwordBytes.count,
-                        saltBytes.baseAddress!,
-                        saltBytes.count,
-                        UInt64(rounds),
-                        UInt64(blockSize),
-                        UInt64(parallelism),
-                        maxMemory,
-                        derivedKeyBytes.baseAddress!,
-                        derivedKeyBytes.count
-                    )
+    private static func deriveKeyBytes<Passphrase: DataProtocol, Salt: DataProtocol>(
+        from password: Passphrase,
+        salt: Salt,
+        rounds: Int,
+        blockSize: Int,
+        parallelism: Int,
+        memoryLimit: Int,
+        output: UnsafeMutableRawBufferPointer
+    ) throws(CryptoKitMetaError) {
+        guard let outputAddress = output.baseAddress else {
+            throw cryptoExtrasError(CryptoKitError.internalBoringSSLError())
+        }
+        try Crypto.withContiguousBytes(of: password) {
+            (passwordBytes: UnsafeRawBufferPointer) throws(CryptoKitMetaError) in
+            try Crypto.withContiguousBytes(of: salt) {
+                (saltBytes: UnsafeRawBufferPointer) throws(CryptoKitMetaError) in
+                let result = CCryptoBoringSSL_EVP_PBE_scrypt(
+                    passwordBytes.baseAddress,
+                    passwordBytes.count,
+                    saltBytes.baseAddress,
+                    saltBytes.count,
+                    UInt64(rounds),
+                    UInt64(blockSize),
+                    UInt64(parallelism),
+                    memoryLimit,
+                    outputAddress,
+                    output.count
+                )
+                guard result == 1 else {
+                    throw cryptoExtrasError(CryptoKitError.internalBoringSSLError())
                 }
             }
         }
+    }
 
-        guard result == 1 else {
-            throw cryptoExtrasError(CryptoKitError.internalBoringSSLError())
+    private static func requiredMemory(
+        rounds: Int,
+        blockSize: Int,
+        parallelism: Int
+    ) throws(CryptoKitMetaError) -> Int {
+        let (parallelBlocks, parallelBlocksOverflow) = parallelism.addingReportingOverflow(1)
+        let (blockCount, blockCountOverflow) = rounds.addingReportingOverflow(parallelBlocks)
+        let (blockByteCount, blockByteCountOverflow) = blockSize.multipliedReportingOverflow(by: 128)
+        let (requiredMemory, requiredMemoryOverflow) = blockByteCount.multipliedReportingOverflow(by: blockCount)
+        guard
+            !parallelBlocksOverflow,
+            !blockCountOverflow,
+            !blockByteCountOverflow,
+            !requiredMemoryOverflow,
+            requiredMemory > 0
+        else {
+            throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
         }
+        return requiredMemory
+    }
+}
 
-        return SymmetricKey(data: derivedKeyData)
+private extension Int {
+    var isPowerOfTwo: Bool {
+        self > 0 && (self & (self - 1)) == 0
     }
 }

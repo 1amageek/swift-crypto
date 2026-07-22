@@ -134,11 +134,11 @@ public struct SymmetricKey: ContiguousBytes, Sendable {
     }
 
     #if hasFeature(Embedded)
-    internal init<E: Error>(unsafeUninitializedCapacity: Int, initializingWith callback: (inout UnsafeMutableRawBufferPointer, inout Int) throws(E) -> Void) throws(E) {
+    package init<E: Error>(unsafeUninitializedCapacity: Int, initializingWith callback: (inout UnsafeMutableRawBufferPointer, inout Int) throws(E) -> Void) throws(E) {
         self.init(key: try SecureBytes(unsafeUninitializedCapacity: unsafeUninitializedCapacity, initializingWith: callback))
     }
     #else
-    internal init(unsafeUninitializedCapacity: Int, initializingWith callback: (inout UnsafeMutableRawBufferPointer, inout Int) throws -> Void) rethrows {
+    package init(unsafeUninitializedCapacity: Int, initializingWith callback: (inout UnsafeMutableRawBufferPointer, inout Int) throws -> Void) rethrows {
         self.init(key: try SecureBytes(unsafeUninitializedCapacity: unsafeUninitializedCapacity, initializingWith: callback))
     }
     #endif
