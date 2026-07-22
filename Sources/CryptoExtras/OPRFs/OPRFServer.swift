@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 import Crypto
@@ -42,7 +42,7 @@ extension OPRF {
             privateKey * G.Element.generator
         }
         
-        func evaluate(blindedElement: G.Element, info: Data? = nil, proofScalar: G.Scalar = G.Scalar.random) throws ->
+        func evaluate(blindedElement: G.Element, info: Data? = nil, proofScalar: G.Scalar = G.Scalar.random) throws(CryptoKitMetaError) ->
         (G.Element, DLEQProof<H2G.G.Element.Scalar>?) {
             let dst = setupContext(mode: mode, suite: ciphersuite, v8CompatibilityMode: self.v8CompatibilityMode)
             
@@ -77,11 +77,11 @@ extension OPRF {
             return (evaluatedElement, proof)
         }
         
-        internal func v8Evaluate(blindedElement: G.Element, info: Data? = nil, proofScalar: G.Scalar = G.Scalar.random) throws ->
+        internal func v8Evaluate(blindedElement: G.Element, info: Data? = nil, proofScalar: G.Scalar = G.Scalar.random) throws(CryptoKitMetaError) ->
         (G.Element, DLEQProof<H2G.G.Element.Scalar>?) {
             precondition(self.mode == .verifiable || self.mode == .base)
             let setupCtx = setupContext(mode: mode, suite: ciphersuite, v8CompatibilityMode: self.v8CompatibilityMode)
-            let contextDST = "Context-".data(using: .utf8)! + setupCtx
+            let contextDST = Data("Context-".utf8) + setupCtx
             
             let ctx = contextDST + I2OSP(value: (info?.count ?? 0), outputByteCount: 2) + (info ?? Data())
             
@@ -104,8 +104,8 @@ extension OPRF {
         
         internal func verifyFinalize(msg: Data,
                                      output: Data,
-                                     info: Data?) throws -> Bool {
-            let dst = "HashToGroup-".data(using: .utf8)! + setupContext(mode: mode, suite: ciphersuite, v8CompatibilityMode: self.v8CompatibilityMode)
+                                     info: Data?) throws(CryptoKitMetaError) -> Bool {
+            let dst = Data("HashToGroup-".utf8) + setupContext(mode: mode, suite: ciphersuite, v8CompatibilityMode: self.v8CompatibilityMode)
             let t: H2G.G.Element = H2G.hashToGroup(msg, domainSeparationString: dst)
             let (issuedElement, _): (H2G.G.Element, DLEQProof<H2G.G.Element.Scalar>?) = try evaluate(blindedElement: t, info: info)
             

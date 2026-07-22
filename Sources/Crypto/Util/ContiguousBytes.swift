@@ -15,9 +15,15 @@
 
 #if canImport(CryptoKit)
 @_exported import CryptoKit
-#else
+#endif
 
-#if !canImport(FoundationEssentials) && !canImport(Foundation)
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+public typealias ContiguousBytes = FoundationEssentials.ContiguousBytes
+#elseif canImport(Foundation)
+import Foundation
+public typealias ContiguousBytes = Foundation.ContiguousBytes
+#else
 /// A minimal embedded-compatible byte container interface.
 public protocol ContiguousBytes {
     func withUnsafeBytes<R, E: Error>(_ body: (UnsafeRawBufferPointer) throws(E) -> R) throws(E) -> R
@@ -70,6 +76,4 @@ extension ContiguousArray: ContiguousBytes where Element == UInt8 {
         }
     }
 }
-#endif
-
 #endif

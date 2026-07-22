@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 import Crypto
@@ -43,21 +43,21 @@ struct Prover<H2G: HashToGroup>: ProofParticipant {
         return ScalarVar(index: self.scalars.count - 1)
     }
 
-    func prove() throws -> Proof<H2G> {
+    func prove() throws(CryptoKitMetaError) -> Proof<H2G> {
         // Create a blinding scalar for each scalar variable.
         let blindings = (0..<self.scalars.count).map { _ in Group.Scalar.random }
         return try self.proveWithFixedRandomness(blindings: blindings)
     }
 
     // Pass in externally generated blinding values, for generating or testing against test vectors.
-    func proveWithFixedRandomness(blindings: [Group.Scalar]) throws -> Proof<H2G> {
+    func proveWithFixedRandomness(blindings: [Group.Scalar]) throws(CryptoKitMetaError) -> Proof<H2G> {
         // Perform size checks on proof fields.
         if (self.scalars.count != self.scalarLabels.count) || (self.points.count != self.pointLabels.count) {
-            throw ZKPErrors.invalidProofFields
+            throw cryptoExtrasError(ZKPErrors.invalidProofFields)
         }
         // Check that there is one blinding scalar for each allocated scalar variable.
         if (blindings.count != self.scalars.count) {
-            throw ZKPErrors.invalidInputLength
+            throw cryptoExtrasError(ZKPErrors.invalidInputLength)
         }
 
         // For each constraint, compute the blinded version of the constraint element.
@@ -68,11 +68,11 @@ struct Prover<H2G: HashToGroup>: ProofParticipant {
         for (constraintPoint, linearCombination) in self.constraints {
             // Check that all PointVar and ScalarVar variables in the constraint have been correctly allocated.
             if !(0..<self.points.count).contains(constraintPoint.index) {
-                throw ZKPErrors.invalidVariableAllocation
+                throw cryptoExtrasError(ZKPErrors.invalidVariableAllocation)
             }
             for (scalarVar, pointVar) in linearCombination {
                 if !(0..<self.scalars.count).contains(scalarVar.index) || !(0..<self.points.count).contains(pointVar.index) {
-                    throw ZKPErrors.invalidVariableAllocation
+                    throw cryptoExtrasError(ZKPErrors.invalidVariableAllocation)
                 }
             }
 

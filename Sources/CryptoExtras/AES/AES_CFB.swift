@@ -15,7 +15,7 @@
 import Crypto
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
@@ -32,8 +32,8 @@ extension AES {
             _ plaintext: Plaintext,
             using key: SymmetricKey,
             iv: AES._CFB.IV
-        ) throws -> Data {
-            let bytes: ContiguousBytes = plaintext.regions.count == 1 ? plaintext.regions.first! : Array(plaintext)
+        ) throws(CryptoKitMetaError) -> Data {
+            let bytes = Data(plaintext)
             return try AESCFBImpl.encryptOrDecrypt(.encrypt, bytes, using: key, iv: iv)
         }
 
@@ -42,8 +42,8 @@ extension AES {
             _ ciphertext: Ciphertext,
             using key: SymmetricKey,
             iv: AES._CFB.IV
-        ) throws -> Data {
-            let bytes: ContiguousBytes = ciphertext.regions.count == 1 ? ciphertext.regions.first! : Array(ciphertext)
+        ) throws(CryptoKitMetaError) -> Data {
+            let bytes = Data(ciphertext)
             return try AESCFBImpl.encryptOrDecrypt(.decrypt, bytes, using: key, iv: iv)
         }
     }
@@ -61,9 +61,9 @@ extension AES._CFB {
             self.ivBytes = (rng.next(), rng.next())
         }
 
-        public init<IVBytes: Collection>(ivBytes: IVBytes) throws where IVBytes.Element == UInt8 {
+        public init<IVBytes: Collection>(ivBytes: IVBytes) throws(CryptoKitMetaError) where IVBytes.Element == UInt8 {
             guard ivBytes.count == 16 else {
-                throw CryptoKitError.incorrectParameterSize
+                throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
             }
 
             self.ivBytes = (0, 0)
@@ -73,7 +73,7 @@ extension AES._CFB {
             }
         }
 
-        mutating func withUnsafeMutableBytes<ReturnType>(_ body: (UnsafeMutableRawBufferPointer) throws -> ReturnType) rethrows -> ReturnType {
+        mutating func withUnsafeMutableBytes<ReturnType, E: Error>(_ body: (UnsafeMutableRawBufferPointer) throws(E) -> ReturnType) throws(E) -> ReturnType {
             return try Swift.withUnsafeMutableBytes(of: &self.ivBytes, body)
         }
     }

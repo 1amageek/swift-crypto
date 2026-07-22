@@ -12,13 +12,21 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
+#else
 @_implementationOnly import CCryptoBoringSSL
+#endif
+#if hasFeature(Embedded)
+import CCryptoBoringSSLShims
+#else
 @_implementationOnly import CCryptoBoringSSLShims
+#endif
 import Crypto
 import CryptoBoringWrapper
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
@@ -51,7 +59,7 @@ extension Insecure {
             using key: SymmetricKey,
             counter: Insecure.ChaCha20CTR.Counter = Counter(),
             nonce: Insecure.ChaCha20CTR.Nonce
-        ) throws -> Data {
+        ) throws(CryptoKitMetaError) -> Data {
             return try ChaCha20CTRImpl.encrypt(key: key, message: message, counter: counter.counter, nonce: nonce.bytes)
         }
     }
@@ -60,7 +68,7 @@ extension Insecure {
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension Insecure.ChaCha20CTR {
     @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-    public struct Nonce: Sendable, ContiguousBytes, Sequence {
+    public struct Nonce: Sendable, Crypto.ContiguousBytes, Sequence {
         let bytes: Data
 
         /// Generates a fresh random Nonce. Unless required by a specification to provide a specific Nonce, this is the recommended initializer.
@@ -73,15 +81,15 @@ extension Insecure.ChaCha20CTR {
             self.bytes = data
         }
 
-        public init<D: DataProtocol>(data: D) throws {
+        public init<D: DataProtocol>(data: D) throws(CryptoKitMetaError) {
             if data.count != Insecure.ChaCha20CTR.nonceByteCount {
-                throw CryptoKitError.incorrectParameterSize
+                throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
             }
 
             self.bytes = Data(data)
         }
 
-        public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+        public func withUnsafeBytes<R, E: Error>(_ body: (UnsafeRawBufferPointer) throws(E) -> R) throws(E) -> R {
             return try self.bytes.withUnsafeBytes(body)
         }
 
@@ -93,7 +101,7 @@ extension Insecure.ChaCha20CTR {
     }
 
     @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-    public struct Counter: Sendable, ContiguousBytes {
+    public struct Counter: Sendable, Crypto.ContiguousBytes {
         let counter: UInt32
 
         /// Generates a fresh Counter set to 0. Unless required by a specification to provide a specific Counter, this is the recommended initializer.
@@ -102,9 +110,9 @@ extension Insecure.ChaCha20CTR {
         }
 
         /// Explicitly set the Counter's offset using a byte sequence
-        public init<D: DataProtocol>(data: D) throws {
+        public init<D: DataProtocol>(data: D) throws(CryptoKitMetaError) {
             if data.count != Insecure.ChaCha20CTR.counterByteCount {
-                throw CryptoKitError.incorrectParameterSize
+                throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
             }
 
             let startIndex = data.startIndex
@@ -117,11 +125,11 @@ extension Insecure.ChaCha20CTR {
         }
 
         /// Explicitly set the Counter's offset using a UInt32
-        public init(offset: UInt32) throws {
+        public init(offset: UInt32) throws(CryptoKitMetaError) {
             self.counter = offset
         }
 
-        public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+        public func withUnsafeBytes<R, E: Error>(_ body: (UnsafeRawBufferPointer) throws(E) -> R) throws(E) -> R {
             return try Swift.withUnsafeBytes(of: self.counter, body)
         }
     }

@@ -12,12 +12,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
+#else
 @_implementationOnly import CCryptoBoringSSL
+#endif
 import Crypto
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
@@ -39,14 +43,14 @@ enum OpenSSLAESCFBImpl {
     }
 
     @inlinable
-    static func encryptOrDecrypt<Plaintext: ContiguousBytes>(
+    static func encryptOrDecrypt<Plaintext: Crypto.ContiguousBytes>(
         _ mode: Mode,
         _ plaintext: Plaintext,
         using key: SymmetricKey,
         iv: AES._CFB.IV
-    ) throws -> Data {
+    ) throws(CryptoKitMetaError) -> Data {
         guard [128, 192, 256].contains(key.bitCount) else {
-            throw CryptoKitError.incorrectKeySize
+            throw cryptoExtrasError(CryptoKitError.incorrectKeySize)
         }
         return plaintext.withUnsafeBytes { plaintextBufferPtr in
             Self._encryptOrDecrypt(mode, plaintextBufferPtr, using: key, iv: iv)

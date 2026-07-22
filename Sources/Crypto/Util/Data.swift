@@ -38,6 +38,11 @@ public struct Data: MutableDataProtocol, Sendable, Equatable, Hashable {
         self.storage = []
     }
 
+    public init(capacity: Int) {
+        self.storage = []
+        self.storage.reserveCapacity(capacity)
+    }
+
     public init<S: Sequence>(_ elements: S) where S.Element == UInt8 {
         self.storage = Array(elements)
     }

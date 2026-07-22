@@ -21,6 +21,7 @@ Sources/Crypto/ASN1/SEC1PrivateKey.swift
 Sources/Crypto/ASN1/SubjectPublicKeyInfo.swift
 Sources/Crypto/CryptoKitErrors.swift
 Sources/Crypto/Digests/Digest.swift
+Sources/Crypto/Digests/DigestAlgorithm.swift
 Sources/Crypto/Digests/Digests.swift.gyb
 Sources/Crypto/Digests/HashFunctions.swift
 Sources/Crypto/Digests/HashFunctions_SHA2.swift

@@ -40,6 +40,7 @@ add_library(Crypto
   "CryptoKitErrors.swift"
   "Digests/BoringSSL/Digest_boring.swift"
   "Digests/Digest.swift"
+  "Digests/DigestAlgorithm.swift"
   "Digests/Digests.swift"
   "Digests/HashFunctions.swift"
   "Digests/HashFunctions_SHA2.swift"

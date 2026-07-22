@@ -46,8 +46,8 @@ extension ASN1 {
 
         var privateKey: ASN1OctetString
 
-        init(derEncoded rootNode: ASN1Node, withIdentifier identifier: ASN1Identifier) throws {
-            self = try DER.sequence(rootNode, identifier: identifier) { nodes in
+        init(derEncoded rootNode: ASN1Node, withIdentifier identifier: ASN1Identifier) throws(ASN1MetaError) {
+            self = try DER.sequence(rootNode, identifier: identifier) { (nodes: inout ASN1NodeCollection.Iterator) throws(ASN1MetaError) in
                 let version = try Int(derEncoded: &nodes)
                 guard version == 0 || version == 1 else {
                     throw ASN1Error.invalidASN1Object(reason: "Version number mismatch")
@@ -66,7 +66,7 @@ extension ASN1 {
             }
         }
 
-        private init(algorithm: ASN1.RFC8410AlgorithmIdentifier, privateKey: ASN1OctetString) throws {
+        private init(algorithm: ASN1.RFC8410AlgorithmIdentifier, privateKey: ASN1OctetString) throws(ASN1MetaError) {
             self.privateKey = privateKey
             self.algorithm = algorithm
         }
@@ -76,8 +76,8 @@ extension ASN1 {
             self.privateKey = ASN1OctetString(contentBytes: privateKey[...])
         }
 
-        func serialize(into coder: inout DER.Serializer, withIdentifier identifier: ASN1Identifier) throws {
-            try coder.appendConstructedNode(identifier: identifier) { coder in
+        func serialize(into coder: inout DER.Serializer, withIdentifier identifier: ASN1Identifier) throws(ASN1MetaError) {
+            try coder.appendConstructedNode(identifier: identifier) { (coder: inout DER.Serializer) throws(ASN1MetaError) in
                 try coder.serialize(0)
                 try coder.serialize(self.algorithm)
 

@@ -13,12 +13,20 @@
 //===----------------------------------------------------------------------===//
 
 import Crypto
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
+#else
 @_implementationOnly import CCryptoBoringSSL
+#endif
+#if hasFeature(Embedded)
+import CCryptoBoringSSLShims
+#else
 @_implementationOnly import CCryptoBoringSSLShims
+#endif
 import CryptoBoringWrapper
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
@@ -41,7 +49,7 @@ extension AES.GCM {
         /// - Returns: A sealed box returning the authentication tag (seal) and the ciphertext
         /// - Throws: CipherError errors
         public static func seal<Plaintext: DataProtocol, AuthenticatedData: DataProtocol>
-            (_ message: Plaintext, using key: SymmetricKey, nonce: Nonce? = nil, authenticating authenticatedData: AuthenticatedData) throws -> SealedBox {
+            (_ message: Plaintext, using key: SymmetricKey, nonce: Nonce? = nil, authenticating authenticatedData: AuthenticatedData) throws(CryptoKitMetaError) -> SealedBox {
             return try OpenSSLAESGCMSIVImpl.seal(key: key, message: message, nonce: nonce, authenticatedData: authenticatedData)
         }
 
@@ -54,7 +62,7 @@ extension AES.GCM {
         /// - Returns: A sealed box returning the authentication tag (seal) and the ciphertext
         /// - Throws: CipherError errors
         public static func seal<Plaintext: DataProtocol>
-            (_ message: Plaintext, using key: SymmetricKey, nonce: Nonce? = nil) throws -> SealedBox {
+            (_ message: Plaintext, using key: SymmetricKey, nonce: Nonce? = nil) throws(CryptoKitMetaError) -> SealedBox {
             return try OpenSSLAESGCMSIVImpl.seal(key: key, message: message, nonce: nonce, authenticatedData: Optional<Data>.none)
         }
 
@@ -68,7 +76,7 @@ extension AES.GCM {
         /// - Returns: The ciphertext if opening was successful
         /// - Throws: CipherError errors. If the authentication of the sealed box failed, incorrectTag is thrown.
         public static func open<AuthenticatedData: DataProtocol>
-            (_ sealedBox: SealedBox, using key: SymmetricKey, authenticating authenticatedData: AuthenticatedData) throws -> Data {
+            (_ sealedBox: SealedBox, using key: SymmetricKey, authenticating authenticatedData: AuthenticatedData) throws(CryptoKitMetaError) -> Data {
             return try OpenSSLAESGCMSIVImpl.open(key: key, sealedBox: sealedBox, authenticatedData: authenticatedData)
         }
 
@@ -80,7 +88,7 @@ extension AES.GCM {
         ///   - nonce: An Nonce for AES-GCM-SIV encryption. The nonce must be unique for every use of the key to seal data. It can be safely generated with AES.GCM.Nonce().
         /// - Returns: The ciphertext if opening was successful
         /// - Throws: CipherError errors. If the authentication of the sealed box failed, incorrectTag is thrown.
-        public static func open(_ sealedBox: SealedBox, using key: SymmetricKey) throws -> Data {
+        public static func open(_ sealedBox: SealedBox, using key: SymmetricKey) throws(CryptoKitMetaError) -> Data {
             return try OpenSSLAESGCMSIVImpl.open(key: key, sealedBox: sealedBox, authenticatedData: Optional<Data>.none)
         }
     }
@@ -89,7 +97,7 @@ extension AES.GCM {
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension AES.GCM._SIV {
     @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-    public struct Nonce: Sendable, ContiguousBytes, Sequence {
+    public struct Nonce: Sendable, Crypto.ContiguousBytes, Sequence {
         let bytes: Data
 
         /// Generates a fresh random Nonce. Unless required by a specification to provide a specific Nonce, this is the recommended initializer.
@@ -102,15 +110,15 @@ extension AES.GCM._SIV {
             self.bytes = data
         }
 
-        public init<D: DataProtocol>(data: D) throws {
+        public init<D: DataProtocol>(data: D) throws(CryptoKitMetaError) {
             if data.count != AES.GCM._SIV.nonceByteCount {
-                throw CryptoKitError.incorrectParameterSize
+                throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
             }
 
             self.bytes = Data(data)
         }
 
-        public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+        public func withUnsafeBytes<R, E: Error>(_ body: (UnsafeRawBufferPointer) throws(E) -> R) throws(E) -> R {
             return try self.bytes.withUnsafeBytes(body)
         }
 
@@ -142,21 +150,21 @@ extension AES.GCM._SIV {
         }
 
         @inlinable
-        public init<D: DataProtocol>(combined: D) throws {
+        public init<D: DataProtocol>(combined: D) throws(CryptoKitMetaError) {
             // AES minimum nonce (12 bytes) + AES tag (16 bytes)
             // While we have these values in the internal APIs, we can't use it in inlinable code.
             let aesGCMOverhead = 12 + 16
 
             if combined.count < aesGCMOverhead {
-                throw CryptoKitError.incorrectParameterSize
+                throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
             }
 
             self.combined = Data(combined)
         }
 
-        public init<C: DataProtocol, T: DataProtocol>(nonce: AES.GCM._SIV.Nonce, ciphertext: C, tag: T) throws {
+        public init<C: DataProtocol, T: DataProtocol>(nonce: AES.GCM._SIV.Nonce, ciphertext: C, tag: T) throws(CryptoKitMetaError) {
             guard tag.count == AES.GCM._SIV.tagByteCount else {
-                throw CryptoKitError.incorrectParameterSize
+                throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
             }
 
             self.combined = Data(nonce) + ciphertext + tag

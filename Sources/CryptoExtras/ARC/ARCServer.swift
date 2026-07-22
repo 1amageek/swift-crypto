@@ -1,3 +1,4 @@
+#if !hasFeature(Embedded)
 //===----------------------------------------------------------------------===//
 //
 // This source file is part of the SwiftCrypto open source project
@@ -14,7 +15,7 @@
 import Crypto
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
@@ -103,3 +104,5 @@ extension ARC {
         }
     }
 }
+
+#endif  // !hasFeature(Embedded)

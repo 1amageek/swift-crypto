@@ -1,3 +1,4 @@
+#if !hasFeature(Embedded)
 //===----------------------------------------------------------------------===//
 //
 // This source file is part of the SwiftCrypto open source project
@@ -13,7 +14,7 @@
 //===----------------------------------------------------------------------===//
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 import Crypto
@@ -270,3 +271,5 @@ extension ARC.PresentationState {
         return ARC.PresentationState(state: state)
     }
 }
+
+#endif  // !hasFeature(Embedded)

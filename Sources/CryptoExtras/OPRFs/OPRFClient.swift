@@ -14,7 +14,7 @@
 import Crypto
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
@@ -37,7 +37,7 @@ extension OPRF {
         }
         
         func blindMessage(_ message: Data, blind: G.Scalar = G.Scalar.random) -> (blind: G.Scalar, blindedElement: G.Element) {
-            let dst = "HashToGroup-".data(using: .utf8)! + setupContext(mode: mode, suite: ciphersuite, v8CompatibilityMode: self.v8CompatibilityMode)
+            let dst = Data("HashToGroup-".utf8) + setupContext(mode: mode, suite: ciphersuite, v8CompatibilityMode: self.v8CompatibilityMode)
             let P: G.Element = H2G.hashToGroup(message, domainSeparationString: dst)
             let blindedElement = blind * P
             return (blind: blind, blindedElement: blindedElement)
@@ -47,7 +47,7 @@ extension OPRF {
             return (blind ^ (-1)) * evaluatedElement
         }
         
-        func finalize(message: Data, info: Data?, blind: G.Scalar, evaluatedElement: G.Element) throws -> Data {
+        func finalize(message: Data, info: Data?, blind: G.Scalar, evaluatedElement: G.Element) throws(CryptoKitMetaError) -> Data {
             let unblinded = unblind(blind: blind,
                                     evaluatedElement: evaluatedElement)
             

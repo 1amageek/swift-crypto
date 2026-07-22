@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
@@ -27,7 +27,7 @@ extension FixedWidthInteger {
     /// - Parameter bytes: Big endian bytes.
     ///
     /// - Throws: A decoding error if the collection did not contain the exact number of bytes.
-    init(bigEndianBytes bytes: some Collection<UInt8>) throws {
+    init(bigEndianBytes bytes: some Collection<UInt8>) throws(IntegerDecodingError) {
         guard bytes.count == Self.bitWidth / 8 else {
             throw IntegerDecodingError.incorrectNumberOfBytes(expected: Self.bitWidth / 8, actual: bytes.count)
         }
@@ -41,8 +41,16 @@ extension FixedWidthInteger {
         }
     }
 
-    fileprivate init(bigEndianContiguousBytes bytes: some ContiguousBytes) throws {
-        self = try bytes.withUnsafeBytes { try Self(bigEndianBytes: $0 ) }
+    fileprivate init(bigEndianContiguousBytes bytes: some Crypto.ContiguousBytes) throws(IntegerDecodingError) {
+        var result: Result<Self, IntegerDecodingError>!
+        bytes.withUnsafeBytes { buffer in
+            do throws(IntegerDecodingError) {
+                result = .success(try Self(bigEndianBytes: buffer))
+            } catch {
+                result = .failure(error)
+            }
+        }
+        self = try result.get()
     }
 
     /// Create an new value from its big endian bytes representation.
@@ -50,7 +58,7 @@ extension FixedWidthInteger {
     /// - Parameter bytes: Big endian bytes.
     ///
     /// - Throws: A decoding error if the collection did not contain the exact number of bytes.
-    init(bigEndianBytes bytes: Data) throws {
+    init(bigEndianBytes bytes: Data) throws(IntegerDecodingError) {
         self = try Self(bigEndianContiguousBytes: bytes)
     }
 
@@ -70,7 +78,7 @@ extension Data {
         let previousCount = self.count
         let newCount = previousCount + T.bitWidth / 8
         self.reserveCapacity(newCount)
-        self.count = newCount
+        self.append(contentsOf: repeatElement(0, count: newCount - previousCount))
         self.withUnsafeMutableBytes {
             $0.storeBytes(of: integer.bigEndian, toByteOffset: previousCount, as: T.self)
         }
@@ -84,7 +92,7 @@ extension Data {
     }
 
     /// Removes and returns the first k bytes, decoded as a value of the given type from its big endian bytes.
-    mutating func popFirst<T: FixedWidthInteger>(bigEndian: T.Type) throws -> T {
+    mutating func popFirst<T: FixedWidthInteger>(bigEndian: T.Type) throws(IntegerDecodingError) -> T {
         let value = try T(bigEndianBytes: self.prefix(T.bitWidth / 8))
         self.removeFirst(T.bitWidth / 8)
         return value

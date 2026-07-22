@@ -24,14 +24,14 @@ struct SubjectPublicKeyInfo: DERImplicitlyTaggable, Hashable {
 
     var key: ASN1BitString
 
-    init(derEncoded rootNode: ASN1Node, withIdentifier identifier: ASN1Identifier) throws {
+    init(derEncoded rootNode: ASN1Node, withIdentifier identifier: ASN1Identifier) throws(ASN1MetaError) {
         // The SPKI block looks like this:
         //
         // SubjectPublicKeyInfo  ::=  SEQUENCE  {
         //   algorithm         AlgorithmIdentifier,
         //   subjectPublicKey  BIT STRING
         // }
-        self = try DER.sequence(rootNode, identifier: identifier) { nodes in
+        self = try DER.sequence(rootNode, identifier: identifier) { (nodes: inout ASN1NodeCollection.Iterator) throws(ASN1MetaError) in
             let algorithmIdentifier = try RFC5480AlgorithmIdentifier(derEncoded: &nodes)
             let key = try ASN1BitString(derEncoded: &nodes)
 
@@ -49,8 +49,8 @@ struct SubjectPublicKeyInfo: DERImplicitlyTaggable, Hashable {
         self.key = ASN1BitString(bytes: key[...])
     }
 
-    func serialize(into coder: inout DER.Serializer, withIdentifier identifier: ASN1Identifier) throws {
-        try coder.appendConstructedNode(identifier: identifier) { coder in
+    func serialize(into coder: inout DER.Serializer, withIdentifier identifier: ASN1Identifier) throws(ASN1MetaError) {
+        try coder.appendConstructedNode(identifier: identifier) { (coder: inout DER.Serializer) throws(ASN1MetaError) in
             try coder.serialize(self.algorithmIdentifier)
             try coder.serialize(self.key)
         }
@@ -72,7 +72,7 @@ struct RFC5480AlgorithmIdentifier: DERImplicitlyTaggable, Hashable {
         self.parameters = parameters
     }
 
-    init(derEncoded rootNode: ASN1Node, withIdentifier identifier: ASN1Identifier) throws {
+    init(derEncoded rootNode: ASN1Node, withIdentifier identifier: ASN1Identifier) throws(ASN1MetaError) {
         // The AlgorithmIdentifier block looks like this.
         //
         // AlgorithmIdentifier  ::=  SEQUENCE  {
@@ -87,7 +87,7 @@ struct RFC5480AlgorithmIdentifier: DERImplicitlyTaggable, Hashable {
         // }
         //
         // We don't bother with helpers: we just try to decode it directly.
-        self = try DER.sequence(rootNode, identifier: identifier) { nodes in
+        self = try DER.sequence(rootNode, identifier: identifier) { (nodes: inout ASN1NodeCollection.Iterator) throws(ASN1MetaError) in
             let algorithmOID = try ASN1ObjectIdentifier(derEncoded: &nodes)
 
             let parameters = nodes.next().map { ASN1Any(derEncoded: $0) }
@@ -96,8 +96,8 @@ struct RFC5480AlgorithmIdentifier: DERImplicitlyTaggable, Hashable {
         }
     }
 
-    func serialize(into coder: inout DER.Serializer, withIdentifier identifier: ASN1Identifier) throws {
-        try coder.appendConstructedNode(identifier: identifier) { coder in
+    func serialize(into coder: inout DER.Serializer, withIdentifier identifier: ASN1Identifier) throws(ASN1MetaError) {
+        try coder.appendConstructedNode(identifier: identifier) { (coder: inout DER.Serializer) throws(ASN1MetaError) in
             try coder.serialize(self.algorithm)
             if let parameters = self.parameters {
                 try coder.serialize(parameters)
@@ -108,7 +108,7 @@ struct RFC5480AlgorithmIdentifier: DERImplicitlyTaggable, Hashable {
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension SubjectPublicKeyInfo {
-    static func stripRsaPssParameters(derEncoded: [UInt8]) throws -> [UInt8] {
+    static func stripRsaPssParameters(derEncoded: [UInt8]) throws(ASN1MetaError) -> [UInt8] {
         let parsedSPKI: SubjectPublicKeyInfo
         do {
             parsedSPKI = try SubjectPublicKeyInfo(derEncoded: derEncoded)

@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 import Crypto
@@ -54,12 +54,12 @@ extension _RSA.BlindSigning {
         ///
         /// This constructor supports key sizes of 2048 bits or more. Users should validate that key sizes are appropriate
         /// for their use-case.
-        public init(pemRepresentation: String, parameters: Parameters = .RSABSSA_SHA384_PSS_Randomized) throws {
+        public init(pemRepresentation: String, parameters: Parameters = .RSABSSA_SHA384_PSS_Randomized) throws(CryptoKitMetaError) {
             self.backing = try BackingPublicKey(pemRepresentation: pemRepresentation)
             self.parameters = parameters
 
             guard self.keySizeInBits >= 2048 else {
-                throw CryptoKitError.incorrectParameterSize
+                throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
             }
         }
 
@@ -68,12 +68,12 @@ extension _RSA.BlindSigning {
         /// This constructor supports key sizes of 1024 bits or more. Users should validate that key sizes are appropriate
         /// for their use-case.
         /// - Warning: Key sizes less than 2048 are not recommended and should only be used for compatibility reasons.
-        public init(unsafePEMRepresentation pemRepresentation: String, parameters: Parameters = .RSABSSA_SHA384_PSS_Randomized) throws {
+        public init(unsafePEMRepresentation pemRepresentation: String, parameters: Parameters = .RSABSSA_SHA384_PSS_Randomized) throws(CryptoKitMetaError) {
             self.backing = try BackingPublicKey(pemRepresentation: pemRepresentation)
             self.parameters = parameters
 
             guard self.keySizeInBits >= 1024 else {
-                throw CryptoKitError.incorrectParameterSize
+                throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
             }
         }
 
@@ -81,12 +81,12 @@ extension _RSA.BlindSigning {
         ///
         /// This constructor supports key sizes of 2048 bits or more. Users should validate that key sizes are appropriate
         /// for their use-case.
-        public init<Bytes: DataProtocol>(derRepresentation: Bytes, parameters: Parameters = .RSABSSA_SHA384_PSS_Randomized) throws {
+        public init<Bytes: DataProtocol>(derRepresentation: Bytes, parameters: Parameters = .RSABSSA_SHA384_PSS_Randomized) throws(CryptoKitMetaError) {
             self.backing = try BackingPublicKey(derRepresentation: derRepresentation)
             self.parameters = parameters
 
             guard self.keySizeInBits >= 2048 else {
-                throw CryptoKitError.incorrectParameterSize
+                throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
             }
         }
 
@@ -95,17 +95,17 @@ extension _RSA.BlindSigning {
         /// This constructor supports key sizes of 1024 bits or more. Users should validate that key sizes are appropriate
         /// for their use-case.
         /// - Warning: Key sizes less than 2048 are not recommended and should only be used for compatibility reasons.
-        public init<Bytes: DataProtocol>(unsafeDERRepresentation derRepresentation: Bytes, parameters: Parameters = .RSABSSA_SHA384_PSS_Randomized) throws {
+        public init<Bytes: DataProtocol>(unsafeDERRepresentation derRepresentation: Bytes, parameters: Parameters = .RSABSSA_SHA384_PSS_Randomized) throws(CryptoKitMetaError) {
             self.backing = try BackingPublicKey(derRepresentation: derRepresentation)
             self.parameters = parameters
 
             guard self.keySizeInBits >= 1024 else {
-                throw CryptoKitError.incorrectParameterSize
+                throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
             }
         }
 
         /// Construct a RSA public key with the specified parameters.
-        public init(n: some ContiguousBytes, e: some ContiguousBytes, parameters: Parameters) throws {
+        public init(n: some Crypto.ContiguousBytes, e: some Crypto.ContiguousBytes, parameters: Parameters) throws(CryptoKitMetaError) {
             self.backing = try BackingPublicKey(n: n, e: e)
             self.parameters = parameters
         }
@@ -135,7 +135,7 @@ extension _RSA.BlindSigning {
             self.parameters = parameters
         }
 
-        public func getKeyPrimitives() throws -> Primitives {
+        public func getKeyPrimitives() throws(CryptoKitMetaError) -> Primitives {
             let (n, e) = self.backing.getKeyPrimitives()
             return Primitives(modulus: n, publicExponent: e)
         }
@@ -155,12 +155,12 @@ extension _RSA.BlindSigning {
         ///
         /// This constructor supports key sizes of 2048 bits or more. Users should validate that key sizes are appropriate
         /// for their use-case.
-        public init(pemRepresentation: String, parameters: Parameters = .RSABSSA_SHA384_PSS_Randomized) throws {
+        public init(pemRepresentation: String, parameters: Parameters = .RSABSSA_SHA384_PSS_Randomized) throws(CryptoKitMetaError) {
             self.backing = try BackingPrivateKey(pemRepresentation: pemRepresentation)
             self.parameters = parameters
 
             guard self.keySizeInBits >= 2048 else {
-                throw CryptoKitError.incorrectParameterSize
+                throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
             }
         }
 
@@ -169,12 +169,12 @@ extension _RSA.BlindSigning {
         /// This constructor supports key sizes of 1024 bits or more. Users should validate that key sizes are appropriate
         /// for their use-case.
         /// - Warning: Key sizes less than 2048 are not recommended and should only be used for compatibility reasons.
-        public init(unsafePEMRepresentation pemRepresentation: String, parameters: Parameters = .RSABSSA_SHA384_PSS_Randomized) throws {
+        public init(unsafePEMRepresentation pemRepresentation: String, parameters: Parameters = .RSABSSA_SHA384_PSS_Randomized) throws(CryptoKitMetaError) {
             self.backing = try BackingPrivateKey(pemRepresentation: pemRepresentation)
             self.parameters = parameters
 
             guard self.keySizeInBits >= 1024 else {
-                throw CryptoKitError.incorrectParameterSize
+                throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
             }
         }
 
@@ -182,12 +182,12 @@ extension _RSA.BlindSigning {
         ///
         /// This constructor supports key sizes of 2048 bits or more. Users should validate that key sizes are appropriate
         /// for their use-case.
-        public init<Bytes: DataProtocol>(derRepresentation: Bytes, parameters: Parameters = .RSABSSA_SHA384_PSS_Randomized) throws {
+        public init<Bytes: DataProtocol>(derRepresentation: Bytes, parameters: Parameters = .RSABSSA_SHA384_PSS_Randomized) throws(CryptoKitMetaError) {
             self.backing = try BackingPrivateKey(derRepresentation: derRepresentation)
             self.parameters = parameters
 
             guard self.keySizeInBits >= 2048 else {
-                throw CryptoKitError.incorrectParameterSize
+                throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
             }
         }
 
@@ -196,17 +196,17 @@ extension _RSA.BlindSigning {
         /// This constructor supports key sizes of 1024 bits or more. Users should validate that key sizes are appropriate
         /// for their use-case.
         /// - Warning: Key sizes less than 2048 are not recommended and should only be used for compatibility reasons.
-        public init<Bytes: DataProtocol>(unsafeDERRepresentation derRepresentation: Bytes, parameters: Parameters = .RSABSSA_SHA384_PSS_Randomized) throws {
+        public init<Bytes: DataProtocol>(unsafeDERRepresentation derRepresentation: Bytes, parameters: Parameters = .RSABSSA_SHA384_PSS_Randomized) throws(CryptoKitMetaError) {
             self.backing = try BackingPrivateKey(derRepresentation: derRepresentation)
             self.parameters = parameters
 
             guard self.keySizeInBits >= 1024 else {
-                throw CryptoKitError.incorrectParameterSize
+                throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
             }
         }
 
         /// Construct an RSA private key with the specified parameters.
-        public init(n: some ContiguousBytes, e: some ContiguousBytes, d: some ContiguousBytes, p: some ContiguousBytes, q: some ContiguousBytes, parameters: Parameters) throws {
+        public init(n: some Crypto.ContiguousBytes, e: some Crypto.ContiguousBytes, d: some Crypto.ContiguousBytes, p: some Crypto.ContiguousBytes, q: some Crypto.ContiguousBytes, parameters: Parameters) throws(CryptoKitMetaError) {
             self.backing = try BackingPrivateKey(n: n, e: e, d: d, p: p, q: q)
             self.parameters = parameters
         }
@@ -215,9 +215,9 @@ extension _RSA.BlindSigning {
         ///
         /// This constructor will refuse to generate keys smaller than 2048 bits. Callers that want to enforce minimum
         /// key size requirements should validate `keySize` before use.
-        public init(keySize: _RSA.Signing.KeySize, parameters: Parameters = .RSABSSA_SHA384_PSS_Randomized) throws {
+        public init(keySize: _RSA.Signing.KeySize, parameters: Parameters = .RSABSSA_SHA384_PSS_Randomized) throws(CryptoKitMetaError) {
             guard keySize.bitCount >= 2048 else {
-                throw CryptoKitError.incorrectParameterSize
+                throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
             }
             self.backing = try BackingPrivateKey(keySize: keySize)
             self.parameters = parameters
@@ -228,9 +228,9 @@ extension _RSA.BlindSigning {
         /// This constructor will refuse to generate keys smaller than 1024 bits. Callers that want to enforce minimum
         /// key size requirements should validate `unsafekeySize` before use.
         /// - Warning: Key sizes less than 2048 are not recommended and should only be used for compatibility reasons.
-        public init(unsafeKeySize keySize: _RSA.Signing.KeySize, parameters: Parameters = .RSABSSA_SHA384_PSS_Randomized) throws {
+        public init(unsafeKeySize keySize: _RSA.Signing.KeySize, parameters: Parameters = .RSABSSA_SHA384_PSS_Randomized) throws(CryptoKitMetaError) {
             guard keySize.bitCount >= 1024 else {
-                throw CryptoKitError.incorrectParameterSize
+                throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
             }
             self.backing = try BackingPrivateKey(keySize: keySize)
             self.parameters = parameters
@@ -269,17 +269,17 @@ extension _RSA.BlindSigning {
         ///   - e: public exponent of the key
         ///   - d: private exponent of the key
         ///   - parameters: parameters used in the blind signing protocol
-        public static func _createFromNumbers(n: some ContiguousBytes, e: some ContiguousBytes, d: some ContiguousBytes, parameters: Parameters) throws -> Self {
+        public static func _createFromNumbers(n: some Crypto.ContiguousBytes, e: some Crypto.ContiguousBytes, d: some Crypto.ContiguousBytes, parameters: Parameters) throws(CryptoKitMetaError) -> Self {
             let (p, q) = try _RSA.extractPrimeFactors(
-                n: try ArbitraryPrecisionInteger(bytes: n), 
-                e: try ArbitraryPrecisionInteger(bytes: e), 
-                d: try ArbitraryPrecisionInteger(bytes: d)
+                n: try ArbitraryPrecisionInteger(cryptoBytes: n),
+                e: try ArbitraryPrecisionInteger(cryptoBytes: e),
+                d: try ArbitraryPrecisionInteger(cryptoBytes: d)
             )
 
             return try Self.init(
                 n: n, e: e, d: d, 
-                p: try Data(bytesOf: p, paddedToSize: p.byteCount), 
-                q: try Data(bytesOf: q, paddedToSize: q.byteCount),
+                p: try Data(cryptoExtrasBytesOf: p, paddedToSize: p.byteCount),
+                q: try Data(cryptoExtrasBytesOf: q, paddedToSize: q.byteCount),
                 parameters: parameters
             )
         }
@@ -289,7 +289,7 @@ extension _RSA.BlindSigning {
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension _RSA.BlindSigning {
     @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-    public struct BlindSignature: Sendable, ContiguousBytes {
+    public struct BlindSignature: Sendable, Crypto.ContiguousBytes {
         public var rawRepresentation: Data
 
         public init<D: DataProtocol>(rawRepresentation: D) {
@@ -300,7 +300,7 @@ extension _RSA.BlindSigning {
             self.rawRepresentation = Data(signatureBytes)
         }
 
-        public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+        public func withUnsafeBytes<R, E: Error>(_ body: (UnsafeRawBufferPointer) throws(E) -> R) throws(E) -> R {
             try self.rawRepresentation.withUnsafeBytes(body)
         }
     }
@@ -423,7 +423,7 @@ extension _RSA.BlindSigning.PrivateKey {
     /// - Throws: If there is a failure producing the signature.
     ///
     /// - Seealso: [RFC 9474: BlindSign](https://www.rfc-editor.org/rfc/rfc9474.html#name-blindsign).
-    public func blindSignature<D: DataProtocol>(for message: D) throws -> _RSA.BlindSigning.BlindSignature {
+    public func blindSignature<D: DataProtocol>(for message: D) throws(CryptoKitMetaError) -> _RSA.BlindSigning.BlindSignature {
         try self.backing.blindSignature(for: message)
     }
 }
@@ -455,7 +455,7 @@ extension _RSA.BlindSigning.PublicKey {
     /// - Returns: The blinded message, and its inverse for unblinding its blind signature.
     ///
     /// - Seealso: [RFC 9474: Blind](https://www.rfc-editor.org/rfc/rfc9474.html#name-blind).
-    public func blind(_ message: _RSA.BlindSigning.PreparedMessage) throws -> _RSA.BlindSigning.BlindingResult {
+    public func blind(_ message: _RSA.BlindSigning.PreparedMessage) throws(CryptoKitMetaError) -> _RSA.BlindSigning.BlindingResult {
         try self.backing.blind(message, parameters: self.parameters)
     }
 
@@ -471,7 +471,7 @@ extension _RSA.BlindSigning.PublicKey {
         _ signature: _RSA.BlindSigning.BlindSignature,
         for message: _RSA.BlindSigning.PreparedMessage,
         blindingInverse: _RSA.BlindSigning.BlindingInverse
-    ) throws -> _RSA.Signing.RSASignature {
+    ) throws(CryptoKitMetaError) -> _RSA.Signing.RSASignature {
         try self.backing.finalize(signature, for: message, blindingInverse: blindingInverse, parameters: self.parameters)
     }
 

@@ -15,7 +15,7 @@
 import Crypto
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
@@ -31,7 +31,7 @@ extension AES {
             _ plaintext: inout Block,
             priorCiphertextBlock: Block,
             using key: SymmetricKey
-        ) throws {
+        ) throws(CryptoKitMetaError) {
             assert([128, 192, 256].contains(key.bitCount))
 
             plaintext ^= priorCiphertextBlock
@@ -45,7 +45,7 @@ extension AES {
         ///   - key: A encryption key.
         ///   - iv: The initialization vector.
         /// - Returns: The encrypted ciphertext.
-        public static func encrypt<Plaintext: DataProtocol>(_ plaintext: Plaintext, using key: SymmetricKey, iv: AES._CBC.IV) throws -> Data {
+        public static func encrypt<Plaintext: DataProtocol>(_ plaintext: Plaintext, using key: SymmetricKey, iv: AES._CBC.IV) throws(CryptoKitMetaError) -> Data {
             try self.encrypt(plaintext, using: key, iv: iv, noPadding: false)
         }
         
@@ -59,15 +59,15 @@ extension AES {
         /// - Returns: The encrypted ciphertext.
         ///
         /// - Note: If `noPadding` is set to `true`, `plainText` has to be a multiple of the blockSize (16 bytes). Otherwise an error will be thrown.
-        public static func encrypt<Plaintext: DataProtocol>(_ plaintext: Plaintext, using key: SymmetricKey, iv: AES._CBC.IV, noPadding: Bool) throws -> Data {
+        public static func encrypt<Plaintext: DataProtocol>(_ plaintext: Plaintext, using key: SymmetricKey, iv: AES._CBC.IV, noPadding: Bool) throws(CryptoKitMetaError) -> Data {
             guard [128, 192, 256].contains(key.bitCount) else {
-                throw CryptoKitError.incorrectKeySize
+                throw cryptoExtrasError(CryptoKitError.incorrectKeySize)
             }
 
             let requiresFullPaddingBlock = (plaintext.count % AES._CBC.blockSize) == 0
 
             if noPadding && !requiresFullPaddingBlock {
-                throw CryptoKitError.incorrectParameterSize
+                throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
             }
 
             var ciphertext = Data()
@@ -93,7 +93,7 @@ extension AES {
             return ciphertext
         }
 
-        private static func decryptBlockInPlace(_ ciphertext: inout Block, priorCiphertextBlock: Block, using key: SymmetricKey) throws {
+        private static func decryptBlockInPlace(_ ciphertext: inout Block, priorCiphertextBlock: Block, using key: SymmetricKey) throws(CryptoKitMetaError) {
             assert([128, 192, 256].contains(key.bitCount))
 
             try AES.inversePermute(&ciphertext, key: key)
@@ -107,7 +107,7 @@ extension AES {
         ///   - key: A decryption key.
         ///   - iv: The initialization vector.
         /// - Returns: The decrypted message.
-        public static func decrypt<Ciphertext: DataProtocol>(_ ciphertext: Ciphertext, using key: SymmetricKey, iv: AES._CBC.IV) throws -> Data {
+        public static func decrypt<Ciphertext: DataProtocol>(_ ciphertext: Ciphertext, using key: SymmetricKey, iv: AES._CBC.IV) throws(CryptoKitMetaError) -> Data {
             try self.decrypt(ciphertext, using: key, iv: iv, noPadding: false)
         }
         
@@ -119,9 +119,9 @@ extension AES {
         ///   - iv: The initialization vector.
         ///   - noPadding: If this is set to `true`, padding won't be removed.
         /// - Returns: The decrypted message.
-        public static func decrypt<Ciphertext: DataProtocol>(_ ciphertext: Ciphertext, using key: SymmetricKey, iv: AES._CBC.IV, noPadding: Bool) throws -> Data {
+        public static func decrypt<Ciphertext: DataProtocol>(_ ciphertext: Ciphertext, using key: SymmetricKey, iv: AES._CBC.IV, noPadding: Bool) throws(CryptoKitMetaError) -> Data {
             guard [128, 192, 256].contains(key.bitCount) else {
-                throw CryptoKitError.incorrectKeySize
+                throw cryptoExtrasError(CryptoKitError.incorrectKeySize)
             }
 
             var plaintext = Data()
@@ -183,10 +183,10 @@ extension AES._CBC {
             )
         }
 
-        public init<IVBytes: Collection>(ivBytes: IVBytes) throws where IVBytes.Element == UInt8 {
+        public init<IVBytes: Collection>(ivBytes: IVBytes) throws(CryptoKitMetaError) where IVBytes.Element == UInt8 {
             // We support a 128-bit IV.
             guard ivBytes.count == 16 else {
-                throw CryptoKitError.incorrectKeySize
+                throw cryptoExtrasError(CryptoKitError.incorrectKeySize)
             }
 
             self.ivBytes = (
@@ -210,17 +210,17 @@ extension AES._CBC {
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension Data {
-    fileprivate mutating func trimPadding() throws {
+    fileprivate mutating func trimPadding() throws(CryptoKitMetaError) {
         guard let paddingBytes = self.last else {
             // Degenerate case, empty string. This is forbidden:
             // we must always pad.
-            throw CryptoKitError.incorrectParameterSize
+            throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
         }
 
         guard paddingBytes > 0 &&
               self.count >= paddingBytes &&
               self.suffix(Int(paddingBytes)).allSatisfy({ $0 == paddingBytes }) else {
-            throw CryptoKitError.incorrectParameterSize
+            throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
         }
 
         self = self.dropLast(Int(paddingBytes))

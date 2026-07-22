@@ -12,12 +12,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
+#else
 @_implementationOnly import CCryptoBoringSSL
+#endif
 import Crypto
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
@@ -25,13 +29,13 @@ import Foundation
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 enum OpenSSLAESCTRImpl {
     @inlinable
-    static func encrypt<Plaintext: ContiguousBytes>(
+    static func encrypt<Plaintext: Crypto.ContiguousBytes>(
         _ plaintext: Plaintext,
         using key: SymmetricKey,
         nonce: AES._CTR.Nonce
-    ) throws -> Data {
+    ) throws(CryptoKitMetaError) -> Data {
         guard [128, 192, 256].contains(key.bitCount) else {
-            throw CryptoKitError.incorrectKeySize
+            throw cryptoExtrasError(CryptoKitError.incorrectKeySize)
         }
         return plaintext.withUnsafeBytes { plaintextBufferPtr in
             Self._encrypt(plaintextBufferPtr, using: key, nonce: nonce)

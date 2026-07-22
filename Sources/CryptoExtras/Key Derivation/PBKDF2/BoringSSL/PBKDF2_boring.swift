@@ -15,13 +15,21 @@ import Crypto
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
 #if !canImport(CommonCrypto)
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
+#else
 @_implementationOnly import CCryptoBoringSSL
+#endif
+#if hasFeature(Embedded)
+import CCryptoBoringSSLShims
+#else
 @_implementationOnly import CCryptoBoringSSLShims
+#endif
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 internal struct BoringSSLPBKDF2 {
@@ -39,15 +47,14 @@ internal struct BoringSSLPBKDF2 {
         using hashFunction: KDF.Insecure.PBKDF2.HashFunction,
         outputByteCount: Int,
         rounds: Int
-    ) throws -> SymmetricKey {
+    ) throws(CryptoKitMetaError) -> SymmetricKey {
         // This should be SecureBytes, but we can't use that here.
         var derivedKeyData = Data(count: outputByteCount)
 
         let rc = derivedKeyData.withUnsafeMutableBytes { derivedKeyBytes -> Int32 in
-            let saltBytes: ContiguousBytes = salt.regions.count == 1 ? salt.regions.first! : Array(salt)
+            let saltBytes = Data(salt)
             return saltBytes.withUnsafeBytes { saltBytes -> Int32 in
-                let passwordBytes: ContiguousBytes =
-                    password.regions.count == 1 ? password.regions.first! : Array(password)
+                let passwordBytes = Data(password)
                 return passwordBytes.withUnsafeBytes { passwordBytes -> Int32 in
                     CCryptoBoringSSL_PKCS5_PBKDF2_HMAC(
                         passwordBytes.baseAddress!,
@@ -64,7 +71,7 @@ internal struct BoringSSLPBKDF2 {
         }
 
         guard rc == 1 else {
-            throw CryptoKitError.internalBoringSSLError()
+            throw cryptoExtrasError(CryptoKitError.internalBoringSSLError())
         }
 
         return SymmetricKey(data: derivedKeyData)

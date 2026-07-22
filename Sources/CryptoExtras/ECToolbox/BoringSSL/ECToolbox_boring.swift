@@ -16,7 +16,7 @@ import CryptoBoringWrapper
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
@@ -46,6 +46,11 @@ protocol OpenSSLSupportedNISTCurve {
     static var hashToFieldByteCount: Int { get }
 
     @inlinable
+    static var oprfSuiteID: Int { get }
+
+    static func hashToGroup(_ data: Data, domainSeparationString: Data) -> EllipticCurvePoint
+
+    @inlinable
     static var __ffac: FiniteFieldArithmeticContext { get }
 }
 
@@ -69,6 +74,14 @@ extension P256: OpenSSLSupportedNISTCurve {
 
     @inlinable
     static var hashToFieldByteCount: Int { 48 }
+
+    @inlinable
+    static var oprfSuiteID: Int { 3 }
+
+    @usableFromInline
+    static func hashToGroup(_ data: Data, domainSeparationString: Data) -> EllipticCurvePoint {
+        try! EllipticCurvePoint(hashing: data, to: Self.group, domainSeparationTag: domainSeparationString)
+    }
 
     private static let __ffacTSV = ThreadSpecificVariable<FiniteFieldArithmeticContext>()
 
@@ -104,6 +117,14 @@ extension P384: OpenSSLSupportedNISTCurve {
     @inlinable
     static var hashToFieldByteCount: Int { 72 }
 
+    @inlinable
+    static var oprfSuiteID: Int { 4 }
+
+    @usableFromInline
+    static func hashToGroup(_ data: Data, domainSeparationString: Data) -> EllipticCurvePoint {
+        try! EllipticCurvePoint(hashing: data, to: Self.group, domainSeparationTag: domainSeparationString)
+    }
+
     private static let __ffacTSV = ThreadSpecificVariable<FiniteFieldArithmeticContext>()
 
     @usableFromInline
@@ -138,6 +159,14 @@ extension P521: OpenSSLSupportedNISTCurve {
     @inlinable
     static var hashToFieldByteCount: Int { 98 }
 
+    @inlinable
+    static var oprfSuiteID: Int { 5 }
+
+    @usableFromInline
+    static func hashToGroup(_ data: Data, domainSeparationString: Data) -> EllipticCurvePoint {
+        fatalError("HashToGroup is not supported for P521.")
+    }
+
     private static let __ffacTSV = ThreadSpecificVariable<FiniteFieldArithmeticContext>()
 
     @usableFromInline
@@ -164,13 +193,17 @@ struct OpenSSLGroupScalar<C: OpenSSLSupportedNISTCurve>: GroupScalar, CustomStri
     ///   - data: The serialized scalar
     ///   - reductionIsModOrder: Resulting number is taken "mod q" (characteristic) by default. Override by setting true if "mod p" (order) is desired.
     /// - Returns: The deserialized scalar
-    init(bytes: Data, reductionIsModOrder: Bool = false) throws {
+    init(bytes: Data, reductionIsModOrder: Bool = false) throws(CryptoKitMetaError) {
         if reductionIsModOrder {
-            self.init(
-                try ArbitraryPrecisionInteger(bytes: bytes).modulo(C.group.weierstrassCoefficients.field)
-            )
+            let integer = try ArbitraryPrecisionInteger(cryptoBytes: bytes)
+            self.init(try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
+                try integer.modulo(C.group.weierstrassCoefficients.field)
+            })
         } else {
-            self.init(try C.__ffac.residue(ArbitraryPrecisionInteger(bytes: bytes)))
+            let integer = try ArbitraryPrecisionInteger(cryptoBytes: bytes)
+            self.init(try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
+                try C.__ffac.residue(integer)
+            })
         }
     }
 
@@ -212,7 +245,7 @@ struct OpenSSLGroupScalar<C: OpenSSLSupportedNISTCurve>: GroupScalar, CustomStri
 
     var rawRepresentation: Data {
         // Force-try: This can only throw if the requested size is not big enough to represent the point.
-        try! Data(bytesOf: self.openSSLScalar, paddedToSize: C.orderByteCount)
+        try! Data(cryptoExtrasBytesOf: self.openSSLScalar, paddedToSize: C.orderByteCount)
     }
 
     var description: String {
@@ -269,14 +302,16 @@ struct OpenSSLCurvePoint<C: OpenSSLSupportedNISTCurve>: GroupElement {
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension OpenSSLCurvePoint {
     var compressedRepresentation: Data {
-        try! self.ecPoint.x962Representation(compressed: true, on: C.group, context: C.__ffac)
+        Data(try! self.ecPoint.x962Representation(compressed: true, on: C.group, context: C.__ffac))
     }
 }
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension OpenSSLCurvePoint: OPRFGroupElement {
-    init(oprfRepresentation data: Data) throws {
-        let point = try EllipticCurvePoint(x962Representation: data, on: C.group, context: C.__ffac)
+    init(oprfRepresentation data: Data) throws(CryptoKitMetaError) {
+        let point = try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
+            try EllipticCurvePoint(x962Representation: data, on: C.group, context: C.__ffac)
+        }
         self.init(ecPoint: point)
     }
 
@@ -299,7 +334,9 @@ struct OpenSSLHashToCurve<C: OpenSSLSupportedNISTCurve>: HashToGroup {
     typealias GE = OpenSSLCurvePoint<C>
     typealias G = OpenSSLGroup<C>
 
-    static func hashToScalar(_ data: Data, domainSeparationString: Data) throws -> GE.Scalar {
+    static var suiteID: Int { C.oprfSuiteID }
+
+    static func hashToScalar(_ data: Data, domainSeparationString: Data) throws(CryptoKitMetaError) -> GE.Scalar {
         // Force-unwrap: HashToField is guaranteed to produce one or more elements, so .first is always non-nil.
         try HashToField<C>.hashToField(
             data,
@@ -313,26 +350,8 @@ struct OpenSSLHashToCurve<C: OpenSSLSupportedNISTCurve>: HashToGroup {
     static func hashToGroup(_ data: Data, domainSeparationString: Data) -> GE {
         precondition(G.cofactor == 1, "H2C doesn't have support for clearing co-factors.")
         precondition(!domainSeparationString.isEmpty, "DST must be non-empty.")
-        switch C.self {
-        case is P256.Type:
-            let point = try! EllipticCurvePoint(
-                hashing: data,
-                to: P256.group,
-                domainSeparationTag: domainSeparationString
-            )
-            return OpenSSLCurvePoint(ecPoint: point)
-        case is P384.Type:
-            let point = try! EllipticCurvePoint(
-                hashing: data,
-                to: P384.group,
-                domainSeparationTag: domainSeparationString
-            )
-            return OpenSSLCurvePoint(ecPoint: point)
-        case is P521.Type:
-            // BoringSSL doesn't have implementation of P521_XMD:SHA-512_SSWU_RO_.
-            fatalError("HashToGroup not supported for type: \(C.self).")
-        default:
-            fatalError("HashToGroup not supported for type: \(C.self).")
-        }
+        return OpenSSLCurvePoint<C>(
+            ecPoint: C.hashToGroup(data, domainSeparationString: domainSeparationString)
+        )
     }
 }

@@ -12,7 +12,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
+#else
 @_implementationOnly import CCryptoBoringSSL
+#endif
 import Crypto
 
 struct BoringSSLSHA512256HashFunction {

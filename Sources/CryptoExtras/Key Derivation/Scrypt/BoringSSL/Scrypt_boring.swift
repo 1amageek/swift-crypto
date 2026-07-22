@@ -12,11 +12,18 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
+#else
 @_implementationOnly import CCryptoBoringSSL
+#endif
+#if hasFeature(Embedded)
+import CCryptoBoringSSLShims
+#else
 @_implementationOnly import CCryptoBoringSSLShims
+#endif
 import Crypto
 
-#if canImport(FoundationEssentials)
 #if os(Windows)
 import ucrt
 #elseif canImport(Darwin)
@@ -30,8 +37,10 @@ import Android
 #elseif canImport(WASILibc)
 import WASILibc
 #endif
+
+#if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
@@ -76,7 +85,7 @@ internal struct BoringSSLScrypt {
         blockSize: Int,
         parallelism: Int,
         maxMemory: Int? = nil
-    ) throws -> SymmetricKey {
+    ) throws(CryptoKitMetaError) -> SymmetricKey {
         // This should be SecureBytes, but we can't use that here.
         var derivedKeyData = Data(count: outputByteCount)
 
@@ -85,10 +94,9 @@ internal struct BoringSSLScrypt {
         let maxMemory = maxMemory ?? (128 * rounds * blockSize * parallelism + getPageSize())
 
         let result = derivedKeyData.withUnsafeMutableBytes { derivedKeyBytes -> Int32 in
-            let saltBytes: ContiguousBytes = salt.regions.count == 1 ? salt.regions.first! : Array(salt)
+            let saltBytes = Data(salt)
             return saltBytes.withUnsafeBytes { saltBytes -> Int32 in
-                let passwordBytes: ContiguousBytes =
-                    password.regions.count == 1 ? password.regions.first! : Array(password)
+                let passwordBytes = Data(password)
                 return passwordBytes.withUnsafeBytes { passwordBytes -> Int32 in
                     CCryptoBoringSSL_EVP_PBE_scrypt(
                         passwordBytes.baseAddress!,
@@ -107,7 +115,7 @@ internal struct BoringSSLScrypt {
         }
 
         guard result == 1 else {
-            throw CryptoKitError.internalBoringSSLError()
+            throw cryptoExtrasError(CryptoKitError.internalBoringSSLError())
         }
 
         return SymmetricKey(data: derivedKeyData)

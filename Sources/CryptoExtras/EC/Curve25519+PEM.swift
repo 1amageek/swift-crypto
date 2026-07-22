@@ -17,7 +17,7 @@ import SwiftASN1
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
@@ -43,8 +43,10 @@ extension Curve25519.Signing.PrivateKey {
     ///
     /// - Parameters:
     ///   - pemRepresentation: A PEM representation of the key.
-    public init(pemRepresentation: String) throws {
-        let document = try ASN1.PEMDocument(pemString: pemRepresentation)
+    public init(pemRepresentation: String) throws(CryptoKitMetaError) {
+        let document = try withCryptoExtrasInvalidParameter { () throws(_CryptoRSAError) in
+            try ASN1.PEMDocument(pemString: pemRepresentation)
+        }
         self = try .init(derRepresentation: document.derBytes)
     }
 
@@ -53,9 +55,11 @@ extension Curve25519.Signing.PrivateKey {
     ///
     /// - Parameters:
     ///   - derRepresentation: A DER-encoded representation of the key.
-    public init<Bytes: RandomAccessCollection>(derRepresentation: Bytes) throws where Bytes.Element == UInt8 {
+    public init<Bytes: RandomAccessCollection>(derRepresentation: Bytes) throws(CryptoKitMetaError) where Bytes.Element == UInt8 {
         let bytes = Array(derRepresentation)
-        let key = try ASN1.PKCS8PrivateKey(derEncoded: bytes)
+        let key = try withCryptoExtrasInvalidParameter { () throws(ASN1MetaError) in
+            try ASN1.PKCS8PrivateKey(derEncoded: bytes)
+        }
         self = try .init(rawRepresentation: key.privateKey.bytes)
     }
 }
@@ -82,8 +86,10 @@ extension Curve25519.Signing.PublicKey {
     ///
     /// - Parameters:
     ///   - pemRepresentation: A PEM representation of the key.
-    public init(pemRepresentation: String) throws {
-        let document = try ASN1.PEMDocument(pemString: pemRepresentation)
+    public init(pemRepresentation: String) throws(CryptoKitMetaError) {
+        let document = try withCryptoExtrasInvalidParameter { () throws(_CryptoRSAError) in
+            try ASN1.PEMDocument(pemString: pemRepresentation)
+        }
         self = try .init(derRepresentation: document.derBytes)
     }
 
@@ -92,11 +98,13 @@ extension Curve25519.Signing.PublicKey {
     ///
     /// - Parameters:
     ///   - derRepresentation: A DER-encoded representation of the key.
-    public init<Bytes: RandomAccessCollection>(derRepresentation: Bytes) throws where Bytes.Element == UInt8 {
+    public init<Bytes: RandomAccessCollection>(derRepresentation: Bytes) throws(CryptoKitMetaError) where Bytes.Element == UInt8 {
         let bytes = Array(derRepresentation)
-        let spki = try SubjectPublicKeyInfo(derEncoded: bytes)
+        let spki = try withCryptoExtrasInvalidParameter { () throws(ASN1MetaError) in
+            try SubjectPublicKeyInfo(derEncoded: bytes)
+        }
         guard spki.algorithmIdentifier == .ed25519 else {
-            throw CryptoKitASN1Error.invalidASN1Object
+            throw cryptoExtrasError(CryptoKitASN1Error.invalidASN1Object)
         }
         self = try .init(rawRepresentation: spki.key.bytes)
     }
@@ -125,8 +133,10 @@ extension Curve25519.KeyAgreement.PrivateKey {
     ///
     /// - Parameters:
     ///   - pemRepresentation: A PEM representation of the key.
-    public init(pemRepresentation: String) throws {
-        let document = try ASN1.PEMDocument(pemString: pemRepresentation)
+    public init(pemRepresentation: String) throws(CryptoKitMetaError) {
+        let document = try withCryptoExtrasInvalidParameter { () throws(_CryptoRSAError) in
+            try ASN1.PEMDocument(pemString: pemRepresentation)
+        }
         self = try .init(derRepresentation: document.derBytes)
     }
 
@@ -135,9 +145,11 @@ extension Curve25519.KeyAgreement.PrivateKey {
     ///
     /// - Parameters:
     ///   - derRepresentation: A DER-encoded representation of the key.
-    public init<Bytes: RandomAccessCollection>(derRepresentation: Bytes) throws where Bytes.Element == UInt8 {
+    public init<Bytes: RandomAccessCollection>(derRepresentation: Bytes) throws(CryptoKitMetaError) where Bytes.Element == UInt8 {
         let bytes = Array(derRepresentation)
-        let key = try ASN1.PKCS8PrivateKey(derEncoded: bytes)
+        let key = try withCryptoExtrasInvalidParameter { () throws(ASN1MetaError) in
+            try ASN1.PKCS8PrivateKey(derEncoded: bytes)
+        }
         self = try .init(rawRepresentation: key.privateKey.bytes)
     }
 }
@@ -164,8 +176,10 @@ extension Curve25519.KeyAgreement.PublicKey {
     ///
     /// - Parameters:
     ///   - pemRepresentation: A PEM representation of the key.
-    public init(pemRepresentation: String) throws {
-        let document = try ASN1.PEMDocument(pemString: pemRepresentation)
+    public init(pemRepresentation: String) throws(CryptoKitMetaError) {
+        let document = try withCryptoExtrasInvalidParameter { () throws(_CryptoRSAError) in
+            try ASN1.PEMDocument(pemString: pemRepresentation)
+        }
         self = try .init(derRepresentation: document.derBytes)
     }
 
@@ -174,11 +188,13 @@ extension Curve25519.KeyAgreement.PublicKey {
     ///
     /// - Parameters:
     ///   - derRepresentation: A DER-encoded representation of the key.
-    public init<Bytes: RandomAccessCollection>(derRepresentation: Bytes) throws where Bytes.Element == UInt8 {
+    public init<Bytes: RandomAccessCollection>(derRepresentation: Bytes) throws(CryptoKitMetaError) where Bytes.Element == UInt8 {
         let bytes = Array(derRepresentation)
-        let spki = try SubjectPublicKeyInfo(derEncoded: bytes)
+        let spki = try withCryptoExtrasInvalidParameter { () throws(ASN1MetaError) in
+            try SubjectPublicKeyInfo(derEncoded: bytes)
+        }
         guard spki.algorithmIdentifier == .x25519 else {
-            throw CryptoKitASN1Error.invalidASN1Object
+            throw cryptoExtrasError(CryptoKitASN1Error.invalidASN1Object)
         }
         self = try .init(rawRepresentation: spki.key.bytes)
     }

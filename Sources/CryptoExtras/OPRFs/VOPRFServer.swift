@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 import Crypto
@@ -24,9 +24,9 @@ extension OPRF {
         typealias G = H2G.G
         let server: OPRF.Server<H2G>
         
-        init(ciphersuite: Ciphersuite<H2G>, privateKey: G.Scalar = G.Scalar.random, v8CompatibilityMode: Bool = false, mode: OPRF.Mode) throws {
+        init(ciphersuite: Ciphersuite<H2G>, privateKey: G.Scalar = G.Scalar.random, v8CompatibilityMode: Bool = false, mode: OPRF.Mode) throws(CryptoKitMetaError) {
             if mode != .partiallyOblivious && mode != .verifiable {
-                throw OPRF.Errors.incompatibleMode
+                throw cryptoExtrasError(OPRF.Errors.incompatibleMode)
             }
             
             self.server = .init(mode: mode, ciphersuite: ciphersuite, privateKey: privateKey, v8CompatibilityMode: v8CompatibilityMode)
@@ -36,11 +36,11 @@ extension OPRF {
             server.publicKey
         }
         
-        func evaluate(blindedElement: G.Element, info: Data? = nil, proofScalar: G.Scalar = G.Scalar.random) throws ->
+        func evaluate(blindedElement: G.Element, info: Data? = nil, proofScalar: G.Scalar = G.Scalar.random) throws(CryptoKitMetaError) ->
         (G.Element, DLEQProof<H2G.G.Element.Scalar>) {
             let hasInfo = (info != nil)
             if hasInfo && self.server.mode == .verifiable && !server.v8CompatibilityMode {
-                throw OPRF.Errors.invalidModeForInfo
+                throw cryptoExtrasError(OPRF.Errors.invalidModeForInfo)
             }
             
             let (evaluatedElement, proof) = try self.server.evaluate(blindedElement: blindedElement,
@@ -52,7 +52,7 @@ extension OPRF {
         
         internal func verifyFinalize(msg: Data,
                                      output: Data,
-                                     info: Data?) throws -> Bool {
+                                     info: Data?) throws(CryptoKitMetaError) -> Bool {
             return try server.verifyFinalize(msg: msg, output: output, info: info)
         }
     }

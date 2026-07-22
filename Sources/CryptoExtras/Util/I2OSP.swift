@@ -11,7 +11,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if canImport(FoundationEssentials)
 #if os(Windows)
 import ucrt
 #elseif canImport(Darwin)
@@ -25,8 +24,10 @@ import Android
 #elseif canImport(WASILibc)
 import WASILibc
 #endif
+
+#if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 

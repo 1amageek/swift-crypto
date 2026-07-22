@@ -13,12 +13,20 @@
 //===----------------------------------------------------------------------===//
 
 import Crypto
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
+#else
 @_implementationOnly import CCryptoBoringSSL
+#endif
+#if hasFeature(Embedded)
+import CCryptoBoringSSLShims
+#else
 @_implementationOnly import CCryptoBoringSSLShims
+#endif
 import CryptoBoringWrapper
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
@@ -34,8 +42,8 @@ extension AES {
     ///
     /// - parameter payload: The payload to encrypt. Must be exactly 16 bytes long.
     /// - parameter key: The encryption key to use.
-    /// - throws: On invalid parameter sizes.
-    public static func permute<Payload: MutableCollection>(_ payload: inout Payload, key: SymmetricKey) throws where Payload.Element == UInt8 {
+    /// - Throws: On invalid parameter sizes.
+    public static func permute<Payload: MutableCollection>(_ payload: inout Payload, key: SymmetricKey) throws(CryptoKitMetaError) where Payload.Element == UInt8 {
         return try Self.permuteBlock(&payload, key: key, permutation: .forward)
     }
 
@@ -47,38 +55,56 @@ extension AES {
     ///
     /// - parameter payload: The payload to decrypt. Must be exactly 16 bytes long.
     /// - parameter key: The decryption key to use.
-    /// - throws: On invalid parameter sizes.
-    public static func inversePermute<Payload: MutableCollection>(_ payload: inout Payload, key: SymmetricKey) throws where Payload.Element == UInt8 {
+    /// - Throws: On invalid parameter sizes.
+    public static func inversePermute<Payload: MutableCollection>(_ payload: inout Payload, key: SymmetricKey) throws(CryptoKitMetaError) where Payload.Element == UInt8 {
         return try Self.permuteBlock(&payload, key: key, permutation: .backward)
     }
 
-    private static func permuteBlock<Payload: MutableCollection>(_ payload: inout Payload, key: SymmetricKey, permutation: Permutation) throws where Payload.Element == UInt8 {
+    private static func permuteBlock<Payload: MutableCollection>(_ payload: inout Payload, key: SymmetricKey, permutation: Permutation) throws(CryptoKitMetaError) where Payload.Element == UInt8 {
         if payload.count != Int(Self.blockSize) {
-            throw CryptoKitError.incorrectParameterSize
+            throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
         }
 
         if !AES.isValidKey(key) {
-            throw CryptoKitError.incorrectKeySize
+            throw cryptoExtrasError(CryptoKitError.incorrectKeySize)
         }
 
-        let requiresSlowPath: Bool = try payload.withContiguousMutableStorageIfAvailable { storage in
-            try Self.permute(UnsafeMutableRawBufferPointer(storage), key: key, permutation: permutation)
-            return false
+        var contiguousStorageError: CryptoKitMetaError?
+        let requiresSlowPath: Bool = payload.withContiguousMutableStorageIfAvailable { storage in
+            do throws(CryptoKitMetaError) {
+                try Self.permute(UnsafeMutableRawBufferPointer(storage), key: key, permutation: permutation)
+                return false
+            } catch {
+                contiguousStorageError = error
+                return false
+            }
         } ?? true
+        if let contiguousStorageError {
+            throw contiguousStorageError
+        }
 
         if requiresSlowPath {
             var block = AES.Block()
-            try block.withUnsafeMutableBytes { blockBytes in
+            var blockError: CryptoKitMetaError?
+            block.withUnsafeMutableBytes { blockBytes in
                 precondition(blockBytes.count == payload.count)
 
                 blockBytes.copyBytes(from: payload)
-                try Self.permute(blockBytes, key: key, permutation: permutation)
+                do throws(CryptoKitMetaError) {
+                    try Self.permute(blockBytes, key: key, permutation: permutation)
+                } catch {
+                    blockError = error
+                    return
+                }
 
                 var index = payload.startIndex
                 for byte in blockBytes {
                     payload[index] = byte
                     payload.formIndex(after: &index)
                 }
+            }
+            if let blockError {
+                throw blockError
             }
         }
     }
@@ -89,7 +115,7 @@ extension AES {
         case backward
     }
 
-    private static func permute(_ payload: UnsafeMutableRawBufferPointer, key: SymmetricKey, permutation: Permutation) throws {
+    private static func permute(_ payload: UnsafeMutableRawBufferPointer, key: SymmetricKey, permutation: Permutation) throws(CryptoKitMetaError) {
         precondition(AES.isValidKey(key))
         precondition(payload.count == Int(Self.blockSize))
 
@@ -178,11 +204,13 @@ extension AES {
             ))
         }
 
-        func withUnsafeBytes<ReturnType>(_ body: (UnsafeRawBufferPointer) throws -> ReturnType) rethrows -> ReturnType {
+        func withUnsafeBytes<ReturnType, E: Error>(
+            _ body: (UnsafeRawBufferPointer) throws(E) -> ReturnType
+        ) throws(E) -> ReturnType {
             return try Swift.withUnsafeBytes(of: self.blockBytes, body)
         }
 
-        mutating func withUnsafeMutableBytes<ReturnType>(_ body: (UnsafeMutableRawBufferPointer) throws -> ReturnType) rethrows -> ReturnType {
+        mutating func withUnsafeMutableBytes<ReturnType, E: Error>(_ body: (UnsafeMutableRawBufferPointer) throws(E) -> ReturnType) throws(E) -> ReturnType {
             return try Swift.withUnsafeMutableBytes(of: &self.blockBytes, body)
         }
 
@@ -237,25 +265,37 @@ extension AES.Block: RandomAccessCollection, MutableCollection {
         }
     }
 
-    func withContiguousStorageIfAvailable<ReturnValue>(
-        _ body: (UnsafeBufferPointer<UInt8>) throws -> ReturnValue)
-    rethrows -> ReturnValue? {
-        return try withUnsafePointer(to: self.blockBytes) { tuplePtr in
+    func withContiguousStorageIfAvailable<ReturnValue, E: Error>(
+        _ body: (UnsafeBufferPointer<UInt8>) throws(E) -> ReturnValue
+    ) throws(E) -> ReturnValue? {
+        var result: Result<ReturnValue, E>!
+        withUnsafePointer(to: self.blockBytes) { tuplePtr in
             // Homogeneous tuples are always bound to the element type as well as to their own type.
             let retyped = UnsafeRawPointer(tuplePtr).assumingMemoryBound(to: UInt8.self)
             let bufferised = UnsafeBufferPointer(start: retyped, count: Self.blockSize)
-            return try body(bufferised)
+            do throws(E) {
+                result = .success(try body(bufferised))
+            } catch {
+                result = .failure(error)
+            }
         }
+        return try result.get()
     }
 
-    mutating func withContiguousMutableStorageIfAvailable<ReturnValue>(
-        _ body: (inout UnsafeMutableBufferPointer<UInt8>) throws -> ReturnValue)
-    rethrows -> ReturnValue? {
-        return try withUnsafeMutablePointer(to: &self.blockBytes) { tuplePtr in
+    mutating func withContiguousMutableStorageIfAvailable<ReturnValue, E: Error>(
+        _ body: (inout UnsafeMutableBufferPointer<UInt8>) throws(E) -> ReturnValue
+    ) throws(E) -> ReturnValue? {
+        var result: Result<ReturnValue, E>!
+        withUnsafeMutablePointer(to: &self.blockBytes) { tuplePtr in
             // Homogeneous tuples are always bound to the element type as well as to their own type.
             let retyped = UnsafeMutableRawPointer(tuplePtr).assumingMemoryBound(to: UInt8.self)
             var bufferised = UnsafeMutableBufferPointer(start: retyped, count: Self.blockSize)
-            return try body(&bufferised)
+            do throws(E) {
+                result = .success(try body(&bufferised))
+            } catch {
+                result = .failure(error)
+            }
         }
+        return try result.get()
     }
 }

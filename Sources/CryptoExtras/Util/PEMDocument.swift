@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 import Crypto
@@ -29,7 +29,7 @@ enum ASN1 {
 
         var derBytes: Data
 
-        init(pemString: String) throws {
+        init(pemString: String) throws(_CryptoRSAError) {
             // A PEM document looks like this:
             //
             // -----BEGIN <SOME DISCRIMINATOR>-----
@@ -116,6 +116,6 @@ extension Substring {
             return nil
         }
 
-        return String(utf8Bytes)
+        return String(decoding: utf8Bytes, as: UTF8.self)
     }
 }

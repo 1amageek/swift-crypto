@@ -11,7 +11,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if canImport(FoundationEssentials)
 #if os(Windows)
 import ucrt
 #elseif canImport(Darwin)
@@ -25,8 +24,10 @@ import Android
 #elseif canImport(WASILibc)
 import WASILibc
 #endif
+
+#if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 import Crypto
@@ -52,14 +53,14 @@ enum Hash2FieldErrors: Error {
 /// HashToField hashes a byte string msg of arbitrary length into one or more elements of a finite field
 @available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 struct HashToField<C: SupportedCurveDetailsImpl> {
-    static func expandMessageXMD(_ msg: Data, DST: Data, outputByteCount L: Int) throws -> Data {
+    static func expandMessageXMD(_ msg: Data, DST: Data, outputByteCount L: Int) throws(CryptoKitMetaError) -> Data {
         typealias H = C.H
         let digestByteCount = H.Digest.byteCount
         
         let ell = Int(ceil(Double(L) / Double(digestByteCount)))
         
         if ell > 255 {
-            throw Hash2FieldErrors.outputSizeIsTooLarge
+            throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
         }
         
         let DST_prime = DST + I2OSP(value: DST.count, outputByteCount: 1)
@@ -78,7 +79,7 @@ struct HashToField<C: SupportedCurveDetailsImpl> {
         return Data(bis.prefix(L))
     }
     
-    static func hashToField(_ data: Data, outputElementCount: Int, dst: Data, outputSize L: Int, reductionIsModOrder: Bool) throws -> [GroupImpl<C>.Scalar] {
+    static func hashToField(_ data: Data, outputElementCount: Int, dst: Data, outputSize L: Int, reductionIsModOrder: Bool) throws(CryptoKitMetaError) -> [GroupImpl<C>.Scalar] {
         precondition(outputElementCount > 0)
         let byteCount = outputElementCount * L
         let uniformBytes = try expandMessageXMD(data,

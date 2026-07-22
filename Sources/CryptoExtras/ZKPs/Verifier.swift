@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 import Crypto
@@ -40,10 +40,10 @@ struct Verifier<H2G: HashToGroup>: ProofParticipant {
         return ScalarVar(index: self.scalarLabels.count - 1)
     }
 
-    func verify(proof: Proof<H2G>) throws -> Bool {
+    func verify(proof: Proof<H2G>) throws(CryptoKitMetaError) -> Bool {
         // Perform size checks on proof fields.
         if self.points.count != self.pointLabels.count {
-            throw ZKPErrors.invalidProofFields
+            throw cryptoExtrasError(ZKPErrors.invalidProofFields)
         }
 
         // For each constraint, recompute the blinded version of the constraint element.
@@ -54,11 +54,11 @@ struct Verifier<H2G: HashToGroup>: ProofParticipant {
         for (constraintPoint, linearCombination) in self.constraints {
             // Check that all PointVar and ScalarVar variables in the constraint have been correctly allocated.
             if !(0..<self.points.count).contains(constraintPoint.index) {
-                throw ZKPErrors.invalidVariableAllocation
+                throw cryptoExtrasError(ZKPErrors.invalidVariableAllocation)
             }
             for (_, pointVar) in linearCombination {
                 if !(0..<self.points.count).contains(pointVar.index) {
-                    throw ZKPErrors.invalidVariableAllocation
+                    throw cryptoExtrasError(ZKPErrors.invalidVariableAllocation)
                 }
             }
 

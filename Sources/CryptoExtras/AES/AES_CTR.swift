@@ -15,7 +15,7 @@
 import Crypto
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
@@ -33,8 +33,8 @@ extension AES {
             _ plaintext: Plaintext,
             using key: SymmetricKey,
             nonce: AES._CTR.Nonce
-        ) throws -> Data {
-            let bytes: ContiguousBytes = plaintext.regions.count == 1 ? plaintext.regions.first! : Array(plaintext)
+        ) throws(CryptoKitMetaError) -> Data {
+            let bytes = Data(plaintext)
             return try AESCTRImpl.encrypt(bytes, using: key, nonce: nonce)
         }
 
@@ -43,7 +43,7 @@ extension AES {
             _ ciphertext: Ciphertext,
             using key: SymmetricKey,
             nonce: AES._CTR.Nonce
-        ) throws -> Data {
+        ) throws(CryptoKitMetaError) -> Data {
             // Surprise, CTR mode is symmetric in encryption/decryption!
             try Self.encrypt(ciphertext, using: key, nonce: nonce)
         }
@@ -68,11 +68,11 @@ extension AES._CTR {
             )
         }
 
-        public init<NonceBytes: Collection>(nonceBytes: NonceBytes) throws where NonceBytes.Element == UInt8 {
+        public init<NonceBytes: Collection>(nonceBytes: NonceBytes) throws(CryptoKitMetaError) where NonceBytes.Element == UInt8 {
             // We support a 96-bit nonce (with a 32-bit counter, initialized to 0) or a full 128-bit
             // expression.
             guard nonceBytes.count == 12 || nonceBytes.count == 16 else {
-                throw CryptoKitError.incorrectParameterSize
+                throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
             }
 
             self.nonceBytes = (
@@ -84,7 +84,7 @@ extension AES._CTR {
             }
         }
 
-        mutating func withUnsafeMutableBytes<ReturnType>(_ body: (UnsafeMutableRawBufferPointer) throws -> ReturnType) rethrows -> ReturnType {
+        mutating func withUnsafeMutableBytes<ReturnType, E: Error>(_ body: (UnsafeMutableRawBufferPointer) throws(E) -> ReturnType) throws(E) -> ReturnType {
             return try Swift.withUnsafeMutableBytes(of: &self.nonceBytes, body)
         }
     }

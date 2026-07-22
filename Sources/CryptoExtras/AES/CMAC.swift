@@ -11,12 +11,16 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
+#else
 @_implementationOnly import CCryptoBoringSSL
+#endif
 import Crypto
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
@@ -36,7 +40,7 @@ extension AES {
         ///
         /// - Parameters:
         ///   - key: The symmetric key used to secure the computation.
-        public init(key: SymmetricKey) throws {
+        public init(key: SymmetricKey) throws(CryptoKitMetaError) {
             try self.init(key: key, outputSize: 16)
         }
 
@@ -45,12 +49,12 @@ extension AES {
         /// - Parameters:
         ///   - key: The symmetric key used to secure the computation.
         ///   - outputSize: The number of bytes of MAC to generate. Must be in the range 0 to 16 inclusive.
-        public init(key: SymmetricKey, outputSize: Int) throws {
+        public init(key: SymmetricKey, outputSize: Int) throws(CryptoKitMetaError) {
             guard [128, 192, 256].contains(key.bitCount) else {
-                throw CryptoError.incorrectKeySize
+                throw cryptoExtrasError(CryptoKitError.incorrectKeySize)
             }
             guard (0...16).contains(outputSize) else {
-                throw CryptoKitError.incorrectParameterSize
+                throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
             }
 
             self.backing = Backing(key: key, outputSize: outputSize)
@@ -132,7 +136,7 @@ extension AES.CMAC {
         /// - Parameters:
         ///   - body: A closure that takes a raw buffer pointer to the bytes of the
         ///       code.
-        public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+        public func withUnsafeBytes<R, E: Error>(_ body: (UnsafeRawBufferPointer) throws(E) -> R) throws(E) -> R {
             try self.underlyingData.withUnsafeBytes(body)
         }
     }

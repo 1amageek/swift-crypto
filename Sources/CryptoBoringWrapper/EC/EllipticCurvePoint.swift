@@ -371,6 +371,15 @@ package struct EllipticCurvePoint: @unchecked Sendable {
     ) throws(CryptoBoringWrapperError) -> Data {
         try self.backing.x962Representation(compressed: compressed, on: group, context: context)
     }
+    #elseif hasFeature(Embedded)
+    @usableFromInline
+    package func x962Representation(
+        compressed: Bool,
+        on group: BoringSSLEllipticCurveGroup,
+        context: FiniteFieldArithmeticContext? = nil
+    ) throws(CryptoBoringWrapperError) -> [UInt8] {
+        try self.backing.x962Representation(compressed: compressed, on: group, context: context)
+    }
     #endif
 
     private mutating func cowIfNeeded(on group: BoringSSLEllipticCurveGroup) throws(CryptoBoringWrapperError) {
@@ -622,6 +631,35 @@ extension EllipticCurvePoint {
             }
 
             return buf
+        }
+        #elseif hasFeature(Embedded)
+        fileprivate func x962Representation(
+            compressed: Bool,
+            on group: BoringSSLEllipticCurveGroup,
+            context: FiniteFieldArithmeticContext? = nil
+        ) throws(CryptoBoringWrapperError) -> [UInt8] {
+            let numBytesNeeded = try self.x962RepresentationByteCount(
+                compressed: compressed,
+                on: group,
+                context: context
+            )
+            var buffer = [UInt8](repeating: 0, count: numBytesNeeded)
+            let numBytesWritten = group.withUnsafeGroupPointer { groupPointer in
+                buffer.withUnsafeMutableBufferPointer { bufferPointer in
+                    CCryptoBoringSSLShims_EC_POINT_point2oct(
+                        groupPointer,
+                        self._basePoint,
+                        compressed ? POINT_CONVERSION_COMPRESSED : POINT_CONVERSION_UNCOMPRESSED,
+                        bufferPointer.baseAddress,
+                        numBytesNeeded,
+                        context?.bnCtx
+                    )
+                }
+            }
+            guard numBytesWritten == numBytesNeeded else {
+                throw CryptoBoringWrapperError.internalBoringSSLError()
+            }
+            return buffer
         }
         #endif
     }

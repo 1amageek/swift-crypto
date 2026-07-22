@@ -15,7 +15,7 @@ import Crypto
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
@@ -43,9 +43,9 @@ internal struct CommonCryptoPBKDF2 {
         var derivedKeyData = Data(count: outputByteCount)
 
         let derivationStatus = derivedKeyData.withUnsafeMutableBytes { derivedKeyBytes -> Int32 in
-            let saltBytes: ContiguousBytes = salt.regions.count == 1 ? salt.regions.first! : Array(salt)
+            let saltBytes: Crypto.ContiguousBytes = salt.regions.count == 1 ? salt.regions.first! : Array(salt)
             return saltBytes.withUnsafeBytes { saltBytes -> Int32 in
-                let passwordBytes: ContiguousBytes =
+                let passwordBytes: Crypto.ContiguousBytes =
                     password.regions.count == 1 ? password.regions.first! : Array(password)
                 return passwordBytes.withUnsafeBytes { passwordBytes -> Int32 in
                     CCKeyDerivationPBKDF(
@@ -64,7 +64,7 @@ internal struct CommonCryptoPBKDF2 {
         }
 
         if derivationStatus != kCCSuccess {
-            throw CryptoKitError.underlyingCoreCryptoError(error: derivationStatus)
+            throw cryptoExtrasError(CryptoKitError.underlyingCoreCryptoError(error: derivationStatus))
         }
 
         return SymmetricKey(data: derivedKeyData)

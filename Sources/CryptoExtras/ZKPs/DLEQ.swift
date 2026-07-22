@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 import Crypto
@@ -36,8 +36,8 @@ struct DLEQProof<GS: GroupScalar> {
 struct DLEQ<H2G: HashToGroup> {
     typealias GE = H2G.G.Element
     
-    static func composites(k: GE.Scalar? = nil, B: GE, dst: Data, CDs: [(C: GE, D: GE)], v8CompatibilityMode: Bool) throws -> (M: GE, Z: GE) {
-        let seedDST = "Seed-".data(using: .utf8)! + dst
+    static func composites(k: GE.Scalar? = nil, B: GE, dst: Data, CDs: [(C: GE, D: GE)], v8CompatibilityMode: Bool) throws(CryptoKitMetaError) -> (M: GE, Z: GE) {
+        let seedDST = Data("Seed-".utf8) + dst
         
         let Bm = B.oprfRepresentation
         
@@ -61,7 +61,7 @@ struct DLEQ<H2G: HashToGroup> {
             + I2OSP(value: Cim.count, outputByteCount: 2) + Cim
             + I2OSP(value: Dim.count, outputByteCount: 2) + Dim
             if v8CompatibilityMode {
-                let compositeDST = "Composite-".data(using: .utf8)! + dst
+                let compositeDST = Data("Composite-".utf8) + dst
                 h2input = h2input + I2OSP(value: compositeDST.count, outputByteCount: 2) + compositeDST
             } else {
                 h2input = h2input + Data("Composite".utf8)
@@ -90,7 +90,7 @@ struct DLEQ<H2G: HashToGroup> {
         return (M: M!, Z: Z!)
     }
     
-    static func composeChallenge(dst: Data, B: GE, M: GE, Z: GE, T2: GE, T3: GE, v8CompatibilityMode: Bool) throws -> GE.Scalar {
+    static func composeChallenge(dst: Data, B: GE, M: GE, Z: GE, T2: GE, T3: GE, v8CompatibilityMode: Bool) throws(CryptoKitMetaError) -> GE.Scalar {
         let Bm = B.oprfRepresentation
         let A0 = M.oprfRepresentation
         let A1 = Z.oprfRepresentation
@@ -104,11 +104,11 @@ struct DLEQ<H2G: HashToGroup> {
         I2OSP(value: A3.count, outputByteCount: 2) + A3
         
         if v8CompatibilityMode {
-            let challengeDST = "Challenge-".data(using: .utf8)! + dst
+            let challengeDST = Data("Challenge-".utf8) + dst
             h2Input = h2Input + I2OSP(value: challengeDST.count, outputByteCount: 2) + challengeDST
             
         } else {
-            let challengeDST = "Challenge".data(using: .utf8)!
+            let challengeDST = Data("Challenge".utf8)
             h2Input = h2Input + challengeDST
         }
         
@@ -120,7 +120,7 @@ struct DLEQ<H2G: HashToGroup> {
                                         B: GE,
                                         CDs: [(C: GE, D: GE)],
                                         dst: Data,
-                                        proofScalar: GE.Scalar, v8CompatibilityMode: Bool) throws -> DLEQProof<GE.Scalar> {
+                                        proofScalar: GE.Scalar, v8CompatibilityMode: Bool) throws(CryptoKitMetaError) -> DLEQProof<GE.Scalar> {
         var M: GE
         var Z: GE
         
@@ -143,7 +143,7 @@ struct DLEQ<H2G: HashToGroup> {
     static func verifyProof(A: GE,
                             B: GE,
                             CDs: [(C: GE, D: GE)],
-                            proof: DLEQProof<GE.Scalar>, dst: Data, v8CompatibilityMode: Bool) throws -> Bool {
+                            proof: DLEQProof<GE.Scalar>, dst: Data, v8CompatibilityMode: Bool) throws(CryptoKitMetaError) -> Bool {
         let composites = try composites(B: B, dst: dst, CDs: CDs, v8CompatibilityMode: v8CompatibilityMode)
         let t2 = (proof.s * A) + (proof.c * B)
         let t3 = ((proof.s * composites.M) + (proof.c * composites.Z))

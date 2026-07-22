@@ -30,6 +30,9 @@ import Foundation
 public protocol Digest: Hashable, Sendable, ContiguousBytes, Sequence where Element == UInt8 {
     /// The number of bytes in the digest.
     static var byteCount: Int { get }
+
+    /// Identifies the digest algorithm without relying on runtime type metadata.
+    static var _algorithm: _DigestAlgorithm { get }
 }
 #else
 /// A type that represents the output of a hash.

@@ -23,6 +23,10 @@ public struct SHA512256Digest: Digest {
         32
     }
 
+    #if hasFeature(Embedded)
+    public static var _algorithm: _DigestAlgorithm { .unsupported }
+    #endif
+
     init?(bufferPointer: UnsafeRawBufferPointer) {
         guard bufferPointer.count == 32 else {
             return nil
@@ -43,34 +47,28 @@ public struct SHA512256Digest: Digest {
     /// and returns the digest.
     ///
     /// - Returns: The digest, as returned from the body closure.
-    #if !hasFeature(Embedded)
-    public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
-        try Swift.withUnsafeBytes(of: bytes) {
+    public func withUnsafeBytes<R, E: Error>(_ body: (UnsafeRawBufferPointer) throws(E) -> R) throws(E) -> R {
+        var result: Result<R, E>!
+        Swift.withUnsafeBytes(of: bytes) {
             let boundsCheckedPtr = UnsafeRawBufferPointer(
                 start: $0.baseAddress,
                 count: Self.byteCount
             )
-            return try body(boundsCheckedPtr)
+            do throws(E) {
+                result = .success(try body(boundsCheckedPtr))
+            } catch {
+                result = .failure(error)
+            }
         }
+        return try result.get()
     }
-    #else
-    public func withUnsafeBytes<R, E: Error>(_ body: (UnsafeRawBufferPointer) throws(E) -> R) throws(E) -> R {
-        try Swift.withUnsafeBytes(of: bytes) { ptr throws(E) -> R in
-            let boundsCheckedPtr = UnsafeRawBufferPointer(
-                start: ptr.baseAddress,
-                count: Self.byteCount
-            )
-            return try body(boundsCheckedPtr)
-        }
-    }
-    #endif
 
     private func toArray() -> ArraySlice<UInt8> {
         var array = [UInt8]()
-        array.appendByte(bytes.0)
-        array.appendByte(bytes.1)
-        array.appendByte(bytes.2)
-        array.appendByte(bytes.3)
+        for var byte in [bytes.0, bytes.1, bytes.2, bytes.3] {
+            byte = byte.littleEndian
+            Swift.withUnsafeBytes(of: &byte) { array.append(contentsOf: $0) }
+        }
         return array.prefix(SHA512256Digest.byteCount)
     }
 

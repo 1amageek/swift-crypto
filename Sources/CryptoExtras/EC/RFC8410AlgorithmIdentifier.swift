@@ -33,7 +33,7 @@ extension ASN1 {
             self.parameters = parameters
         }
 
-        init(derEncoded rootNode: ASN1Node, withIdentifier identifier: ASN1Identifier) throws {
+        init(derEncoded rootNode: ASN1Node, withIdentifier identifier: ASN1Identifier) throws(ASN1MetaError) {
             // The AlgorithmIdentifier block looks like this.
             //
             // AlgorithmIdentifier  ::=  SEQUENCE  {
@@ -42,7 +42,7 @@ extension ASN1 {
             // }
             //
             // We don't bother with helpers: we just try to decode it directly.
-            self = try DER.sequence(rootNode, identifier: identifier) { nodes in
+            self = try DER.sequence(rootNode, identifier: identifier) { (nodes: inout ASN1NodeCollection.Iterator) throws(ASN1MetaError) in
                 let algorithmOID = try ASN1ObjectIdentifier(berEncoded: &nodes)
 
                 let parameters = nodes.next().map { ASN1Any(berEncoded: $0) }
@@ -51,8 +51,8 @@ extension ASN1 {
             }
         }
 
-        func serialize(into coder: inout DER.Serializer, withIdentifier identifier: ASN1Identifier) throws {
-            try coder.appendConstructedNode(identifier: identifier) { coder in
+        func serialize(into coder: inout DER.Serializer, withIdentifier identifier: ASN1Identifier) throws(ASN1MetaError) {
+            try coder.appendConstructedNode(identifier: identifier) { (coder: inout DER.Serializer) throws(ASN1MetaError) in
                 try coder.serialize(self.algorithm)
                 if let parameters = self.parameters {
                     try coder.serialize(parameters)

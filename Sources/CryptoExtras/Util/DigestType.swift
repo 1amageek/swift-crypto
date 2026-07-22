@@ -13,7 +13,11 @@
 //===----------------------------------------------------------------------===//
 
 // NOTE: This file is unconditionally compiled because RSABSSA is implemented using BoringSSL on all platforms.
+#if hasFeature(Embedded)
+import CCryptoBoringSSL
+#else
 @_implementationOnly import CCryptoBoringSSL
+#endif
 import Crypto
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
@@ -40,7 +44,46 @@ struct DigestType: @unchecked Sendable {
 
     static let sha512 = DigestType(CCryptoBoringSSL_EVP_sha512(), NID_sha512, digestLength: 64)
 
-    init<DGT: Digest>(forDigestType digestType: DGT.Type = DGT.self) throws {
+    init<DGT: Digest>(forDigest digest: borrowing DGT) throws(CryptoKitMetaError) {
+        #if hasFeature(Embedded)
+        switch DGT._algorithm {
+        case .sha1:
+            self = .sha1
+        case .sha256:
+            self = .sha256
+        case .sha384:
+            self = .sha384
+        case .sha512:
+            self = .sha512
+        case .unsupported:
+            throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
+        }
+        #else
+        try self.init(forDigestType: DGT.self)
+        #endif
+    }
+
+    init<H: HashFunction>(forHashFunction hashFunction: borrowing H) throws(CryptoKitMetaError) {
+        #if hasFeature(Embedded)
+        switch H.Digest._algorithm {
+        case .sha1:
+            self = .sha1
+        case .sha256:
+            self = .sha256
+        case .sha384:
+            self = .sha384
+        case .sha512:
+            self = .sha512
+        case .unsupported:
+            throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
+        }
+        #else
+        try self.init(forDigestType: H.Digest.self)
+        #endif
+    }
+
+    #if !hasFeature(Embedded)
+    private init<DGT: Digest>(forDigestType digestType: DGT.Type) throws(CryptoKitMetaError) {
         switch digestType {
         case is Insecure.SHA1.Digest.Type:
             self = .sha1
@@ -51,7 +94,8 @@ struct DigestType: @unchecked Sendable {
         case is SHA512.Digest.Type:
             self = .sha512
         default:
-            throw CryptoKitError.incorrectParameterSize
+            throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
         }
     }
+    #endif
 }

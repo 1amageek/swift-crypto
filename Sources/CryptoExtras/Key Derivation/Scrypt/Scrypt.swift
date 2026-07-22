@@ -14,7 +14,7 @@
 import Crypto
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
@@ -37,7 +37,7 @@ extension KDF {
         ///    - parallelism: The parallelism factor to use for key derivation. Must be a positive integer less than or equal to `((2^32 - 1) * 32) / (128 * blockSize)`.
         ///    - maxMemory: The maximum amount of memory allowed to use for key derivation. If not provided, the default value is computed for the provided parameters.
         /// - Returns: The derived symmetric key.
-        public static func deriveKey<Passphrase: DataProtocol, Salt: DataProtocol>(from password: Passphrase, salt: Salt, outputByteCount: Int, rounds: Int, blockSize: Int, parallelism: Int, maxMemory: Int? = nil) throws -> SymmetricKey {
+        public static func deriveKey<Passphrase: DataProtocol, Salt: DataProtocol>(from password: Passphrase, salt: Salt, outputByteCount: Int, rounds: Int, blockSize: Int, parallelism: Int, maxMemory: Int? = nil) throws(CryptoKitMetaError) -> SymmetricKey {
             return try BackingScrypt.deriveKey(from: password, salt: salt, outputByteCount: outputByteCount, rounds: rounds, blockSize: blockSize, parallelism: parallelism)
         }
     }

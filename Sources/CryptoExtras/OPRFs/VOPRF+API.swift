@@ -14,7 +14,7 @@
 import Crypto
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
@@ -51,7 +51,7 @@ extension P384 {
             ///
             /// - Parameters:
             ///   - rawRepresentation: A raw representation of the key as a collection of contiguous bytes.
-            public init<D: ContiguousBytes>(rawRepresentation: D) throws {
+            public init<D: Crypto.ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
                 self.init(backingKey: try BackingPublicKey(rawRepresentation: rawRepresentation))
             }
 
@@ -59,7 +59,7 @@ extension P384 {
             ///
             /// - Parameters:
             ///   - compactRepresentation: A compact representation of the key as a collection of contiguous bytes.
-            public init<Bytes: ContiguousBytes>(compactRepresentation: Bytes) throws {
+            public init<Bytes: Crypto.ContiguousBytes>(compactRepresentation: Bytes) throws(CryptoKitMetaError) {
                 self.init(backingKey: try BackingPublicKey(compactRepresentation: compactRepresentation))
             }
 
@@ -67,7 +67,7 @@ extension P384 {
             ///
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key as collection of contiguous bytes.
-            public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws {
+            public init<Bytes: Crypto.ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
                 self.init(backingKey: try BackingPublicKey(x963Representation: x963Representation))
             }
 
@@ -75,7 +75,7 @@ extension P384 {
             ///
             /// - Parameters:
             ///   - compressedRepresentation: A compressed representation of the key as a collection of contiguous bytes.
-            public init<Bytes: ContiguousBytes>(compressedRepresentation: Bytes) throws {
+            public init<Bytes: Crypto.ContiguousBytes>(compressedRepresentation: Bytes) throws(CryptoKitMetaError) {
                 self.init(backingKey: try BackingPublicKey(compressedRepresentation: compressedRepresentation))
             }
 
@@ -83,16 +83,18 @@ extension P384 {
             ///
             /// - Parameters:
             ///   - pemRepresentation: A PEM representation of the key.
-            public init(pemRepresentation: String) throws {
+            #if !hasFeature(Embedded)
+            public init(pemRepresentation: String) throws(CryptoKitMetaError) {
                 self.init(backingKey: try BackingPublicKey(pemRepresentation: pemRepresentation))
             }
+            #endif
 
             /// Creates a P-384 public key for VOPRF(P-384, SHA-384) from a Distinguished Encoding Rules (DER) encoded
             /// representation.
             ///
             /// - Parameters:
             ///   - derRepresentation: A DER-encoded representation of the key.
-            public init<Bytes: RandomAccessCollection>(derRepresentation: Bytes) throws where Bytes.Element == UInt8 {
+            public init<Bytes: RandomAccessCollection>(derRepresentation: Bytes) throws(CryptoKitMetaError) where Bytes.Element == UInt8 {
                 self.init(backingKey: try BackingPublicKey(derRepresentation: derRepresentation))
             }
 
@@ -112,7 +114,9 @@ extension P384 {
             public var derRepresentation: Data { self.backingKey.derRepresentation }
 
             /// A Privacy-Enhanced Mail (PEM) representation of the public key.
+            #if !hasFeature(Embedded)
             public var pemRepresentation: String { self.backingKey.pemRepresentation }
+            #endif
 
             /// An RFC 9497 OPRF representation of the public key.
             public var oprfRepresentation: Data { self.backingPoint.oprfRepresentation }
@@ -147,7 +151,7 @@ extension P384 {
             ///
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
-            public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws {
+            public init<Bytes: Crypto.ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
                 self.init(backingKey: try BackingPrivateKey(x963Representation: x963Representation))
             }
 
@@ -156,7 +160,7 @@ extension P384 {
             /// - Parameters:
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
-            public init<Bytes: ContiguousBytes>(rawRepresentation: Bytes) throws {
+            public init<Bytes: Crypto.ContiguousBytes>(rawRepresentation: Bytes) throws(CryptoKitMetaError) {
                 self.init(backingKey: try BackingPrivateKey(rawRepresentation: rawRepresentation))
             }
 
@@ -164,16 +168,18 @@ extension P384 {
             ///
             /// - Parameters:
             ///   - pemRepresentation: A PEM representation of the key.
-            public init(pemRepresentation: String) throws {
+            #if !hasFeature(Embedded)
+            public init(pemRepresentation: String) throws(CryptoKitMetaError) {
                 self.init(backingKey: try BackingPrivateKey(pemRepresentation: pemRepresentation))
             }
+            #endif
 
             /// Creates a P-384 private key for VOPRF(P-384, SHA-384) from a Distinguished Encoding Rules (DER) encoded
             /// representation.
             ///
             /// - Parameters:
             ///   - derRepresentation: A DER-encoded representation of the key.
-            public init<Bytes: RandomAccessCollection>(derRepresentation: Bytes) throws where Bytes.Element == UInt8 {
+            public init<Bytes: RandomAccessCollection>(derRepresentation: Bytes) throws(CryptoKitMetaError) where Bytes.Element == UInt8 {
                 self.init(backingKey: try BackingPrivateKey(derRepresentation: derRepresentation))
             }
 
@@ -194,9 +200,11 @@ extension P384 {
             }
 
             /// A Privacy-Enhanced Mail (PEM) representation of the private key.
+            #if !hasFeature(Embedded)
             public var pemRepresentation: String {
                 self.backingKey.pemRepresentation
             }
+            #endif
         }
     }
 }
@@ -231,7 +239,7 @@ extension P384._VOPRF {
         /// Clients should not create values of this type manually; they are created and returned by the blind operation.
         ///
         /// Servers should reconstruct values of this type from the serialized blinded element bytes sent by the client.
-        public init<D: DataProtocol>(oprfRepresentation: D) throws {
+        public init<D: DataProtocol>(oprfRepresentation: D) throws(CryptoKitMetaError) {
             self.init(backing: try H2G.G.Element(oprfRepresentation: Data(oprfRepresentation)))
         }
 
@@ -262,7 +270,7 @@ extension P384._VOPRF {
             self.backing = backing
         }
 
-        internal init<D: DataProtocol>(oprfRepresentation: D) throws {
+        internal init<D: DataProtocol>(oprfRepresentation: D) throws(CryptoKitMetaError) {
             self.init(backing: try H2G.G.Element(oprfRepresentation: Data(oprfRepresentation)))
         }
 
@@ -281,9 +289,9 @@ extension P384._VOPRF {
             self.backing = backing
         }
 
-        internal init<D: DataProtocol>(rawRepresentation: D) throws {
+        internal init<D: DataProtocol>(rawRepresentation: D) throws(CryptoKitMetaError) {
             guard rawRepresentation.count == Self.serializedByteCount else {
-                throw CryptoKitError.incorrectParameterSize
+                throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
             }
 
             var remainingBytes = rawRepresentation[...]
@@ -334,9 +342,9 @@ extension P384._VOPRF {
         /// Servers should not create values of this type manually; they are created and returned by the evaluate operation.
         ///
         /// Clients should reconstruct values of this type from the serialized blind evaluation bytes sent by the server.
-        public init<D: DataProtocol>(rawRepresentation: D) throws {
+        public init<D: DataProtocol>(rawRepresentation: D) throws(CryptoKitMetaError) {
             guard rawRepresentation.count == Self.serializedByteCount else {
-                throw CryptoKitError.incorrectParameterSize
+                throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
             }
             
             var remainingBytes = rawRepresentation[...]
@@ -349,8 +357,8 @@ extension P384._VOPRF {
 
             precondition(remainingBytes.isEmpty)
 
-            let evaluatedElement = try EvaluatedElement(oprfRepresentation: evaluatedElementBytes)
-            let proof = try Proof(rawRepresentation: proofBytes)
+            let evaluatedElement = try EvaluatedElement(oprfRepresentation: Data(evaluatedElementBytes))
+            let proof = try Proof(rawRepresentation: Data(proofBytes))
             self.init(evaluatedElement: evaluatedElement, proof: proof)
         }
 
@@ -366,7 +374,7 @@ extension P384._VOPRF {
 
 @available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 2.0, *)
 extension P384._VOPRF.PublicKey {
-    internal func blind<D: DataProtocol>(_ input: D, with fixedBlind: P384._VOPRF.H2G.G.Scalar) throws -> P384._VOPRF.BlindedInput {
+    internal func blind<D: DataProtocol>(_ input: D, with fixedBlind: P384._VOPRF.H2G.G.Scalar) throws(CryptoKitMetaError) -> P384._VOPRF.BlindedInput {
         let input = Data(input)
         let (blind, blindedElement) = Self.client.blindMessage(input, blind: fixedBlind)
         return P384._VOPRF.BlindedInput(
@@ -382,7 +390,7 @@ extension P384._VOPRF.PublicKey {
     /// - Returns: The blinded input, and its blind for unblinding.
     ///
     /// - Seealso: [RFC 9497: VOPRF Protocol](https://www.rfc-editor.org/rfc/rfc9497.html#name-voprf-protocol).
-    public func blind<D: DataProtocol>(_ input: D) throws -> P384._VOPRF.BlindedInput {
+    public func blind<D: DataProtocol>(_ input: D) throws(CryptoKitMetaError) -> P384._VOPRF.BlindedInput {
         try self.blind(input, with: .random)
     }
 
@@ -393,7 +401,7 @@ extension P384._VOPRF.PublicKey {
     /// - Returns: The PRF output.
     ///
     /// - Seealso: [RFC 9497: VOPRF Protocol](https://www.rfc-editor.org/rfc/rfc9497.html#name-voprf-protocol).
-    public func finalize(_ blindedInput: P384._VOPRF.BlindedInput, using blindEvaluation: P384._VOPRF.BlindEvaluation) throws -> Data {
+    public func finalize(_ blindedInput: P384._VOPRF.BlindedInput, using blindEvaluation: P384._VOPRF.BlindEvaluation) throws(CryptoKitMetaError) -> Data {
         try Self.client.finalize(
             message: blindedInput.input,
             info: nil,
@@ -411,7 +419,7 @@ extension P384._VOPRF.PrivateKey {
         Data("HashToGroup-".utf8) + OPRF.setupContext(mode: .verifiable, suite: P384._VOPRF.ciphersuite, v8CompatibilityMode: false)
     }
 
-    internal func evaluate(_ blindedElement: P384._VOPRF.BlindedElement, using fixedProofScalar: P384._VOPRF.H2G.G.Scalar) throws -> P384._VOPRF.BlindEvaluation {
+    internal func evaluate(_ blindedElement: P384._VOPRF.BlindedElement, using fixedProofScalar: P384._VOPRF.H2G.G.Scalar) throws(CryptoKitMetaError) -> P384._VOPRF.BlindEvaluation {
         let (evaluatedElement, proof) = try self.server.evaluate(blindedElement: blindedElement.backing, proofScalar: fixedProofScalar)
         return P384._VOPRF.BlindEvaluation(
             evaluatedElement: P384._VOPRF.EvaluatedElement(backing: evaluatedElement),
@@ -425,7 +433,7 @@ extension P384._VOPRF.PrivateKey {
     /// - Returns: The blind evaluation to be sent to the client.
     ///
     /// - Seealso: [RFC 9497: VOPRF Protocol](https://www.rfc-editor.org/rfc/rfc9497.html#name-voprf-protocol).
-    public func evaluate(_ blindedElement: P384._VOPRF.BlindedElement) throws -> P384._VOPRF.BlindEvaluation {
+    public func evaluate(_ blindedElement: P384._VOPRF.BlindedElement) throws(CryptoKitMetaError) -> P384._VOPRF.BlindEvaluation {
         try self.evaluate(blindedElement, using: .random)
     }
 
@@ -435,7 +443,7 @@ extension P384._VOPRF.PrivateKey {
     /// - Returns: The computed PRF, the same as the VOPRF, without the blinding or proof.
     ///
     /// - Seealso: [RFC 9497: VOPRF Protocol - Evaluate]( https://cfrg.github.io/draft-irtf-cfrg-voprf/draft-irtf-cfrg-voprf.html#section-3.3.2-7).
-    public func evaluate<D: DataProtocol>(_ input: D) throws -> Data {
+    public func evaluate<D: DataProtocol>(_ input: D) throws(CryptoKitMetaError) -> Data {
         let inputElement = P384._VOPRF.H2G.hashToGroup(
             Data(input),
             domainSeparationString: Self.hashToGroupDST

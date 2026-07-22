@@ -14,7 +14,7 @@
 import Crypto
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
@@ -43,13 +43,14 @@ protocol HashToGroup {
     associatedtype H: HashFunction
     associatedtype G: Group where G.Element: OPRFGroupElement
 
-    static func hashToScalar(_ data: Data, domainSeparationString: Data) throws -> G.Scalar
+    static var suiteID: Int { get }
+    static func hashToScalar(_ data: Data, domainSeparationString: Data) throws(CryptoKitMetaError) -> G.Scalar
     static func hashToGroup(_ data: Data, domainSeparationString: Data) -> G.Element
 }
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 protocol GroupScalar: Sendable {
-    init(bytes: Data, reductionIsModOrder: Bool) throws
+    init(bytes: Data, reductionIsModOrder: Bool) throws(CryptoKitMetaError)
 
     var rawRepresentation: Data { get }
 

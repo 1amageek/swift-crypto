@@ -14,7 +14,7 @@
 import Crypto
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
@@ -24,9 +24,9 @@ extension OPRF {
         fileprivate let client: OPRF.Client<H2G>
         typealias G = H2G.G
         
-        init(ciphersuite: Ciphersuite<H2G>, v8CompatibilityMode: Bool = false, mode: OPRF.Mode) throws {
+        init(ciphersuite: Ciphersuite<H2G>, v8CompatibilityMode: Bool = false, mode: OPRF.Mode) throws(CryptoKitMetaError) {
             if mode != .partiallyOblivious && mode != .verifiable {
-                throw OPRF.Errors.incompatibleMode
+                throw cryptoExtrasError(OPRF.Errors.incompatibleMode)
             }
             
             self.client = .init(mode: mode, ciphersuite: ciphersuite, v8CompatibilityMode: v8CompatibilityMode)
@@ -36,10 +36,10 @@ extension OPRF {
             self.client.blindMessage(message, blind: blind)
         }
         
-        fileprivate func v8Finalize(message: Data, info: Data?, blind: G.Scalar, evaluatedElement: G.Element, proof: DLEQProof<G.Scalar>, publicKey: G.Element) throws -> Data {
+        fileprivate func v8Finalize(message: Data, info: Data?, blind: G.Scalar, evaluatedElement: G.Element, proof: DLEQProof<G.Scalar>, publicKey: G.Element) throws(CryptoKitMetaError) -> Data {
             precondition(self.client.mode == .verifiable)
             let setupCtx = setupContext(mode: client.mode, suite: client.ciphersuite, v8CompatibilityMode: self.client.v8CompatibilityMode)
-            let contextDST = "Context-".data(using: .utf8)! + setupCtx
+            let contextDST = Data("Context-".utf8) + setupCtx
             
             let ctx = contextDST + I2OSP(value: (info?.count ?? 0), outputByteCount: 2) + (info ?? Data())
             
@@ -53,19 +53,19 @@ extension OPRF {
                                             CDs: [(C: evaluatedElement, D: blindedElement)],
                                             proof: proof,
                                             dst: setupContext(mode: client.mode, suite: client.ciphersuite, v8CompatibilityMode: self.client.v8CompatibilityMode), v8CompatibilityMode: self.client.v8CompatibilityMode) else {
-                throw OPRF.Errors.invalidProof
+                throw cryptoExtrasError(OPRF.Errors.invalidProof)
             }
             
             return try self.client.finalize(message: message, info: info, blind: blind, evaluatedElement: evaluatedElement)
             
         }
         
-        func finalize(message: Data, info: Data?, blind: G.Scalar, evaluatedElement: G.Element, proof: DLEQProof<G.Scalar>, publicKey: G.Element) throws -> Data {
+        func finalize(message: Data, info: Data?, blind: G.Scalar, evaluatedElement: G.Element, proof: DLEQProof<G.Scalar>, publicKey: G.Element) throws(CryptoKitMetaError) -> Data {
             if self.client.v8CompatibilityMode { return try v8Finalize(message: message, info: info, blind: blind, evaluatedElement: evaluatedElement, proof: proof, publicKey: publicKey) }
             
             let hasInfo = (info != nil)
             if hasInfo && (self.client.mode == .verifiable) {
-                throw OPRF.Errors.invalidModeForInfo
+                throw cryptoExtrasError(OPRF.Errors.invalidModeForInfo)
             }
             
             let setupCtx = setupContext(mode: client.mode, suite: client.ciphersuite, v8CompatibilityMode: self.client.v8CompatibilityMode)
@@ -76,7 +76,7 @@ extension OPRF {
                                                 CDs: [(C: blindedElement, D: evaluatedElement)],
                                                 proof: proof,
                                                 dst: setupContext(mode: client.mode, suite: client.ciphersuite, v8CompatibilityMode: self.client.v8CompatibilityMode), v8CompatibilityMode: self.client.v8CompatibilityMode) else {
-                    throw OPRF.Errors.invalidProof
+                    throw cryptoExtrasError(OPRF.Errors.invalidProof)
                 }
                 
                 return try self.client.finalize(message: message, info: info, blind: blind, evaluatedElement: evaluatedElement)
@@ -93,7 +93,7 @@ extension OPRF {
                                             CDs: [(C: evaluatedElement, D: blindedElement)],
                                             proof: proof,
                                             dst: setupContext(mode: client.mode, suite: client.ciphersuite, v8CompatibilityMode: self.client.v8CompatibilityMode), v8CompatibilityMode: self.client.v8CompatibilityMode) else {
-                throw OPRF.Errors.invalidProof
+                throw cryptoExtrasError(OPRF.Errors.invalidProof)
             }
             
             return try self.client.finalize(message: message, info: info, blind: blind, evaluatedElement: evaluatedElement)

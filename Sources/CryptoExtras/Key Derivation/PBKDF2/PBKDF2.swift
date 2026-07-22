@@ -14,7 +14,7 @@
 import Crypto
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 
@@ -42,9 +42,9 @@ extension KDF.Insecure {
         /// - Throws: An error if the number of rounds is less than 210,000
         /// - Note: The correct choice of rounds depends on a number of factors such as the hash function used, the speed of the target machine, and the intended use of the derived key. A good rule of thumb is to use rounds in the hundered of thousands or millions. For more information see OWASP's [Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html).
         /// - Returns: The derived symmetric key.
-        public static func deriveKey<Passphrase: DataProtocol, Salt: DataProtocol>(from password: Passphrase, salt: Salt, using hashFunction: HashFunction, outputByteCount: Int, rounds: Int) throws -> SymmetricKey {
+        public static func deriveKey<Passphrase: DataProtocol, Salt: DataProtocol>(from password: Passphrase, salt: Salt, using hashFunction: HashFunction, outputByteCount: Int, rounds: Int) throws(CryptoKitMetaError) -> SymmetricKey {
             guard rounds >= 210_000 else {
-                throw CryptoKitError.incorrectParameterSize
+                throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
             }
             return try PBKDF2.deriveKey(from: password, salt: salt, using: hashFunction, outputByteCount: outputByteCount, unsafeUncheckedRounds: rounds)
         }
@@ -59,7 +59,7 @@ extension KDF.Insecure {
         ///    - unsafeUncheckedRounds: The number of rounds which should be used to perform key derivation.
         /// - Warning: This method allows the use of parameters which may result in insecure keys. It is important to ensure that the used parameters do not compromise the security of the application.
         /// - Returns: The derived symmetric key.
-        public static func deriveKey<Passphrase: DataProtocol, Salt: DataProtocol>(from password: Passphrase, salt: Salt, using hashFunction: HashFunction, outputByteCount: Int, unsafeUncheckedRounds: Int) throws -> SymmetricKey {
+        public static func deriveKey<Passphrase: DataProtocol, Salt: DataProtocol>(from password: Passphrase, salt: Salt, using hashFunction: HashFunction, outputByteCount: Int, unsafeUncheckedRounds: Int) throws(CryptoKitMetaError) -> SymmetricKey {
             return try BackingPBKDF2.deriveKey(from: password, salt: salt, using: hashFunction, outputByteCount: outputByteCount, rounds: unsafeUncheckedRounds)
         }
         

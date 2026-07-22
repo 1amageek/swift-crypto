@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-#else
+#elseif canImport(Foundation)
 import Foundation
 #endif
 import Crypto
@@ -35,6 +35,15 @@ enum ZKPErrors: Error {
     case invalidProofFields
 }
 
+@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
+internal func cryptoExtrasError(_ error: ZKPErrors) -> CryptoKitMetaError {
+    #if hasFeature(Embedded)
+    cryptoExtrasError(CryptoKitError.incorrectParameterSize)
+    #else
+    error
+    #endif
+}
+
 // A Schnorr proof, which stores the challenge instead of 
 // commitments to the prover's randomness (blindedPoints).
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
@@ -43,7 +52,7 @@ struct Proof<H2G: HashToGroup> {
     public let challenge: Group.Scalar
     public let responses: [Group.Scalar]
 
-    static func composeChallenge(label: String, points: [Group.Element], pointLabels: [String], blindedPoints: [Group.Element], blindedPointsLabels: [String], scalarLabels: [String]) throws -> Group.Scalar {
+    static func composeChallenge(label: String, points: [Group.Element], pointLabels: [String], blindedPoints: [Group.Element], blindedPointsLabels: [String], scalarLabels: [String]) throws(CryptoKitMetaError) -> Group.Scalar {
         var challengeInput = Data()
 
         // Pass the public points into the transcript.
