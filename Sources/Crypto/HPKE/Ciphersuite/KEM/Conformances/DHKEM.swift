@@ -25,7 +25,6 @@ import CryptoKit
 
 
 /// A type that ``HPKE`` uses to encode the public key.
-@preconcurrency
 public protocol HPKEPublicKeySerialization: Sendable {
 	/// Creates a public key from an encoded representation.
 	///
@@ -43,36 +42,30 @@ public protocol HPKEPublicKeySerialization: Sendable {
 }
 
 /// A type that represents the public key in a Diffie-Hellman key exchange.
-@preconcurrency
 public protocol HPKEDiffieHellmanPublicKey: HPKEPublicKeySerialization, Sendable where EphemeralPrivateKey.PublicKey == Self {
 	/// The type of the ephemeral private key.
     associatedtype EphemeralPrivateKey: HPKEDiffieHellmanPrivateKeyGeneration
 }
 
 /// A type that represents the public key in HPKE
-@preconcurrency
 public protocol HPKEKEMPublicKey: KEMPublicKey, HPKEPublicKeySerialization where EphemeralPrivateKey.PublicKey == Self {
     /// The type of the ephemeral private key.
     associatedtype EphemeralPrivateKey: HPKEKEMPrivateKeyGeneration
 }
 
 /// A type that represents the private key in a Diffie-Hellman key exchange.
-@preconcurrency
 public protocol HPKEDiffieHellmanPrivateKey: Sendable, DiffieHellmanKeyAgreement where PublicKey: HPKEDiffieHellmanPublicKey {}
 
 /// A type that represents the private key in HPKE.
-@preconcurrency
 public protocol HPKEKEMPrivateKey: Sendable, KEMPrivateKey where PublicKey: HPKEKEMPublicKey {}
 
 /// A type that represents the generation of private keys in a Diffie-Hellman key exchange.
-@preconcurrency
 public protocol HPKEDiffieHellmanPrivateKeyGeneration: HPKEDiffieHellmanPrivateKey, Sendable {
 	/// Creates a private key generator.
     init()
 }
 
 /// A type that represents the generation of private keys in HPKE
-@preconcurrency
 public protocol HPKEKEMPrivateKeyGeneration: HPKEKEMPrivateKey, Sendable {
     /// Creates a private key generator.
     init() throws(CryptoKitMetaError)

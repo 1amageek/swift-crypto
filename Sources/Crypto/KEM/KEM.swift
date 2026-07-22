@@ -45,7 +45,6 @@ public enum KEM: Sendable {
 }
 
 /// The public key for a key encapsulation mechanism.
-@preconcurrency
 public protocol KEMPublicKey: Sendable {
     /// Generates and encapsulates a shared secret.
     ///
@@ -56,7 +55,6 @@ public protocol KEMPublicKey: Sendable {
 }
 
 /// The private key for a key encapsulation mechanism.
-@preconcurrency
 public protocol KEMPrivateKey: Sendable {
     associatedtype PublicKey: KEMPublicKey
     
@@ -77,7 +75,6 @@ public protocol KEMPrivateKey: Sendable {
 }
 
 /// A one-time private key for a key encapsulation mechanism, which can only decapsulate once but it does so faster.
-@preconcurrency
 public protocol KEMOneTimePrivateKey: ~Copyable, Sendable {
     associatedtype PublicKey: KEMPublicKey
 

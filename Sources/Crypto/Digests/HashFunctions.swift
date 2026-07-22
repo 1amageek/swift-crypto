@@ -43,7 +43,6 @@ protocol DigestHashFunction: HashFunction where Digest: DigestPrivate {}
 /// authentication code (MAC) like ``HMAC`` instead. MACs rely on hashing, but
 /// incorporate a secret cryptographic key into the digest computation. Only a
 /// user that has the key can generate a valid MAC.
-@preconcurrency
 public protocol HashFunction: Sendable {
     /// The number of bytes that represents the hash function’s internal state.
     static var blockByteCount: Int { get }

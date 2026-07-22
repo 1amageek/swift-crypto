@@ -25,14 +25,12 @@ import CryptoKit
 
 #if hasFeature(Embedded)
 /// A type that represents a message authentication code.
-@preconcurrency
 public protocol MessageAuthenticationCode: Hashable, ContiguousBytes, Sendable, Sequence where Element == UInt8 {
     /// The number of bytes in the message authentication code.
     var byteCount: Int { get }
 }
 #else
 /// A type that represents a message authentication code.
-@preconcurrency
 public protocol MessageAuthenticationCode: Hashable, ContiguousBytes, Sendable, CustomStringConvertible, Sequence where Element == UInt8 {
     /// The number of bytes in the message authentication code.
     var byteCount: Int { get }

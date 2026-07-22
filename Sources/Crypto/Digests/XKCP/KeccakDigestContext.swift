@@ -31,10 +31,53 @@ final class KeccakDigestContext: Sendable {
         }
     }
 
+    func update(
+        data: UnsafeRawBufferPointer,
+        maximumChunkByteCount: Int = Int.max / 8
+    ) -> Bool {
+        state.withLock { state in
+            forEachKeccakInputChunk(
+                data,
+                maximumChunkByteCount: maximumChunkByteCount
+            ) { chunk in
+                guard let baseAddress = chunk.baseAddress else {
+                    return true
+                }
+                return Keccak_HashUpdate(
+                    &state,
+                    baseAddress,
+                    chunk.count * 8
+                ) == KECCAK_SUCCESS
+            }
+        }
+    }
+
     deinit {
         state.withLock { state in
             withUnsafeMutableBytes(of: &state) { $0.zeroize() }
         }
     }
+}
+
+package func forEachKeccakInputChunk(
+    _ input: UnsafeRawBufferPointer,
+    maximumChunkByteCount: Int = Int.max / 8,
+    _ body: (UnsafeRawBufferPointer) -> Bool
+) -> Bool {
+    guard maximumChunkByteCount > 0, maximumChunkByteCount <= Int.max / 8 else {
+        return false
+    }
+
+    var offset = 0
+    while offset < input.count {
+        let chunkByteCount = min(maximumChunkByteCount, input.count - offset)
+        let end = offset + chunkByteCount
+        let chunk = UnsafeRawBufferPointer(rebasing: input[offset..<end])
+        guard body(chunk) else {
+            return false
+        }
+        offset = end
+    }
+    return true
 }
 #endif

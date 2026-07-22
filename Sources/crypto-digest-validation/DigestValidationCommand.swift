@@ -26,6 +26,7 @@ struct DigestValidationCommand {
             expectedHex: "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f"
         )
         #if !canImport(CryptoKit)
+        validateKeccakInputChunking()
         validate(SHA3_256.self, expectedHex: "3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532")
         validate(
             SHA3_384.self,
@@ -68,7 +69,68 @@ struct DigestValidationCommand {
         )
         precondition(!firstDigest.elementsEqual(secondDigest))
         precondition(first.finalize().elementsEqual(firstDigest))
+
+        var multiBlockMessage: [UInt8] = []
+        multiBlockMessage.reserveCapacity(algorithm.blockByteCount * 3 + 17)
+        for index in 0..<(algorithm.blockByteCount * 3 + 17) {
+            multiBlockMessage.append(UInt8(truncatingIfNeeded: index &* 31))
+        }
+
+        let oneShotDigest = algorithm.hash(data: multiBlockMessage)
+        let rawSpanDigest = algorithm.hash(bytes: multiBlockMessage.span.bytes)
+        precondition(rawSpanDigest.elementsEqual(oneShotDigest))
+
+        var splitHasher = algorithm.init()
+        multiBlockMessage.withUnsafeBytes { input in
+            var offset = 0
+            var chunkByteCount = 1
+            while offset < input.count {
+                let end = min(offset + chunkByteCount, input.count)
+                splitHasher.update(
+                    bufferPointer: UnsafeRawBufferPointer(rebasing: input[offset..<end])
+                )
+                offset = end
+                chunkByteCount = chunkByteCount == 17 ? 1 : chunkByteCount + 1
+            }
+        }
+        precondition(splitHasher.finalize().elementsEqual(oneShotDigest))
     }
+
+    #if !canImport(CryptoKit)
+    private static func validateKeccakInputChunking() {
+        let input = Array(UInt8.min...UInt8(10))
+        input.withUnsafeBytes { inputBuffer in
+            var consumedByteCount = 0
+            var chunkCount = 0
+            let completed = forEachKeccakInputChunk(
+                inputBuffer,
+                maximumChunkByteCount: 3
+            ) { chunk in
+                guard
+                    chunk.count <= 3,
+                    chunk.baseAddress == inputBuffer.baseAddress?.advanced(by: consumedByteCount)
+                else {
+                    return false
+                }
+                consumedByteCount += chunk.count
+                chunkCount += 1
+                return true
+            }
+            precondition(completed)
+            precondition(consumedByteCount == inputBuffer.count)
+            precondition(chunkCount == 4)
+            precondition(
+                !forEachKeccakInputChunk(inputBuffer, maximumChunkByteCount: 0) { _ in true }
+            )
+            precondition(
+                !forEachKeccakInputChunk(
+                    inputBuffer,
+                    maximumChunkByteCount: Int.max / 8 + 1
+                ) { _ in true }
+            )
+        }
+    }
+    #endif
 
     private static func decodeHex(_ hex: String) -> [UInt8] {
         var result: [UInt8] = []

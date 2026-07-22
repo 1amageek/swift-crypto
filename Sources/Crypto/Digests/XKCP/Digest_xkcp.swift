@@ -34,12 +34,7 @@ extension SHA3_256 {
     }
 
     static func update(_ context: KeccakDigestContext, data: UnsafeRawBufferPointer) -> Bool {
-        guard let baseAddress = data.baseAddress else {
-            return true
-        }
-        return context.withState { state in
-            Keccak_HashUpdate(&state, baseAddress, data.count * 8) == KECCAK_SUCCESS
-        }
+        context.update(data: data)
     }
 
     static func finalize(
@@ -75,12 +70,7 @@ extension SHA3_384 {
     }
 
     static func update(_ context: KeccakDigestContext, data: UnsafeRawBufferPointer) -> Bool {
-        guard let baseAddress = data.baseAddress else {
-            return true
-        }
-        return context.withState { state in
-            Keccak_HashUpdate(&state, baseAddress, data.count * 8) == KECCAK_SUCCESS
-        }
+        context.update(data: data)
     }
 
     static func finalize(
@@ -116,12 +106,7 @@ extension SHA3_512 {
     }
 
     static func update(_ context: KeccakDigestContext, data: UnsafeRawBufferPointer) -> Bool {
-        guard let baseAddress = data.baseAddress else {
-            return true
-        }
-        return context.withState { state in
-            Keccak_HashUpdate(&state, baseAddress, data.count * 8) == KECCAK_SUCCESS
-        }
+        context.update(data: data)
     }
 
     static func finalize(

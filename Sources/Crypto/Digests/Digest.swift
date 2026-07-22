@@ -26,7 +26,6 @@ import CryptoKit
 
 #if hasFeature(Embedded)
 /// A type that represents the output of a hash.
-@preconcurrency
 public protocol Digest: Hashable, Sendable, ContiguousBytes, Sequence where Element == UInt8 {
     /// The number of bytes in the digest.
     static var byteCount: Int { get }
@@ -36,7 +35,6 @@ public protocol Digest: Hashable, Sendable, ContiguousBytes, Sequence where Elem
 }
 #else
 /// A type that represents the output of a hash.
-@preconcurrency
 public protocol Digest: Hashable, Sendable, ContiguousBytes, CustomStringConvertible, Sequence where Element == UInt8 {
     /// The number of bytes in the digest.
     static var byteCount: Int { get }

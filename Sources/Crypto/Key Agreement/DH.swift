@@ -25,7 +25,6 @@ import CryptoKit
 
 
 /// A Diffie-Hellman Key Agreement Key
-@preconcurrency
 public protocol DiffieHellmanKeyAgreement: Sendable {
     /// The public key share type to perform the DH Key Agreement
     associatedtype PublicKey: Sendable
