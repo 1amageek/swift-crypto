@@ -64,9 +64,6 @@ public struct HMAC<H: HashFunction>: MACAlgorithm, Sendable {
     /// - Parameters:
     ///   - key: The symmetric key used to secure the computation.
     public init(key: SymmetricKey) {
-        #if os(iOS) && (arch(arm) || arch(i386))
-        fatalError("Unsupported architecture")
-        #else
         var innerKey = SecureBytes(capacity: H.blockByteCount) { keyOutput in
             if key.byteCount <= keyOutput.freeCapacity {
                 keyOutput.append(contentsOf: key.bytes)
@@ -95,7 +92,6 @@ public struct HMAC<H: HashFunction>: MACAlgorithm, Sendable {
             }
         }
         outerHasher.update(bytes: outerKey.bytes)
-        #endif
     }
 
     /// Computes a message authentication code for the given data.

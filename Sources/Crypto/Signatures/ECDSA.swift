@@ -85,9 +85,6 @@ extension P256.Signing {
         ///   - derRepresentation: The DER-encoded representation of the
         /// signature.
         public init<D: DataProtocol>(derRepresentation: D) throws(CryptoKitMetaError) {
-            #if os(iOS) && (arch(arm) || arch(i386))
-            fatalError("Unsupported architecture")
-            #else
             let parsed = try ASN1.parse(Array(derRepresentation))
             let signature = try ASN1.ECDSASignature<ArraySlice<UInt8>>(asn1Encoded: parsed)
 
@@ -107,7 +104,6 @@ extension P256.Signing {
             raw.append(contentsOf: signature.s)
 
             self.rawRepresentation = raw
-            #endif
         }
 
         /// Invokes the given closure with a buffer pointer covering the raw
@@ -125,9 +121,6 @@ extension P256.Signing {
         /// A Distinguished Encoding Rules (DER) encoded representation of a
         /// P-256 digital signature.
         public var derRepresentation: Data {
-            #if os(iOS) && (arch(arm) || arch(i386))
-            fatalError("Unsupported architecture")
-            #else
             let raw = rawRepresentation
             let half = raw.count / 2
             let r = Array(raw.prefix(half))[...]
@@ -137,7 +130,6 @@ extension P256.Signing {
             var serializer = ASN1.Serializer()
             try! serializer.serialize(sig)
             return Data(serializer.serializedBytes)
-            #endif
         }
     }
 }
@@ -246,9 +238,6 @@ extension P384.Signing {
         ///   - derRepresentation: The DER-encoded representation of the
         /// signature.
         public init<D: DataProtocol>(derRepresentation: D) throws(CryptoKitMetaError) {
-            #if os(iOS) && (arch(arm) || arch(i386))
-            fatalError("Unsupported architecture")
-            #else
             let parsed = try ASN1.parse(Array(derRepresentation))
             let signature = try ASN1.ECDSASignature<ArraySlice<UInt8>>(asn1Encoded: parsed)
 
@@ -268,7 +257,6 @@ extension P384.Signing {
             raw.append(contentsOf: signature.s)
 
             self.rawRepresentation = raw
-            #endif
         }
 
         /// Invokes the given closure with a buffer pointer covering the raw
@@ -286,9 +274,6 @@ extension P384.Signing {
         /// A Distinguished Encoding Rules (DER) encoded representation of a
         /// P-384 digital signature.
         public var derRepresentation: Data {
-            #if os(iOS) && (arch(arm) || arch(i386))
-            fatalError("Unsupported architecture")
-            #else
             let raw = rawRepresentation
             let half = raw.count / 2
             let r = Array(raw.prefix(half))[...]
@@ -298,7 +283,6 @@ extension P384.Signing {
             var serializer = ASN1.Serializer()
             try! serializer.serialize(sig)
             return Data(serializer.serializedBytes)
-            #endif
         }
     }
 }
@@ -407,9 +391,6 @@ extension P521.Signing {
         ///   - derRepresentation: The DER-encoded representation of the
         /// signature.
         public init<D: DataProtocol>(derRepresentation: D) throws(CryptoKitMetaError) {
-            #if os(iOS) && (arch(arm) || arch(i386))
-            fatalError("Unsupported architecture")
-            #else
             let parsed = try ASN1.parse(Array(derRepresentation))
             let signature = try ASN1.ECDSASignature<ArraySlice<UInt8>>(asn1Encoded: parsed)
 
@@ -429,7 +410,6 @@ extension P521.Signing {
             raw.append(contentsOf: signature.s)
 
             self.rawRepresentation = raw
-            #endif
         }
 
         /// Invokes the given closure with a buffer pointer covering the raw
@@ -447,9 +427,6 @@ extension P521.Signing {
         /// A Distinguished Encoding Rules (DER) encoded representation of a
         /// P-521 digital signature.
         public var derRepresentation: Data {
-            #if os(iOS) && (arch(arm) || arch(i386))
-            fatalError("Unsupported architecture")
-            #else
             let raw = rawRepresentation
             let half = raw.count / 2
             let r = Array(raw.prefix(half))[...]
@@ -459,7 +436,6 @@ extension P521.Signing {
             var serializer = ASN1.Serializer()
             try! serializer.serialize(sig)
             return Data(serializer.serializedBytes)
-            #endif
         }
     }
 }

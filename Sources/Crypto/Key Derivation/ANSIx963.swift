@@ -41,11 +41,7 @@ internal struct ANSIKDFx963<H: HashFunction>: Sendable {
             // 1. Compute: Ki = Hash(Z || Counter || [SharedInfo]).
             var hasher = H()
             inputKeyMaterial.withUnsafeBytes { ikmBytes in
-                #if CRYPTOKIT_URBP_LACKS_CONFORMANCE
-                hasher.update(bufferPointer: ikmBytes)
-                #else
                 hasher.update(bytes: ikmBytes.bytes)
-                #endif
             }
             hasher.update(counter.bigEndian)
             hasher.update(data: info)

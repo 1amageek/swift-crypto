@@ -26,8 +26,12 @@ add_library(CryptoExtras
   "ARC/ARC.swift"
   "ARC/ARCCredential.swift"
   "ARC/ARCEncoding.swift"
+  "ARC/ARCError.swift"
   "ARC/ARCPrecredential.swift"
   "ARC/ARCPresentation.swift"
+  "ARC/ARCRepresentationLayout.swift"
+  "ARC/ARCRepresentationReader.swift"
+  "ARC/ARCRepresentationWriter.swift"
   "ARC/ARCRequest.swift"
   "ARC/ARCResponse.swift"
   "ARC/ARCServer.swift"
@@ -92,8 +96,10 @@ target_link_libraries(CryptoExtras PUBLIC
 
 target_compile_options(CryptoExtras PRIVATE ${SWIFT_CRYPTO_COMPILE_OPTIONS})
 
-target_link_options(CryptoExtras PRIVATE
-    "$<$<PLATFORM_ID:Darwin>:SHELL:-Xlinker -framework -Xlinker Security>")
+if(APPLE)
+  target_link_options(CryptoExtras PRIVATE
+    "SHELL:-Xlinker -framework -Xlinker Security")
+endif()
 
 set_target_properties(CryptoExtras PROPERTIES
   INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_Swift_MODULE_DIRECTORY})

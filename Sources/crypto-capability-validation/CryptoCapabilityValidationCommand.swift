@@ -30,6 +30,8 @@ struct CryptoCapabilityValidationCommand {
         validateAuthenticatedEncryption()
         print("Validating finite-field arithmetic")
         validateFiniteFieldArithmetic()
+        print("Validating platform-sized secure storage")
+        validateSecureStorageCapacity()
         #if !canImport(FoundationEssentials) && !canImport(Foundation)
         print("Validating borrowed slices")
         validateBorrowedSlice()
@@ -171,6 +173,14 @@ struct CryptoCapabilityValidationCommand {
         } catch {
             preconditionFailure("Finite-field arithmetic capability validation failed")
         }
+    }
+
+    private static func validateSecureStorageCapacity() {
+        precondition(UInt32(0).nextPowerOf2ClampedToMax() == 1)
+        precondition(UInt32(3).nextPowerOf2ClampedToMax() == 4)
+        precondition(
+            UInt32.max.nextPowerOf2ClampedToMax() == UInt32(clamping: Int.max)
+        )
     }
 
     private static func validateBorrowedSlice() {

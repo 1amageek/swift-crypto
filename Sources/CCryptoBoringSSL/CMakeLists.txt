@@ -44,15 +44,12 @@ add_library(CCryptoBoringSSL STATIC
   "crypto/base64/base64.cc"
   "crypto/bio/bio.cc"
   "crypto/bio/bio_mem.cc"
-  "crypto/bio/connect.cc"
   "crypto/bio/errno.cc"
   "crypto/bio/fd.cc"
   "crypto/bio/file.cc"
   "crypto/bio/hexdump.cc"
   "crypto/bio/pair.cc"
   "crypto/bio/printf.cc"
-  "crypto/bio/socket.cc"
-  "crypto/bio/socket_helper.cc"
   "crypto/blake2/blake2.cc"
   "crypto/bn/bn_asn1.cc"
   "crypto/bn/convert.cc"
@@ -258,14 +255,9 @@ add_library(CCryptoBoringSSL STATIC
   "crypto/x509/x_x509.cc"
   "crypto/x509/x_x509a.cc"
   "crypto/xwing/xwing.cc"
-  "gen/crypto/err_data.cc"
-  "$<$<NOT:$<PLATFORM_ID:Windows>>:crypto/hrss/asm/poly_rq_mul.S>"
-  "$<$<NOT:$<PLATFORM_ID:Windows>>:third_party/fiat/asm/fiat_curve25519_adx_mul.S>"
-  "$<$<NOT:$<PLATFORM_ID:Windows>>:third_party/fiat/asm/fiat_curve25519_adx_square.S>"
-  "$<$<NOT:$<PLATFORM_ID:Windows>>:third_party/fiat/asm/fiat_p256_adx_mul.S>"
-  "$<$<NOT:$<PLATFORM_ID:Windows>>:third_party/fiat/asm/fiat_p256_adx_sqr.S>")
+  "gen/crypto/err_data.cc")
 
-if(CMAKE_SYSTEM_NAME STREQUAL Darwin AND CMAKE_SYSTEM_PROCESSOR MATCHES "amd64|x86_64")
+if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "amd64|x86_64")
   target_sources(CCryptoBoringSSL PRIVATE
     gen/bcm/aes-gcm-avx2-x86_64-apple.S
     gen/bcm/aes-gcm-avx512-x86_64-apple.S
@@ -286,7 +278,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL Darwin AND CMAKE_SYSTEM_PROCESSOR MATCHES "amd64|x
     gen/crypto/aes128gcmsiv-x86_64-apple.S
     gen/crypto/chacha-x86_64-apple.S
     gen/crypto/chacha20_poly1305_x86_64-apple.S
-    gen/crypto/md5-x86_64-apple.S)
+    gen/crypto/md5-x86_64-apple.S
+    third_party/fiat/asm/fiat_curve25519_adx_mul.S
+    third_party/fiat/asm/fiat_curve25519_adx_square.S
+    third_party/fiat/asm/fiat_p256_adx_mul.S
+    third_party/fiat/asm/fiat_p256_adx_sqr.S)
 elseif(CMAKE_SYSTEM_NAME MATCHES "Linux|Android|FreeBSD|OpenBSD" AND CMAKE_SYSTEM_PROCESSOR MATCHES "amd64|x86_64")
   target_sources(CCryptoBoringSSL PRIVATE
     gen/bcm/aes-gcm-avx2-x86_64-linux.S
@@ -308,8 +304,16 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Linux|Android|FreeBSD|OpenBSD" AND CMAKE_SYSTE
     gen/crypto/aes128gcmsiv-x86_64-linux.S
     gen/crypto/chacha-x86_64-linux.S
     gen/crypto/chacha20_poly1305_x86_64-linux.S
-    gen/crypto/md5-x86_64-linux.S)
-elseif(CMAKE_SYSTEM_NAME STREQUAL Darwin AND CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+    gen/crypto/md5-x86_64-linux.S
+    third_party/fiat/asm/fiat_curve25519_adx_mul.S
+    third_party/fiat/asm/fiat_curve25519_adx_square.S
+    third_party/fiat/asm/fiat_p256_adx_mul.S
+    third_party/fiat/asm/fiat_p256_adx_sqr.S)
+  if(CMAKE_SYSTEM_NAME MATCHES "Linux|Android")
+    target_sources(CCryptoBoringSSL PRIVATE
+      crypto/hrss/asm/poly_rq_mul.S)
+  endif()
+elseif(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
   target_sources(CCryptoBoringSSL PRIVATE
     gen/bcm/aesv8-armv8-apple.S
     gen/bcm/aesv8-gcm-armv8-apple.S
@@ -341,10 +345,9 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Linux|Android|FreeBSD|OpenBSD" AND CMAKE_SYSTE
     gen/bcm/vpaes-armv8-linux.S
     gen/crypto/chacha-armv8-linux.S
     gen/crypto/chacha20_poly1305_armv8-linux.S)
-elseif(CMAKE_SYSTEM_NAME MATCHES "Windows" AND CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|amd64|x86_64")
-  target_sources(CCryptoBoringSSL PRIVATE
-)
-elseif(CMAKE_SYSTEM_NAME MATCHES "Windows" AND CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64|arm64|aarch64")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|amd64|x86_64")
+  target_compile_definitions(CCryptoBoringSSL PRIVATE OPENSSL_NO_ASM)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64|arm64|aarch64")
   target_sources(CCryptoBoringSSL PRIVATE
     gen/bcm/aesv8-armv8-win.S
     gen/bcm/aesv8-gcm-armv8-win.S
@@ -361,14 +364,23 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Windows" AND CMAKE_SYSTEM_PROCESSOR MATCHES "A
     gen/crypto/chacha-armv8-win.S
     gen/crypto/chacha20_poly1305_armv8-win.S)
 else()
-   message(FATAL_ERROR "platform sources are not defined here for ${CMAKE_SYSTEM_NAME} on ${CMAKE_SYSTEM_PROCESSOR}")
+  target_compile_definitions(CCryptoBoringSSL PRIVATE OPENSSL_NO_ASM)
 endif()
 
 target_include_directories(CCryptoBoringSSL PUBLIC
   include)
 
 target_compile_definitions(CCryptoBoringSSL PRIVATE
-  $<$<PLATFORM_ID:Windows>:WIN32_LEAN_AND_MEAN>)
+  $<$<PLATFORM_ID:Windows>:_HAS_EXCEPTIONS=0>
+  $<$<PLATFORM_ID:Windows>:WIN32_LEAN_AND_MEAN>
+  $<$<PLATFORM_ID:Windows>:NOMINMAX>
+  $<$<PLATFORM_ID:Windows>:_CRT_SECURE_NO_WARNINGS>)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "WASI" OR CMAKE_SYSTEM_PROCESSOR MATCHES "wasm32|wasm64")
+  target_compile_definitions(CCryptoBoringSSL PRIVATE
+    OPENSSL_NO_ASM
+    OPENSSL_NO_THREADS_CORRUPT_MEMORY_AND_LEAK_SECRETS_IF_THREADED)
+endif()
 target_link_libraries(CCryptoBoringSSL PUBLIC
   ${SWIFT_CRYPTO_PLATFORM_LIBRARIES})
 set_property(GLOBAL APPEND PROPERTY SWIFT_CRYPTO_EXPORTS CCryptoBoringSSL)
