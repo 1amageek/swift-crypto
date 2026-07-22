@@ -11,20 +11,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if os(Windows)
-import ucrt
-#elseif canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#elseif canImport(Musl)
-import Musl
-#elseif canImport(Android)
-import Android
-#elseif canImport(WASILibc)
-import WASILibc
-#endif
-
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #elseif canImport(Foundation)
@@ -36,7 +22,13 @@ func I2OSP(value: Int, outputByteCount: Int) -> Data {
     precondition(outputByteCount > 0, "Cannot I2OSP with no output length.")
     precondition(value >= 0, "I2OSP requires a non-null value.")
 
-    let requiredBytes = Int(ceil(log2(Double(max(value, 1) + 1)) / 8))
+    var significantValue = max(value, 1)
+    var requiredBytes = 0
+    repeat {
+        requiredBytes += 1
+        significantValue >>= 8
+    } while significantValue > 0
+
     precondition(outputByteCount >= requiredBytes)
 
     var data = Data(repeating: 0, count: outputByteCount)
