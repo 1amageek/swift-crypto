@@ -19,7 +19,7 @@ import Foundation
 #endif
 
 extension OPRF {
-    struct Client<H2G: HashToGroup> {
+    struct Client<H2G: HashToGroup>: Sendable {
         let mode: Mode
         let ciphersuite: Ciphersuite<H2G>
         let context: Data
@@ -44,28 +44,31 @@ extension OPRF {
             )
         }
         
-        func blindMessage(
-            _ message: Data
+        func blindMessage<Message: Crypto.ContiguousBytes>(
+            _ message: Message
         ) throws(CryptoKitMetaError) -> (blind: G.Scalar, blindedElement: G.Element) {
             try self.blindMessage(message, blind: G.Scalar.randomNonzero())
         }
 
-        func blindMessage(
-            _ message: Data,
+        func blindMessage<Message: Crypto.ContiguousBytes>(
+            _ message: Message,
             blind: G.Scalar
         ) throws(CryptoKitMetaError) -> (blind: G.Scalar, blindedElement: G.Element) {
-            guard message.count <= Int(UInt16.max) else {
-                throw cryptoExtrasError(OPRF.Errors.messageTooLong)
+            try Crypto.withUnsafeBytes(of: message) {
+                (messageBytes: UnsafeRawBufferPointer) throws(CryptoKitMetaError) in
+                guard messageBytes.count <= Int(UInt16.max) else {
+                    throw cryptoExtrasError(OPRF.Errors.messageTooLong)
+                }
+                guard blind != .zero else {
+                    throw cryptoExtrasError(OPRF.Errors.invalidScalar)
+                }
+                let inputElement: G.Element = try H2G.hashToGroup(
+                    messageBytes,
+                    domainSeparationString: hashToGroupDomainSeparationTag
+                )
+                let blindedElement = try inputElement.multiplied(by: blind)
+                return (blind: blind, blindedElement: blindedElement)
             }
-            guard blind != .zero else {
-                throw cryptoExtrasError(OPRF.Errors.invalidScalar)
-            }
-            let inputElement: G.Element = try H2G.hashToGroup(
-                message,
-                domainSeparationString: hashToGroupDomainSeparationTag
-            )
-            let blindedElement = try inputElement.multiplied(by: blind)
-            return (blind: blind, blindedElement: blindedElement)
         }
         
         func unblind(
@@ -79,6 +82,24 @@ extension OPRF {
         }
         
         func finalize(message: Data, info: Data?, blind: G.Scalar, evaluatedElement: G.Element) throws(CryptoKitMetaError) -> Data {
+            let preparedTranscript = try OPRF.prepareFinalizeTranscript(
+                message: message,
+                using: H2G.H.self
+            )
+            return try self.finalize(
+                preparedTranscript: preparedTranscript,
+                info: info,
+                blind: blind,
+                evaluatedElement: evaluatedElement
+            )
+        }
+
+        func finalize(
+            preparedTranscript: OPRF.PreparedFinalizeTranscript<H2G.H>,
+            info: Data?,
+            blind: G.Scalar,
+            evaluatedElement: G.Element
+        ) throws(CryptoKitMetaError) -> Data {
             if mode != .partiallyOblivious, info != nil {
                 throw cryptoExtrasError(OPRF.Errors.invalidModeForInfo)
             }
@@ -88,11 +109,10 @@ extension OPRF {
             )
             
             let digest = try hashFinalizeTranscript(
-                message: message,
+                preparedTranscript: preparedTranscript,
                 info: info,
                 unblindedElement: unblinded,
-                mode: mode,
-                using: H2G.H.self
+                mode: mode
             )
             return Data(digest)
         }

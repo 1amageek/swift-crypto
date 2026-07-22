@@ -19,7 +19,7 @@ import Foundation
 import Crypto
 
 extension OPRF {
-    struct Server<H2G: HashToGroup> {
+    struct Server<H2G: HashToGroup>: Sendable {
         typealias G = H2G.G
         let mode: Mode
         let ciphersuite: Ciphersuite<H2G>

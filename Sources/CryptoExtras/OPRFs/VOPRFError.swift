@@ -24,6 +24,7 @@ public enum VOPRFError: Error, Equatable, Sendable {
     case messageTooLong
     case keyInfoTooLong
     case keyDerivationFailed
+    case insufficientOutputCapacity
     case internalFailure
 }
 

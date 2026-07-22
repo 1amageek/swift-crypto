@@ -24,7 +24,7 @@ private let dleqChallengeLabel = Data("Challenge".utf8)
 
 /// A DLEQ proof as described in RFC 9497.
 /// https://www.rfc-editor.org/rfc/rfc9497.html#name-generateproof
-struct DLEQProof<GS: GroupScalar> {
+struct DLEQProof<GS: GroupScalar>: Sendable {
     var challenge: GS
     var response: GS
 

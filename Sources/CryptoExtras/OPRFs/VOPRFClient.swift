@@ -19,7 +19,7 @@ import Foundation
 #endif
 
 extension OPRF {
-    struct VerifiableClient<H2G: HashToGroup> {
+    struct VerifiableClient<H2G: HashToGroup>: Sendable {
         fileprivate let client: OPRF.Client<H2G>
         typealias G = H2G.G
         
@@ -31,14 +31,14 @@ extension OPRF {
             self.client = .init(mode: mode, ciphersuite: ciphersuite)
         }
         
-        func blindMessage(
-            _ message: Data
+        func blindMessage<Message: Crypto.ContiguousBytes>(
+            _ message: Message
         ) throws(CryptoKitMetaError) -> (blind: G.Scalar, blindedElement: G.Element) {
             try self.client.blindMessage(message)
         }
 
-        func blindMessage(
-            _ message: Data,
+        func blindMessage<Message: Crypto.ContiguousBytes>(
+            _ message: Message,
             blind: G.Scalar
         ) throws(CryptoKitMetaError) -> (blind: G.Scalar, blindedElement: G.Element) {
             try self.client.blindMessage(message, blind: blind)
@@ -46,6 +46,30 @@ extension OPRF {
         
         func finalize(
             message: Data,
+            info: Data?,
+            blind: G.Scalar,
+            blindedElement: G.Element,
+            evaluatedElement: G.Element,
+            proof: DLEQProof<G.Scalar>,
+            publicKey: G.Element
+        ) throws(CryptoKitMetaError) -> Data {
+            let preparedTranscript = try OPRF.prepareFinalizeTranscript(
+                message: message,
+                using: H2G.H.self
+            )
+            return try self.finalize(
+                preparedTranscript: preparedTranscript,
+                info: info,
+                blind: blind,
+                blindedElement: blindedElement,
+                evaluatedElement: evaluatedElement,
+                proof: proof,
+                publicKey: publicKey
+            )
+        }
+
+        func finalize(
+            preparedTranscript: OPRF.PreparedFinalizeTranscript<H2G.H>,
             info: Data?,
             blind: G.Scalar,
             blindedElement: G.Element,
@@ -69,7 +93,12 @@ extension OPRF {
                     throw cryptoExtrasError(OPRF.Errors.invalidProof)
                 }
 
-                return try self.client.finalize(message: message, info: info, blind: blind, evaluatedElement: evaluatedElement)
+                return try self.client.finalize(
+                    preparedTranscript: preparedTranscript,
+                    info: info,
+                    blind: blind,
+                    evaluatedElement: evaluatedElement
+                )
             }
             
             guard let info else {
@@ -94,7 +123,12 @@ extension OPRF {
                 throw cryptoExtrasError(OPRF.Errors.invalidProof)
             }
             
-            return try self.client.finalize(message: message, info: info, blind: blind, evaluatedElement: evaluatedElement)
+            return try self.client.finalize(
+                preparedTranscript: preparedTranscript,
+                info: info,
+                blind: blind,
+                evaluatedElement: evaluatedElement
+            )
         }
 
         func finalize(

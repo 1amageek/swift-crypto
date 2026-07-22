@@ -26,7 +26,7 @@ extension OPRF {
     private static let finalizeLabel = Data("Finalize".utf8)
     private static let infoLabel = Data("Info".utf8)
 
-    enum Errors: Error, Equatable {
+    enum Errors: Error, Equatable, Sendable {
         case invalidProof
         case invalidModeForInfo
         case incompatibleMode
@@ -40,6 +40,14 @@ extension OPRF {
         case batchTooLarge
         case transcriptElementTooLong
         case keyDerivationFailed
+    }
+
+    struct PreparedFinalizeTranscript<H: HashFunction>: Sendable {
+        fileprivate var hasher: H
+
+        fileprivate init(hasher: H) {
+            self.hasher = hasher
+        }
     }
 }
 
@@ -61,16 +69,29 @@ internal func cryptoExtrasError(_ error: OPRF.Errors) -> CryptoKitMetaError {
 /// Defines the IETF Serializations for OPRFs
 protocol OPRFGroupElement: GroupElement {
     static var oprfRepresentationByteCount: Int { get }
-    init(oprfRepresentation: Data) throws(CryptoKitMetaError)
+    init(
+        oprfRepresentation: UnsafeRawBufferPointer
+    ) throws(CryptoKitMetaError)
     var oprfRepresentation: Data { get }
     func writeOPRFRepresentation(
         into destination: UnsafeMutableRawBufferPointer
     ) throws(CryptoKitMetaError)
 }
 
+extension OPRFGroupElement {
+    init<Bytes: Crypto.ContiguousBytes>(
+        oprfRepresentation bytes: Bytes
+    ) throws(CryptoKitMetaError) {
+        self = try Crypto.withUnsafeBytes(of: bytes) {
+            (buffer: UnsafeRawBufferPointer) throws(CryptoKitMetaError) in
+            try Self(oprfRepresentation: buffer)
+        }
+    }
+}
+
 extension OPRF {
     /// OPRF Modes
-    enum Mode: Int, CaseIterable {
+    enum Mode: Int, CaseIterable, Sendable {
         // Base mode corresponds to an OPRF
         case base = 0
         // Verifiable mode corresponds to a V(erifiable)OPRF
@@ -80,7 +101,7 @@ extension OPRF {
     }
     
     /// IETF Ciphersuites defined for OPRFs
-    struct Ciphersuite<H2G: HashToGroup> {
+    struct Ciphersuite<H2G: HashToGroup>: Sendable {
         let identifier: String
 
         init() {
@@ -207,9 +228,42 @@ extension OPRF {
         mode: Mode,
         using hashFunction: H.Type
     ) throws(CryptoKitMetaError) -> H.Digest {
+        let preparedTranscript = try prepareFinalizeTranscript(
+            message: message,
+            using: hashFunction
+        )
+        return try hashFinalizeTranscript(
+            preparedTranscript: preparedTranscript,
+            info: info,
+            unblindedElement: unblindedElement,
+            mode: mode
+        )
+    }
+
+    internal static func prepareFinalizeTranscript<
+        H: HashFunction,
+        Message: DataProtocol
+    >(
+        message: Message,
+        using hashFunction: H.Type
+    ) throws(CryptoKitMetaError) -> PreparedFinalizeTranscript<H> {
         guard message.count <= Int(UInt16.max) else {
             throw cryptoExtrasError(OPRF.Errors.messageTooLong)
         }
+        var hasher = H()
+        try update(&hasher, withTwoByteLengthPrefixed: message)
+        return PreparedFinalizeTranscript(hasher: hasher)
+    }
+
+    internal static func hashFinalizeTranscript<
+        H: HashFunction,
+        Element: OPRFGroupElement
+    >(
+        preparedTranscript: PreparedFinalizeTranscript<H>,
+        info: Data?,
+        unblindedElement: Element,
+        mode: Mode
+    ) throws(CryptoKitMetaError) -> H.Digest {
         if mode == .partiallyOblivious {
             guard let info else {
                 throw cryptoExtrasError(OPRF.Errors.missingInfo)
@@ -219,8 +273,7 @@ extension OPRF {
             }
         }
 
-        var hasher = H()
-        try update(&hasher, withTwoByteLengthPrefixed: message)
+        var hasher = preparedTranscript.hasher
         if mode == .partiallyOblivious {
             guard let info else {
                 throw cryptoExtrasError(OPRF.Errors.missingInfo)

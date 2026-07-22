@@ -19,7 +19,7 @@ import Foundation
 import Crypto
 
 extension OPRF {
-    struct VerifiableServer<H2G: HashToGroup> {
+    struct VerifiableServer<H2G: HashToGroup>: Sendable {
         typealias G = H2G.G
         let server: OPRF.Server<H2G>
         

@@ -44,14 +44,22 @@ package func withContiguousBytes<Bytes: DataProtocol, Result, E: Error>(
     _ body: (UnsafeRawBufferPointer) throws(E) -> Result
 ) throws(E) -> Result {
     #if !canImport(FoundationEssentials) && !canImport(Foundation)
-    if bytes.regions.count == 1 {
-        return try bytes.regions.first!.withUnsafeBytes(body)
+    var regions = bytes.regions.makeIterator()
+    guard let firstRegion = regions.next() else {
+        return try body(UnsafeRawBufferPointer(start: nil, count: 0))
+    }
+    if regions.next() == nil {
+        return try firstRegion.withUnsafeBytes(body)
     }
     return try Array(bytes).withUnsafeBytes(body)
     #else
     do {
-        if bytes.regions.count == 1 {
-            return try bytes.regions.first!.withUnsafeBytes { buffer in
+        var regions = bytes.regions.makeIterator()
+        guard let firstRegion = regions.next() else {
+            return try body(UnsafeRawBufferPointer(start: nil, count: 0))
+        }
+        if regions.next() == nil {
+            return try firstRegion.withUnsafeBytes { buffer in
                 try body(buffer)
             }
         }

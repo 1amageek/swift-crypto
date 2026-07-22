@@ -196,11 +196,16 @@ struct PrimeOrderCurveScalar<C: HashToGroupCurve>: GroupScalar, CustomStringConv
     }
 
     /// Deserializes the fixed-width canonical scalar representation defined by RFC 9497.
-    init(canonicalRepresentation: Data) throws(CryptoKitMetaError) {
+    init(
+        canonicalRepresentation: UnsafeRawBufferPointer
+    ) throws(CryptoKitMetaError) {
         guard canonicalRepresentation.count == C.orderByteCount else {
             throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
         }
-        let integer = try ArbitraryPrecisionInteger(cryptoBytes: canonicalRepresentation)
+        let integer = try withCryptoExtrasBoringError {
+            () throws(CryptoBoringWrapperError) in
+            try ArbitraryPrecisionInteger(bytes: canonicalRepresentation)
+        }
         let groupOrder = try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
             try C.runtime().group.order
         }
@@ -467,7 +472,9 @@ extension PrimeOrderCurvePoint: OPRFGroupElement {
         C.compressedX962PointByteCount
     }
 
-    init(oprfRepresentation data: Data) throws(CryptoKitMetaError) {
+    init(
+        oprfRepresentation data: UnsafeRawBufferPointer
+    ) throws(CryptoKitMetaError) {
         guard data.count == C.compressedX962PointByteCount else {
             throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
         }

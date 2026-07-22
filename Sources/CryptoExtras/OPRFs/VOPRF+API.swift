@@ -35,6 +35,18 @@ private func encodedVOPRFRepresentation(
     return result
 }
 
+private func voprfOutputDestination(
+    _ destination: UnsafeMutableRawBufferPointer,
+    requiredByteCount: Int
+) throws(VOPRFError) -> UnsafeMutableRawBufferPointer {
+    guard destination.count >= requiredByteCount else {
+        throw .insufficientOutputCapacity
+    }
+    return UnsafeMutableRawBufferPointer(
+        rebasing: destination.prefix(requiredByteCount)
+    )
+}
+
 // MARK: - P384 + VOPRF (P384-SHA384)
 extension P384 {
     /// A mechanism to compute the output of a pseudorandom without the client learning the secret or the server
@@ -51,32 +63,38 @@ extension P384 {
         static var ciphersuite: Ciphersuite { Ciphersuite() }
 
         /// A P-384 public key used to blind inputs and finalize blinded elements.
-        public struct PublicKey {
+        public struct PublicKey: Sendable {
             /// The byte count of the RFC 9497 OPRF representation.
             public static var oprfRepresentationByteCount: Int {
                 H2G.G.Element.oprfRepresentationByteCount
             }
 
             fileprivate var backingPoint: H2G.G.Element
-            fileprivate static var client: Client {
-                get throws(CryptoKitMetaError) {
-                    try Client(ciphersuite: P384._VOPRF.ciphersuite, mode: .verifiable)
-                }
-            }
+            fileprivate var client: Client
 
-            fileprivate init(backingPoint: H2G.G.Element) {
+            fileprivate init(
+                backingPoint: H2G.G.Element
+            ) throws(CryptoKitMetaError) {
                 self.backingPoint = backingPoint
+                self.client = try Client(
+                    ciphersuite: P384._VOPRF.ciphersuite,
+                    mode: .verifiable
+                )
             }
 
             /// Creates a public key from the RFC 9497 OPRF representation.
             public init<Bytes: DataProtocol>(
                 oprfRepresentation: Bytes
             ) throws(VOPRFError) {
-                let bytes = Data(oprfRepresentation)
                 self = try withVOPRFError(fallback: .invalidPublicKey) { () throws(CryptoKitMetaError) in
-                    try Self(
-                        backingPoint: H2G.G.Element(oprfRepresentation: bytes)
-                    )
+                    try Crypto.withContiguousBytes(of: oprfRepresentation) {
+                        (bytes: UnsafeRawBufferPointer) throws(CryptoKitMetaError) in
+                        try Self(
+                            backingPoint: H2G.G.Element(
+                                oprfRepresentation: bytes
+                            )
+                        )
+                    }
                 }
             }
 
@@ -84,9 +102,13 @@ extension P384 {
             public func writeOPRFRepresentation(
                 into destination: UnsafeMutableRawBufferPointer
             ) throws(VOPRFError) {
+                let output = try voprfOutputDestination(
+                    destination,
+                    requiredByteCount: Self.oprfRepresentationByteCount
+                )
                 try withVOPRFError(fallback: .internalFailure) { () throws(CryptoKitMetaError) in
                     try self.backingPoint.writeOPRFRepresentation(
-                        into: destination
+                        into: output
                     )
                 }
             }
@@ -102,7 +124,7 @@ extension P384 {
         }
 
         /// A P-384 private key used to evaluate blinded inputs.
-        public struct PrivateKey {
+        public struct PrivateKey: Sendable {
             /// The byte count of the canonical private scalar representation.
             public static var rawRepresentationByteCount: Int {
                 P384.orderByteCount
@@ -120,7 +142,7 @@ extension P384 {
                 )
                 self.backingScalar = backingScalar
                 self.server = server
-                self.correspondingPublicKey = P384._VOPRF.PublicKey(
+                self.correspondingPublicKey = try P384._VOPRF.PublicKey(
                     backingPoint: server.publicKey
                 )
             }
@@ -142,13 +164,15 @@ extension P384 {
             public init<Bytes: DataProtocol>(
                 rawRepresentation: Bytes
             ) throws(VOPRFError) {
-                let bytes = Data(rawRepresentation)
                 self = try withVOPRFError(fallback: .invalidPrivateKey) { () throws(CryptoKitMetaError) in
-                    try Self(
-                        backingScalar: H2G.G.Scalar(
-                            canonicalRepresentation: bytes
+                    try Crypto.withContiguousBytes(of: rawRepresentation) {
+                        (bytes: UnsafeRawBufferPointer) throws(CryptoKitMetaError) in
+                        try Self(
+                            backingScalar: H2G.G.Scalar(
+                                canonicalRepresentation: bytes
+                            )
                         )
-                    )
+                    }
                 }
             }
 
@@ -183,9 +207,13 @@ extension P384 {
             public func writeRawRepresentation(
                 into destination: UnsafeMutableRawBufferPointer
             ) throws(VOPRFError) {
+                let output = try voprfOutputDestination(
+                    destination,
+                    requiredByteCount: Self.rawRepresentationByteCount
+                )
                 try withVOPRFError(fallback: .internalFailure) { () throws(CryptoKitMetaError) in
                     try self.backingScalar.writeRawRepresentation(
-                        into: destination
+                        into: output
                     )
                 }
             }
@@ -206,7 +234,7 @@ extension P384._VOPRF {
     /// A blinding value, used to blind an input.
     ///
     /// Users cannot create values of this type manually; it is created and returned by the blind operation.
-    public struct Blind {
+    public struct Blind: Sendable {
         fileprivate var backing: H2G.G.Scalar
 
         fileprivate init(backing: H2G.G.Scalar) {
@@ -219,7 +247,7 @@ extension P384._VOPRF {
     /// Clients should not create values of this type manually; they are created and returned by the blind operation.
     ///
     /// Servers should reconstruct values of this type from the serialized blinded element bytes sent by the client.
-    public struct BlindedElement {
+    public struct BlindedElement: Sendable {
         /// The byte count of the RFC 9497 OPRF representation.
         public static var oprfRepresentationByteCount: Int {
             H2G.G.Element.oprfRepresentationByteCount
@@ -237,13 +265,13 @@ extension P384._VOPRF {
         ///
         /// Servers should reconstruct values of this type from the serialized blinded element bytes sent by the client.
         public init<D: DataProtocol>(oprfRepresentation: D) throws(VOPRFError) {
-            let oprfRepresentation = Data(oprfRepresentation)
             self = try withVOPRFError(fallback: .invalidElement) { () throws(CryptoKitMetaError) in
-                try Self(
-                    backing: H2G.G.Element(
-                        oprfRepresentation: oprfRepresentation
+                try Crypto.withContiguousBytes(of: oprfRepresentation) {
+                    (bytes: UnsafeRawBufferPointer) throws(CryptoKitMetaError) in
+                    try Self(
+                        backing: H2G.G.Element(oprfRepresentation: bytes)
                     )
-                )
+                }
             }
         }
 
@@ -251,8 +279,12 @@ extension P384._VOPRF {
         public func writeOPRFRepresentation(
             into destination: UnsafeMutableRawBufferPointer
         ) throws(VOPRFError) {
+            let output = try voprfOutputDestination(
+                destination,
+                requiredByteCount: Self.oprfRepresentationByteCount
+            )
             try withVOPRFError(fallback: .internalFailure) { () throws(CryptoKitMetaError) in
-                try self.backing.writeOPRFRepresentation(into: destination)
+                try self.backing.writeOPRFRepresentation(into: output)
             }
         }
 
@@ -268,9 +300,10 @@ extension P384._VOPRF {
 
     /// A blinded element and its blind for unblinding.
     ///
+    /// This value retains a prepared finalize transcript rather than the input bytes.
     /// Users cannot create values of this type manually; it is created and returned by the blind operation.
-    public struct BlindedInput {
-        var input: Data
+    public struct BlindedInput: Sendable {
+        var finalizeTranscript: OPRF.PreparedFinalizeTranscript<H2G.H>
         var blind: Blind
 
         /// The element representing the blinded input to be sent to the server.
@@ -280,7 +313,7 @@ extension P384._VOPRF {
     /// An evaluated element, the result of the blind evaluate operation.
     ///
     /// Users cannot create values of this type manually; it is created and returned by the evaluate operation.
-    public struct EvaluatedElement {
+    public struct EvaluatedElement: Sendable {
         /// The byte count of the RFC 9497 OPRF representation.
         public static var oprfRepresentationByteCount: Int {
             P384.compressedX962PointByteCount
@@ -292,7 +325,9 @@ extension P384._VOPRF {
             self.backing = backing
         }
 
-        internal init(oprfRepresentation: Data) throws(CryptoKitMetaError) {
+        internal init(
+            oprfRepresentation: UnsafeRawBufferPointer
+        ) throws(CryptoKitMetaError) {
             self.init(backing: try H2G.G.Element(oprfRepresentation: oprfRepresentation))
         }
 
@@ -300,8 +335,12 @@ extension P384._VOPRF {
         public func writeOPRFRepresentation(
             into destination: UnsafeMutableRawBufferPointer
         ) throws(VOPRFError) {
+            let output = try voprfOutputDestination(
+                destination,
+                requiredByteCount: Self.oprfRepresentationByteCount
+            )
             try withVOPRFError(fallback: .internalFailure) { () throws(CryptoKitMetaError) in
-                try self.backing.writeOPRFRepresentation(into: destination)
+                try self.backing.writeOPRFRepresentation(into: output)
             }
         }
 
@@ -318,7 +357,7 @@ extension P384._VOPRF {
     /// A proof that the evaluated element was computed using the agreed key pair.
     ///
     /// Users cannot create values of this type manually; it is created and returned by the evaluate operation.
-    public struct Proof {
+    public struct Proof: Sendable {
         /// The byte count of the serialized proof.
         public static var rawRepresentationByteCount: Int {
             P384.orderByteCount * 2
@@ -329,26 +368,32 @@ extension P384._VOPRF {
             self.backing = backing
         }
 
-        internal init(rawRepresentation: Data) throws(CryptoKitMetaError) {
+        internal init(
+            rawRepresentation: UnsafeRawBufferPointer
+        ) throws(CryptoKitMetaError) {
             guard rawRepresentation.count == Self.rawRepresentationByteCount else {
                 throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
             }
 
-            var remainingBytes = rawRepresentation[...]
-
-            let challengeBytes = remainingBytes.prefix(P384.orderByteCount)
-            remainingBytes = remainingBytes.dropFirst(P384.orderByteCount)
-
-            let responseBytes = remainingBytes.prefix(P384.orderByteCount)
-            remainingBytes = remainingBytes.dropFirst(P384.orderByteCount)
-
-            guard remainingBytes.isEmpty else {
-                throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
-            }
+            let challengeBytes = UnsafeRawBufferPointer(
+                rebasing: rawRepresentation.prefix(P384.orderByteCount)
+            )
+            let responseBytes = UnsafeRawBufferPointer(
+                rebasing: rawRepresentation.suffix(P384.orderByteCount)
+            )
 
             let challenge = try H2G.G.Scalar(canonicalRepresentation: challengeBytes)
             let response = try H2G.G.Scalar(canonicalRepresentation: responseBytes)
             self.init(backing: DLEQProof<H2G.G.Scalar>(challenge: challenge, response: response))
+        }
+
+        internal init<Bytes: Crypto.ContiguousBytes>(
+            rawRepresentation: Bytes
+        ) throws(CryptoKitMetaError) {
+            self = try Crypto.withUnsafeBytes(of: rawRepresentation) {
+                (bytes: UnsafeRawBufferPointer) throws(CryptoKitMetaError) in
+                try Self(rawRepresentation: bytes)
+            }
         }
 
         fileprivate func writeCanonicalRepresentation(
@@ -375,8 +420,12 @@ extension P384._VOPRF {
         public func writeRawRepresentation(
             into destination: UnsafeMutableRawBufferPointer
         ) throws(VOPRFError) {
+            let output = try voprfOutputDestination(
+                destination,
+                requiredByteCount: Self.rawRepresentationByteCount
+            )
             try withVOPRFError(fallback: .internalFailure) { () throws(CryptoKitMetaError) in
-                try self.writeCanonicalRepresentation(into: destination)
+                try self.writeCanonicalRepresentation(into: output)
             }
         }
 
@@ -395,7 +444,7 @@ extension P384._VOPRF {
     /// Servers should not create values of this type manually; they are created and returned by the evaluate operation.
     ///
     /// Clients should reconstruct values of this type from the serialized blind evaluation bytes sent by the server.
-    public struct BlindEvaluation {
+    public struct BlindEvaluation: Sendable {
         /// The byte count of the serialized blind evaluation.
         public static var rawRepresentationByteCount: Int {
             EvaluatedElement.oprfRepresentationByteCount
@@ -422,26 +471,33 @@ extension P384._VOPRF {
             guard rawRepresentation.count == Self.rawRepresentationByteCount else {
                 throw .invalidEncoding
             }
-            let rawRepresentation = Data(rawRepresentation)
-            var remainingBytes = rawRepresentation[...]
-
-            let evaluatedElementBytes = remainingBytes.prefix(EvaluatedElement.oprfRepresentationByteCount)
-            remainingBytes = remainingBytes.dropFirst(EvaluatedElement.oprfRepresentationByteCount)
-
-            let proofBytes = remainingBytes.prefix(Proof.rawRepresentationByteCount)
-            remainingBytes = remainingBytes.dropFirst(Proof.rawRepresentationByteCount)
-
-            guard remainingBytes.isEmpty else {
-                throw .invalidEncoding
+            self = try Crypto.withContiguousBytes(of: rawRepresentation) {
+                (bytes: UnsafeRawBufferPointer) throws(VOPRFError) in
+                let evaluatedElementBytes = UnsafeRawBufferPointer(
+                    rebasing: bytes.prefix(
+                        EvaluatedElement.oprfRepresentationByteCount
+                    )
+                )
+                let proofBytes = UnsafeRawBufferPointer(
+                    rebasing: bytes.suffix(Proof.rawRepresentationByteCount)
+                )
+                let evaluatedElement = try withVOPRFError(
+                    fallback: .invalidElement
+                ) { () throws(CryptoKitMetaError) in
+                    try EvaluatedElement(
+                        oprfRepresentation: evaluatedElementBytes
+                    )
+                }
+                let proof = try withVOPRFError(
+                    fallback: .invalidProof
+                ) { () throws(CryptoKitMetaError) in
+                    try Proof(rawRepresentation: proofBytes)
+                }
+                return Self(
+                    evaluatedElement: evaluatedElement,
+                    proof: proof
+                )
             }
-
-            let evaluatedElement = try withVOPRFError(fallback: .invalidElement) { () throws(CryptoKitMetaError) in
-                try EvaluatedElement(oprfRepresentation: evaluatedElementBytes)
-            }
-            let proof = try withVOPRFError(fallback: .invalidProof) { () throws(CryptoKitMetaError) in
-                try Proof(rawRepresentation: proofBytes)
-            }
-            self.init(evaluatedElement: evaluatedElement, proof: proof)
         }
 
         fileprivate func writeComponents(
@@ -466,8 +522,12 @@ extension P384._VOPRF {
         public func writeRawRepresentation(
             into destination: UnsafeMutableRawBufferPointer
         ) throws(VOPRFError) {
+            let output = try voprfOutputDestination(
+                destination,
+                requiredByteCount: Self.rawRepresentationByteCount
+            )
             try withVOPRFError(fallback: .internalFailure) { () throws(CryptoKitMetaError) in
-                try self.writeComponents(into: destination)
+                try self.writeComponents(into: output)
             }
         }
 
@@ -483,16 +543,31 @@ extension P384._VOPRF {
 }
 
 extension P384._VOPRF.PublicKey {
-    internal func blind(
-        _ input: Data,
+    internal func blind<Input: DataProtocol>(
+        _ input: Input,
         with fixedBlind: P384._VOPRF.H2G.G.Scalar
     ) throws(CryptoKitMetaError) -> P384._VOPRF.BlindedInput {
-        let (blind, blindedElement) = try Self.client.blindMessage(input, blind: fixedBlind)
-        return P384._VOPRF.BlindedInput(
-            input: input,
-            blind: P384._VOPRF.Blind(backing: blind),
-            blindedElement: P384._VOPRF.BlindedElement(backing: blindedElement)
+        guard input.count <= Int(UInt16.max) else {
+            throw cryptoExtrasError(OPRF.Errors.messageTooLong)
+        }
+        let finalizeTranscript = try OPRF.prepareFinalizeTranscript(
+            message: input,
+            using: P384._VOPRF.H2G.H.self
         )
+        return try Crypto.withContiguousBytes(of: input) {
+            (inputBytes: UnsafeRawBufferPointer) throws(CryptoKitMetaError) in
+            let (blind, blindedElement) = try self.client.blindMessage(
+                inputBytes,
+                blind: fixedBlind
+            )
+            return P384._VOPRF.BlindedInput(
+                finalizeTranscript: finalizeTranscript,
+                blind: P384._VOPRF.Blind(backing: blind),
+                blindedElement: P384._VOPRF.BlindedElement(
+                    backing: blindedElement
+                )
+            )
+        }
     }
 
     /// Blind an input to be evaluated by the server using the VOPRF protocol.
@@ -512,7 +587,6 @@ extension P384._VOPRF.PublicKey {
         _ input: D,
         randomScalar: () throws(CryptoKitMetaError) -> P384._VOPRF.H2G.G.Scalar
     ) throws(VOPRFError) -> P384._VOPRF.BlindedInput {
-        let input = Data(input)
         guard input.count <= Int(UInt16.max) else {
             throw .messageTooLong
         }
@@ -533,8 +607,8 @@ extension P384._VOPRF.PublicKey {
         using blindEvaluation: P384._VOPRF.BlindEvaluation
     ) throws(VOPRFError) -> Data {
         try withVOPRFError(fallback: .internalFailure) { () throws(CryptoKitMetaError) in
-            try Self.client.finalize(
-                message: blindedInput.input,
+            try self.client.finalize(
+                preparedTranscript: blindedInput.finalizeTranscript,
                 info: nil,
                 blind: blindedInput.blind.backing,
                 blindedElement: blindedInput.blindedElement.backing,
@@ -595,19 +669,10 @@ extension P384._VOPRF.PrivateKey {
             throw .messageTooLong
         }
         return try withVOPRFError(fallback: .internalFailure) { () throws(CryptoKitMetaError) in
-            var regions = input.regions.makeIterator()
-            let inputElement: P384._VOPRF.H2G.G.Element
-            if let firstRegion = regions.next(), regions.next() == nil {
-                inputElement = try P384._VOPRF.H2G.hashToGroup(
-                    firstRegion,
-                    domainSeparationString: Self.hashToGroupDomainSeparationTag
-                )
-            } else {
-                // Hash-to-curve requires one contiguous buffer. Joining multiple
-                // regions is the single necessary ownership copy at that boundary.
-                let contiguousInput = Data(input)
-                inputElement = try P384._VOPRF.H2G.hashToGroup(
-                    contiguousInput,
+            let inputElement = try Crypto.withContiguousBytes(of: input) {
+                (inputBytes: UnsafeRawBufferPointer) throws(CryptoKitMetaError) in
+                try P384._VOPRF.H2G.hashToGroup(
+                    inputBytes,
                     domainSeparationString: Self.hashToGroupDomainSeparationTag
                 )
             }

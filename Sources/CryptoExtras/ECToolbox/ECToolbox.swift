@@ -94,7 +94,9 @@ enum ScalarReductionModulus {
 }
 
 protocol GroupScalar: Sendable, Equatable {
-    init(canonicalRepresentation: Data) throws(CryptoKitMetaError)
+    init(
+        canonicalRepresentation: UnsafeRawBufferPointer
+    ) throws(CryptoKitMetaError)
 
     static func reducing<Bytes: Crypto.ContiguousBytes>(
         _ uniformBytes: Bytes,
@@ -135,6 +137,17 @@ protocol GroupScalar: Sendable, Equatable {
 
     // Constant-time Comparison
     static func == (left: Self, right: Self) -> Bool
+}
+
+extension GroupScalar {
+    init<Bytes: Crypto.ContiguousBytes>(
+        canonicalRepresentation bytes: Bytes
+    ) throws(CryptoKitMetaError) {
+        self = try Crypto.withUnsafeBytes(of: bytes) {
+            (buffer: UnsafeRawBufferPointer) throws(CryptoKitMetaError) in
+            try Self(canonicalRepresentation: buffer)
+        }
+    }
 }
 
 protocol GroupElement: Sendable {

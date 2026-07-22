@@ -20,6 +20,194 @@ import XCTest
 
 final class VOPRFPublicAPITests: XCTestCase {
 
+    private final class ByteAccessRecorder {
+        var elementIteratorCreationCount = 0
+        var elementAccessCount = 0
+        var regionsAccessCount = 0
+        var regionAccessCount = 0
+        var regionBufferBorrowCount = 0
+
+        var materializedByteCount: Int {
+            self.elementAccessCount
+        }
+    }
+
+    private final class ByteStorage {
+        let bytes: [UInt8]
+
+        init(_ bytes: [UInt8]) {
+            self.bytes = bytes
+        }
+    }
+
+    private struct ContiguousRegion: DataProtocol, ContiguousBytes {
+        typealias Index = Int
+        typealias Element = UInt8
+        typealias SubSequence = ContiguousRegion
+        typealias Regions = CollectionOfOne<ContiguousRegion>
+
+        let storage: ByteStorage
+        let bounds: Range<Int>
+        let recorder: ByteAccessRecorder
+
+        var startIndex: Int { self.bounds.lowerBound }
+        var endIndex: Int { self.bounds.upperBound }
+
+        subscript(index: Int) -> UInt8 {
+            self.recorder.elementAccessCount += 1
+            return self.storage.bytes[index]
+        }
+
+        subscript(bounds: Range<Int>) -> ContiguousRegion {
+            precondition(
+                bounds.lowerBound >= self.startIndex
+                    && bounds.upperBound <= self.endIndex
+            )
+            return ContiguousRegion(
+                storage: self.storage,
+                bounds: bounds,
+                recorder: self.recorder
+            )
+        }
+
+        func index(after index: Int) -> Int {
+            self.storage.bytes.index(after: index)
+        }
+
+        func index(before index: Int) -> Int {
+            self.storage.bytes.index(before: index)
+        }
+
+        var regions: CollectionOfOne<ContiguousRegion> {
+            CollectionOfOne(self)
+        }
+
+        func withUnsafeBytes<Result>(
+            _ body: (UnsafeRawBufferPointer) throws -> Result
+        ) rethrows -> Result {
+            self.recorder.regionBufferBorrowCount += 1
+            return try self.storage.bytes.withUnsafeBytes { storageBytes in
+                try body(
+                    UnsafeRawBufferPointer(
+                        rebasing: storageBytes[self.bounds]
+                    )
+                )
+            }
+        }
+    }
+
+    private struct RegionCollection: BidirectionalCollection {
+        typealias Index = Int
+        typealias Element = ContiguousRegion
+
+        let storage: ByteStorage
+        let splitIndex: Int?
+        let recorder: ByteAccessRecorder
+
+        var startIndex: Int { 0 }
+        var endIndex: Int { self.splitIndex == nil ? 1 : 2 }
+
+        subscript(index: Int) -> ContiguousRegion {
+            precondition(index >= self.startIndex && index < self.endIndex)
+            self.recorder.regionAccessCount += 1
+            let bounds: Range<Int>
+            switch (index, self.splitIndex) {
+            case (0, .none):
+                bounds = self.storage.bytes.startIndex..<self.storage.bytes.endIndex
+            case (0, .some(let splitIndex)):
+                bounds = self.storage.bytes.startIndex..<splitIndex
+            case (1, .some(let splitIndex)):
+                bounds = splitIndex..<self.storage.bytes.endIndex
+            default:
+                preconditionFailure("Region index is outside the collection")
+            }
+            return ContiguousRegion(
+                storage: self.storage,
+                bounds: bounds,
+                recorder: self.recorder
+            )
+        }
+
+        func index(after index: Int) -> Int { index + 1 }
+        func index(before index: Int) -> Int { index - 1 }
+    }
+
+    private struct InstrumentedData: DataProtocol {
+        typealias Index = Int
+        typealias Element = UInt8
+        typealias SubSequence = ArraySlice<UInt8>
+        typealias Regions = RegionCollection
+
+        let storage: ByteStorage
+        let splitIndex: Int?
+        let recorder: ByteAccessRecorder
+
+        init(
+            storage: [UInt8],
+            splitIndex: Int?,
+            recorder: ByteAccessRecorder
+        ) {
+            self.storage = ByteStorage(storage)
+            self.splitIndex = splitIndex
+            self.recorder = recorder
+        }
+
+        struct Iterator: IteratorProtocol {
+            let data: InstrumentedData
+            var index: Int
+
+            mutating func next() -> UInt8? {
+                guard self.index < self.data.endIndex else {
+                    return nil
+                }
+                defer {
+                    self.index = self.data.index(after: self.index)
+                }
+                return self.data[self.index]
+            }
+        }
+
+        var startIndex: Int { self.storage.bytes.startIndex }
+        var endIndex: Int { self.storage.bytes.endIndex }
+
+        subscript(index: Int) -> UInt8 {
+            self.recorder.elementAccessCount += 1
+            return self.storage.bytes[index]
+        }
+
+        subscript(bounds: Range<Int>) -> ArraySlice<UInt8> {
+            self.storage.bytes[bounds]
+        }
+
+        func index(after index: Int) -> Int {
+            self.storage.bytes.index(after: index)
+        }
+
+        func index(before index: Int) -> Int {
+            self.storage.bytes.index(before: index)
+        }
+
+        func makeIterator() -> Iterator {
+            self.recorder.elementIteratorCreationCount += 1
+            return Iterator(data: self, index: self.startIndex)
+        }
+
+        var regions: RegionCollection {
+            self.recorder.regionsAccessCount += 1
+            if let splitIndex {
+                precondition(
+                    splitIndex > self.startIndex
+                        && splitIndex < self.endIndex
+                )
+            }
+            return RegionCollection(
+                storage: self.storage,
+                splitIndex: self.splitIndex,
+                recorder: self.recorder
+            )
+        }
+    }
+
     private func representation(
         byteCount: Int,
         write: (UnsafeMutableRawBufferPointer) throws -> Void
@@ -45,6 +233,58 @@ final class VOPRFPublicAPITests: XCTestCase {
         } catch {
             XCTFail("Expected \(expectedError), received \(error)", file: file, line: line)
         }
+    }
+
+    private func assertOutputCapacityContract(
+        byteCount: Int,
+        expectedRepresentation: Data,
+        file: StaticString = #filePath,
+        line: UInt = #line,
+        write: (UnsafeMutableRawBufferPointer) throws -> Void
+    ) throws {
+        var undersized = Data(count: byteCount - 1)
+        assertVOPRFError(
+            .insufficientOutputCapacity,
+            file: file,
+            line: line
+        ) {
+            try undersized.withUnsafeMutableBytes { destination in
+                try write(destination)
+            }
+        }
+
+        var exact = Data(count: byteCount)
+        try exact.withUnsafeMutableBytes { destination in
+            try write(destination)
+        }
+        XCTAssertEqual(
+            exact,
+            expectedRepresentation,
+            file: file,
+            line: line
+        )
+
+        let sentinel = UInt8(0xa5)
+        let trailingByteCount = 8
+        var oversized = Data(
+            repeating: sentinel,
+            count: byteCount + trailingByteCount
+        )
+        try oversized.withUnsafeMutableBytes { destination in
+            try write(destination)
+        }
+        XCTAssertEqual(
+            Data(oversized.prefix(byteCount)),
+            expectedRepresentation,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            Data(oversized.suffix(trailingByteCount)),
+            Data(repeating: sentinel, count: trailingByteCount),
+            file: file,
+            line: line
+        )
     }
 
     func testEndToEndVOPRF() throws {
@@ -162,16 +402,49 @@ final class VOPRFPublicAPITests: XCTestCase {
         )
     }
 
-    func testCallerOwnedRepresentationRejectsWrongSize() throws {
+    func testCallerOwnedRepresentationCapacityContract() throws {
         let privateKey = try P384._VOPRF.PrivateKey()
-        var destination = Data(
-            count: P384._VOPRF.PrivateKey.rawRepresentationByteCount - 1
+        let publicKey = privateKey.publicKey
+        let blindedInput = try publicKey.blind(Data("capacity".utf8))
+        let blindEvaluation = try privateKey.evaluate(
+            blindedInput.blindedElement
         )
 
-        assertVOPRFError(.internalFailure) {
-            try destination.withUnsafeMutableBytes {
-                try privateKey.writeRawRepresentation(into: $0)
-            }
+        try assertOutputCapacityContract(
+            byteCount: P384._VOPRF.PrivateKey.rawRepresentationByteCount,
+            expectedRepresentation: privateKey.rawRepresentation()
+        ) {
+            try privateKey.writeRawRepresentation(into: $0)
+        }
+        try assertOutputCapacityContract(
+            byteCount: P384._VOPRF.PublicKey.oprfRepresentationByteCount,
+            expectedRepresentation: publicKey.oprfRepresentation()
+        ) {
+            try publicKey.writeOPRFRepresentation(into: $0)
+        }
+        try assertOutputCapacityContract(
+            byteCount: P384._VOPRF.BlindedElement.oprfRepresentationByteCount,
+            expectedRepresentation: blindedInput.blindedElement.oprfRepresentation()
+        ) {
+            try blindedInput.blindedElement.writeOPRFRepresentation(into: $0)
+        }
+        try assertOutputCapacityContract(
+            byteCount: P384._VOPRF.EvaluatedElement.oprfRepresentationByteCount,
+            expectedRepresentation: blindEvaluation.evaluatedElement.oprfRepresentation()
+        ) {
+            try blindEvaluation.evaluatedElement.writeOPRFRepresentation(into: $0)
+        }
+        try assertOutputCapacityContract(
+            byteCount: P384._VOPRF.Proof.rawRepresentationByteCount,
+            expectedRepresentation: blindEvaluation.proof.rawRepresentation()
+        ) {
+            try blindEvaluation.proof.writeRawRepresentation(into: $0)
+        }
+        try assertOutputCapacityContract(
+            byteCount: P384._VOPRF.BlindEvaluation.rawRepresentationByteCount,
+            expectedRepresentation: blindEvaluation.rawRepresentation()
+        ) {
+            try blindEvaluation.writeRawRepresentation(into: $0)
         }
     }
 
@@ -187,6 +460,219 @@ final class VOPRFPublicAPITests: XCTestCase {
         )
     }
     #endif
+
+    func testSingleRegionInputsAvoidParentBufferMaterialization() throws {
+        let suite = try OPRFSuite.p384SHA384VOPRF()
+        let vector = try XCTUnwrap(
+            suite.vectors.first {
+                $0.batchSize == 1 && $0.inputs.count > 2
+            }
+        )
+        let privateKey = try P384._VOPRF.PrivateKey(
+            rawRepresentation: Data(hexString: suite.privateKey)
+        )
+        let publicKeyBytes = try privateKey.publicKey.oprfRepresentation()
+        let publicKeyRecorder = ByteAccessRecorder()
+        let publicKeyInput = InstrumentedData(
+            storage: Array(publicKeyBytes),
+            splitIndex: nil,
+            recorder: publicKeyRecorder
+        )
+
+        let publicKey = try P384._VOPRF.PublicKey(
+            oprfRepresentation: publicKeyInput
+        )
+        XCTAssertEqual(
+            try publicKey.oprfRepresentation(),
+            publicKeyBytes
+        )
+        XCTAssertEqual(publicKeyRecorder.materializedByteCount, 0)
+        XCTAssertEqual(publicKeyRecorder.elementIteratorCreationCount, 0)
+        XCTAssertEqual(publicKeyRecorder.regionsAccessCount, 1)
+        XCTAssertEqual(publicKeyRecorder.regionAccessCount, 1)
+        XCTAssertEqual(publicKeyRecorder.regionBufferBorrowCount, 1)
+
+        let messageRecorder = ByteAccessRecorder()
+        let messageBytes = Array(try Data(hexString: vector.inputs))
+        let message = InstrumentedData(
+            storage: messageBytes,
+            splitIndex: nil,
+            recorder: messageRecorder
+        )
+        let blindedInput = try publicKey.blind(message)
+        XCTAssertEqual(messageRecorder.materializedByteCount, 0)
+        XCTAssertEqual(messageRecorder.elementIteratorCreationCount, 0)
+        XCTAssertEqual(messageRecorder.regionsAccessCount, 2)
+        XCTAssertEqual(messageRecorder.regionAccessCount, 2)
+        XCTAssertEqual(messageRecorder.regionBufferBorrowCount, 2)
+
+        let evaluation = try privateKey.evaluate(
+            blindedInput.blindedElement
+        )
+        let evaluationRecorder = ByteAccessRecorder()
+        let evaluationInput = InstrumentedData(
+            storage: Array(try evaluation.rawRepresentation()),
+            splitIndex: nil,
+            recorder: evaluationRecorder
+        )
+        let parsedEvaluation = try P384._VOPRF.BlindEvaluation(
+            rawRepresentation: evaluationInput
+        )
+        XCTAssertEqual(evaluationRecorder.materializedByteCount, 0)
+        XCTAssertEqual(evaluationRecorder.elementIteratorCreationCount, 0)
+        XCTAssertEqual(evaluationRecorder.regionsAccessCount, 1)
+        XCTAssertEqual(evaluationRecorder.regionAccessCount, 1)
+        XCTAssertEqual(evaluationRecorder.regionBufferBorrowCount, 1)
+
+        XCTAssertEqual(
+            try publicKey.finalize(
+                blindedInput,
+                using: parsedEvaluation
+            ).hexString,
+            vector.outputs
+        )
+
+        let directRecorder = ByteAccessRecorder()
+        let directInput = InstrumentedData(
+            storage: messageBytes,
+            splitIndex: nil,
+            recorder: directRecorder
+        )
+        XCTAssertEqual(
+            try privateKey.evaluate(directInput).hexString,
+            vector.outputs
+        )
+        XCTAssertEqual(directRecorder.materializedByteCount, 0)
+        XCTAssertEqual(directRecorder.elementIteratorCreationCount, 0)
+        XCTAssertEqual(directRecorder.regionsAccessCount, 2)
+        XCTAssertEqual(directRecorder.regionAccessCount, 2)
+        XCTAssertEqual(directRecorder.regionBufferBorrowCount, 2)
+    }
+
+    func testMultiRegionInputsMaterializeExactlyOnce() throws {
+        let suite = try OPRFSuite.p384SHA384VOPRF()
+        let vector = try XCTUnwrap(
+            suite.vectors.first {
+                $0.batchSize == 1 && $0.inputs.count > 2
+            }
+        )
+        let privateKey = try P384._VOPRF.PrivateKey(
+            rawRepresentation: Data(hexString: suite.privateKey)
+        )
+        let publicKeyBytes = try privateKey.publicKey.oprfRepresentation()
+        let publicKeyRecorder = ByteAccessRecorder()
+        let publicKeyInput = InstrumentedData(
+            storage: Array(publicKeyBytes),
+            splitIndex: 17,
+            recorder: publicKeyRecorder
+        )
+
+        let publicKey = try P384._VOPRF.PublicKey(
+            oprfRepresentation: publicKeyInput
+        )
+        XCTAssertEqual(
+            try publicKey.oprfRepresentation(),
+            publicKeyBytes
+        )
+        XCTAssertEqual(
+            publicKeyRecorder.materializedByteCount,
+            publicKeyInput.count
+        )
+        XCTAssertEqual(publicKeyRecorder.elementIteratorCreationCount, 1)
+        XCTAssertEqual(publicKeyRecorder.regionsAccessCount, 1)
+        XCTAssertEqual(publicKeyRecorder.regionAccessCount, 2)
+        XCTAssertEqual(publicKeyRecorder.regionBufferBorrowCount, 0)
+
+        let messageBytes = Array(try Data(hexString: vector.inputs))
+        let messageSplitIndex = messageBytes.count / 2
+        let blindRecorder = ByteAccessRecorder()
+        let blindInput = InstrumentedData(
+            storage: messageBytes,
+            splitIndex: messageSplitIndex,
+            recorder: blindRecorder
+        )
+        let blindedInput = try publicKey.blind(blindInput)
+        XCTAssertEqual(
+            blindRecorder.materializedByteCount,
+            blindInput.count
+        )
+        XCTAssertEqual(blindRecorder.elementIteratorCreationCount, 1)
+        XCTAssertEqual(blindRecorder.regionsAccessCount, 2)
+        XCTAssertEqual(blindRecorder.regionAccessCount, 4)
+        XCTAssertEqual(blindRecorder.regionBufferBorrowCount, 2)
+
+        let directRecorder = ByteAccessRecorder()
+        let directInput = InstrumentedData(
+            storage: messageBytes,
+            splitIndex: messageSplitIndex,
+            recorder: directRecorder
+        )
+        let directOutput = try privateKey.evaluate(directInput)
+        XCTAssertEqual(directOutput.hexString, vector.outputs)
+        XCTAssertEqual(
+            directRecorder.materializedByteCount,
+            directInput.count
+        )
+        XCTAssertEqual(directRecorder.elementIteratorCreationCount, 1)
+        XCTAssertEqual(directRecorder.regionsAccessCount, 2)
+        XCTAssertEqual(directRecorder.regionAccessCount, 4)
+        XCTAssertEqual(directRecorder.regionBufferBorrowCount, 2)
+
+        let evaluation = try privateKey.evaluate(
+            blindedInput.blindedElement
+        )
+        let evaluationRecorder = ByteAccessRecorder()
+        let evaluationInput = InstrumentedData(
+            storage: Array(try evaluation.rawRepresentation()),
+            splitIndex: 61,
+            recorder: evaluationRecorder
+        )
+        let parsedEvaluation = try P384._VOPRF.BlindEvaluation(
+            rawRepresentation: evaluationInput
+        )
+        XCTAssertEqual(
+            evaluationRecorder.materializedByteCount,
+            evaluationInput.count
+        )
+        XCTAssertEqual(evaluationRecorder.elementIteratorCreationCount, 1)
+        XCTAssertEqual(evaluationRecorder.regionsAccessCount, 1)
+        XCTAssertEqual(evaluationRecorder.regionAccessCount, 2)
+        XCTAssertEqual(evaluationRecorder.regionBufferBorrowCount, 0)
+        XCTAssertEqual(
+            try publicKey.finalize(
+                blindedInput,
+                using: parsedEvaluation
+            ).hexString,
+            vector.outputs
+        )
+    }
+
+    func testBlindedInputDoesNotRetainSourceBuffer() throws {
+        let privateKey = try P384._VOPRF.PrivateKey()
+        let publicKey = privateKey.publicKey
+        weak var sourceRecorder: ByteAccessRecorder?
+
+        func makeBlindedInput() throws -> P384._VOPRF.BlindedInput {
+            let recorder = ByteAccessRecorder()
+            sourceRecorder = recorder
+            let input = InstrumentedData(
+                storage: Array("ephemeral VOPRF input".utf8),
+                splitIndex: nil,
+                recorder: recorder
+            )
+            return try publicKey.blind(input)
+        }
+
+        let blindedInput = try makeBlindedInput()
+        XCTAssertNil(sourceRecorder)
+
+        let evaluation = try privateKey.evaluate(
+            blindedInput.blindedElement
+        )
+        XCTAssertFalse(
+            try publicKey.finalize(blindedInput, using: evaluation).isEmpty
+        )
+    }
 
     func testZeroProofIsRejectedWithoutTerminating() throws {
         let privateKey = try P384._VOPRF.PrivateKey()
