@@ -33,7 +33,8 @@ jobs:
       - name: Build with CMake 3.29
         run: |
           set -euo pipefail
-          swift --version | grep -E 'Apple Swift version 6\.4([^0-9]|$)|^Swift version 6\.4([^0-9]|$)'
+          swift --version \
+            | grep -E '(^|[[:space:]])(Apple )?Swift version 6\.4([^0-9]|$)'
           curl -fsSL --retry 3 https://raw.githubusercontent.com/apple/swift-nio/199ccb983c1085583a11e7eb46f053ccdec64c52/scripts/cmake-build.sh \
             | CMAKE_VERSION=3.29.9 TARGET_DIRECTORY=. bash
 
@@ -67,11 +68,18 @@ jobs:
           toolchain_identifier="$(plutil -extract CFBundleIdentifier raw "${toolchain}/Info.plist")"
           test -n "$toolchain_identifier"
           echo "TOOLCHAINS=${toolchain_identifier}" >> "$GITHUB_ENV"
-      - name: Run macOS package validators
+      - name: Test the macOS package
         run: |
           set -euo pipefail
           xcrun swift --version \
-            | grep -E 'Apple Swift version 6\.4([^0-9]|$)|^Swift version 6\.4([^0-9]|$)'
+            | grep -E '(^|[[:space:]])(Apple )?Swift version 6\.4([^0-9]|$)'
+          /usr/bin/xcodebuild test \
+            -scheme swift-crypto-Package \
+            -destination 'platform=macOS' \
+            -quiet
+      - name: Run macOS capability validators
+        run: |
+          set -euo pipefail
           xcrun swift run crypto-digest-validation
           xcrun swift run crypto-capability-validation
 
@@ -97,12 +105,12 @@ jobs:
           download="$(jq -er '.[0].download' <<< "$metadata")"
           checksum="$(jq -er '.[0].checksum' <<< "$metadata")"
           [[ "$snapshot" == swift-6.4.x-* ]]
-          [[ -n "$download" ]]
+          [[ "$download" == "${snapshot}_wasm.artifactbundle.tar.gz" ]]
           [[ "$checksum" =~ ^[0-9a-f]{64}$ ]]
           sdk_url="https://download.swift.org/swift-6.4.x-branch/wasm-sdk/${snapshot}/${download}"
           swift sdk install --swift-sdks-path /tmp/swiftsdks "$sdk_url" --checksum "$checksum"
           swift --version \
-            | grep -E 'Apple Swift version 6\.4([^0-9]|$)|^Swift version 6\.4([^0-9]|$)'
+            | grep -E '(^|[[:space:]])(Apple )?Swift version 6\.4([^0-9]|$)'
       - name: Run WebAssembly validators
         run: |
           set -euo pipefail
@@ -138,12 +146,12 @@ jobs:
           download="$(jq -er '.[0].download' <<< "$metadata")"
           checksum="$(jq -er '.[0].checksum' <<< "$metadata")"
           [[ "$snapshot" == swift-6.4.x-* ]]
-          [[ -n "$download" ]]
+          [[ "$download" == "${snapshot}_static-linux-0.1.0.artifactbundle.tar.gz" ]]
           [[ "$checksum" =~ ^[0-9a-f]{64}$ ]]
           sdk_url="https://download.swift.org/swift-6.4.x-branch/static-sdk/${snapshot}/${download}"
           swift sdk install --swift-sdks-path /tmp/swiftsdks "$sdk_url" --checksum "$checksum"
           swift --version \
-            | grep -E 'Apple Swift version 6\.4([^0-9]|$)|^Swift version 6\.4([^0-9]|$)'
+            | grep -E '(^|[[:space:]])(Apple )?Swift version 6\.4([^0-9]|$)'
       - name: Run static Linux validator
         run: |
           set -euo pipefail

@@ -58,8 +58,8 @@ jobs:
       linux_nightly_next_enabled: true
       linux_nightly_main_enabled: false
 
-  platform-validation:
-    name: Platform validation
+  swift-6-4-platform-validation:
+    name: Swift 6.4 platform validation
     uses: ./.github/workflows/platform_validation.yml
     with:
       extended: ${{ github.event_name == 'schedule' }}
