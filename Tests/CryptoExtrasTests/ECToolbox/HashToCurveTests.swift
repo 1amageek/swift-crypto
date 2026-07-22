@@ -34,15 +34,10 @@ struct HashToCurveTestVector: Codable {
     let msg: String
 }
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 class HashToCurveTests: XCTestCase {
 
-    func testVector<C: SupportedCurveDetailsImpl>(vectorFileName file: String, with h2c: HashToCurveImpl<C>.Type) throws {
-        #if CRYPTO_IN_SWIFTPM
+    func testVector<C: HashToGroupCurve>(vectorFileName file: String, with h2c: CurveHashToGroup<C>.Type) throws {
         let bundle = Bundle.module
-        #else
-        let bundle = Bundle(for: type(of: self))
-        #endif
         let fileURL = bundle.url(forResource: file, withExtension: "json")
 
         let data = try Data(contentsOf: fileURL!)
@@ -61,9 +56,8 @@ class HashToCurveTests: XCTestCase {
     }
 
     func testVectors() throws {
-        try testVector(vectorFileName: "P256_XMD-SHA-256_SSWU_RO_", with: HashToCurveImpl<P256>.self)
-        try testVector(vectorFileName: "P384_XMD-SHA-384_SSWU_RO_", with: HashToCurveImpl<P384>.self)
-//        try testVector(vectorFileName: "P521_XMD-SHA-512_SSWU_RO_", with: HashToCurveImpl<P521>.self)
+        try testVector(vectorFileName: "P256_XMD-SHA-256_SSWU_RO_", with: CurveHashToGroup<P256>.self)
+        try testVector(vectorFileName: "P384_XMD-SHA-384_SSWU_RO_", with: CurveHashToGroup<P384>.self)
     }
 
     func testH2F() throws {
@@ -73,7 +67,7 @@ class HashToCurveTests: XCTestCase {
         let scalar = try HashToField<P256>.hashToField(data,
                                                   outputElementCount: 1,
                                                   dst: dst,
-                                                        outputSize: 48, reductionIsModOrder: false).first!
+                                                        outputSize: 48, reductionModulus: .groupOrder).first!
 
         let tv = try! Data(hexString: "5561bc4e7322a640b2ff6cb6aad96d1021f423233b858343caefa05abde7ef85")
         XCTAssert(scalar.rawRepresentation == tv)
@@ -105,7 +99,7 @@ class HashToCurveTests: XCTestCase {
     func testScalarSerialization() throws {
         let serialized = try Data(hexString: "afe47f2ea2b10465cc26ac403194dfb68b7f5ee865cda61e9f3e07a537220af1")
 
-        let scalar = try GroupImpl<P256>.Scalar(bytes: serialized)
+        let scalar = try PrimeOrderCurveGroup<P256>.Scalar(canonicalRepresentation: serialized)
 
         XCTAssertEqual(scalar.rawRepresentation, serialized)
     }
@@ -114,7 +108,13 @@ class HashToCurveTests: XCTestCase {
         let dst = "QUUX-V01-CS02-with-P256_XMD:SHA-256_SSWU_RO_".data(using: .ascii)!
         let msg = "abc".data(using: .ascii)!
 
-        let elements = try HashToField<P256>.hashToField(msg, outputElementCount: 2, dst: dst, outputSize: 48, reductionIsModOrder: true)
+        let elements = try HashToField<P256>.hashToField(
+            msg,
+            outputElementCount: 2,
+            dst: dst,
+            outputSize: 48,
+            reductionModulus: .fieldPrime
+        )
 
         let u0 = elements.first!
         let u1 = elements.last!

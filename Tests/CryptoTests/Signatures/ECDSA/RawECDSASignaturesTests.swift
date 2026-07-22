@@ -54,7 +54,7 @@ func testVectorForCurve<S: NISTSigning>(curve: S.Type, file: StaticString = #fil
 
 class RawECDSASignaturesTests: XCTestCase {
     func testForCurve<S: NISTSigning>(curve: S.Type, file: StaticString = #filePath, line: UInt = #line) throws {
-        let msg = try unwrap("abc".data(using: .utf8), file: file, line: line)
+        let msg = try XCTUnwrap("abc".data(using: .utf8), file: file, line: line)
         // We check that the test message is correctly encoded.
         XCTAssertEqual(msg, try Data(hexString: "616263"), file: file, line: line)
 
@@ -68,11 +68,11 @@ class RawECDSASignaturesTests: XCTestCase {
         XCTAssertEqual(privateKey.rawRepresentation, tv.privateKey, file: file, line: line)
         XCTAssertEqual(privateKey.publicKey.rawRepresentation, tv.publicKey, file: file, line: line)
 
-        let typedSignature = try unwrap(signature as? S.PublicKey.Signature, file: file, line: line)
+        let typedSignature = try XCTUnwrap(signature as? S.PublicKey.Signature, file: file, line: line)
         XCTAssert(publicKey.isValidSignature(typedSignature, for: msg), file: file, line: line)
 
         let privateKeySignature = try orFail { try privateKey.signature(for: msg) }
-        let typedPrivateKeySignature = try unwrap(privateKeySignature as? S.PublicKey.Signature, file: file, line: line)
+        let typedPrivateKeySignature = try XCTUnwrap(privateKeySignature as? S.PublicKey.Signature, file: file, line: line)
         XCTAssert(publicKey.isValidSignature(typedPrivateKeySignature, for: msg), file: file, line: line)
     }
 

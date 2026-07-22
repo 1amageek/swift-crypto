@@ -18,13 +18,12 @@ import FoundationEssentials
 import Foundation
 #endif
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 @usableFromInline
 internal func withCryptoBoringWrapperUnsafeBytes<Bytes: ContiguousBytes, Result>(
     _ bytes: Bytes,
     _ body: (UnsafeRawBufferPointer) throws(CryptoBoringWrapperError) -> Result
 ) throws(CryptoBoringWrapperError) -> Result {
-    #if hasFeature(Embedded) && !canImport(FoundationEssentials) && !canImport(Foundation)
+    #if !canImport(FoundationEssentials) && !canImport(Foundation)
     return try bytes.withUnsafeBytes(body)
     #else
     do {
@@ -40,7 +39,6 @@ internal func withCryptoBoringWrapperUnsafeBytes<Bytes: ContiguousBytes, Result>
 }
 
 #if canImport(FoundationEssentials) || canImport(Foundation)
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 @usableFromInline
 internal func withCryptoBoringWrapperUnsafeMutableBytes<Result>(
     _ data: inout Data,

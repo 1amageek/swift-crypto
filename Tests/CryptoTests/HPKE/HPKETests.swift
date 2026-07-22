@@ -26,14 +26,13 @@ import XCTest
 
 class HPKETests: XCTestCase {
     func testCases() throws {
-        var ciphersuitesToTest = [
-            HPKE.Ciphersuite.P256_SHA256_AES_GCM_256, .P384_SHA384_AES_GCM_256, .P521_SHA512_AES_GCM_256, .Curve25519_SHA256_ChachaPoly
+        let ciphersuitesToTest = [
+            HPKE.Ciphersuite.P256_SHA256_AES_GCM_256,
+            .P384_SHA384_AES_GCM_256,
+            .P521_SHA512_AES_GCM_256,
+            .Curve25519_SHA256_ChachaPoly,
+            .XWingMLKEM768X25519_SHA256_AES_GCM_256,
         ]
-        if #available(iOS 19.0, macOS 16.0, watchOS 12.0, tvOS 19.0, macCatalyst 19.0, *) {
-            ciphersuitesToTest.append(contentsOf: [
-                .XWingMLKEM768X25519_SHA256_AES_GCM_256
-            ])
-        }
 
         for ciphersuite in ciphersuitesToTest {
             try testCiphersuite(ciphersuite)
@@ -56,9 +55,7 @@ class HPKETests: XCTestCase {
         case .Curve25519_HKDF_SHA256:
             try testCiphersuite(ciphersuite, withKeys: Curve25519.KeyAgreement.PrivateKey.self)
         case .XWingMLKEM768X25519:
-            if #available(iOS 19.0, macOS 16.0, watchOS 12.0, tvOS 19.0, macCatalyst 19.0, *) {
-                try testHPKECiphersuite(ciphersuite, withKeys: XWingMLKEM768X25519.PrivateKey.self)
-            } else { /* pass */ }
+            try testHPKECiphersuite(ciphersuite, withKeys: XWingMLKEM768X25519.PrivateKey.self)
         @unknown default:
             fatalError()
         }
@@ -161,14 +158,12 @@ class HPKETests: XCTestCase {
     }
 
     func testHPKEKEMInterface() throws {
-        if #available(iOS 19.0, macOS 16.0, watchOS 12.0, tvOS 19.0, macCatalyst 19.0, *) {
-            let c = HPKE.Ciphersuite.XWingMLKEM768X25519_SHA256_AES_GCM_256
-            let skR = try XWingMLKEM768X25519.PrivateKey.generate()
-            let info = Data("Some Test Data".utf8)
-            var sender = try HPKE.Sender(recipientKey: skR.publicKey, ciphersuite: c, info: info)
-            var recipient = try HPKE.Recipient(privateKey: skR, ciphersuite: c, info: info, encapsulatedKey: sender.encapsulatedKey)
-            XCTAssertNoThrow(try testSenderRecipient(sender: &sender, recipient: &recipient))
-        }
+        let c = HPKE.Ciphersuite.XWingMLKEM768X25519_SHA256_AES_GCM_256
+        let skR = try XWingMLKEM768X25519.PrivateKey.generate()
+        let info = Data("Some Test Data".utf8)
+        var sender = try HPKE.Sender(recipientKey: skR.publicKey, ciphersuite: c, info: info)
+        var recipient = try HPKE.Recipient(privateKey: skR, ciphersuite: c, info: info, encapsulatedKey: sender.encapsulatedKey)
+        XCTAssertNoThrow(try testSenderRecipient(sender: &sender, recipient: &recipient))
     }
 }
 

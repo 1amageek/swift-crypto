@@ -14,7 +14,7 @@
 
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
 /// A container for Advanced Encryption Standard (AES) ciphers.
 @nonexhaustive

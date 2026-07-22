@@ -21,7 +21,6 @@ import Foundation
 #if canImport(FoundationEssentials) || canImport(Foundation)
 extension Data {
     /// Copy the raw bytes from the given span into a new Data instance.
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     init(copying bytes: RawSpan) {
         if bytes.byteCount == 0 {
             self = Data()
@@ -38,7 +37,6 @@ extension Data {
     }
 
     /// Append the contents of the given span to this Data instance.
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     mutating func append(contentsOf bytes: RawSpan) {
         bytes.withUnsafeBytes { buffer in
             self.append(contentsOf: buffer)

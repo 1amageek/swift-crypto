@@ -14,7 +14,7 @@
 
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
 /// An elliptic curve that enables X25519 key agreement and Ed25519 signatures.
 @nonexhaustive

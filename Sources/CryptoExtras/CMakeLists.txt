@@ -33,8 +33,8 @@ add_library(CryptoExtras
   "ARC/ARCServer.swift"
   "ChaCha20CTR/BoringSSL/ChaCha20CTR_boring.swift"
   "ChaCha20CTR/ChaCha20CTR.swift"
-  "Digests/BoringSSL/BoringSSLSHA512256Context.swift"
-  "Digests/BoringSSL/BoringSSLSHA512256HashFunction.swift"
+  "Digests/BoringSSL/SHA512256DigestContext.swift"
+  "Digests/BoringSSL/SHA512256DigestOperations.swift"
   "Digests/SHA512256.swift"
   "Digests/SHA512256Digest.swift"
   "EC/Curve25519+PEM.swift"
@@ -56,12 +56,12 @@ add_library(CryptoExtras
   "OPRFs/OPRFServer.swift"
   "OPRFs/VOPRF+API.swift"
   "OPRFs/VOPRFClient.swift"
+  "OPRFs/VOPRFError.swift"
   "OPRFs/VOPRFServer.swift"
   "RSA/BoringSSLPassphraseCallbackManager.swift"
   "RSA/RSA+BlindSigning.swift"
   "RSA/RSA.swift"
   "RSA/RSA_boring.swift"
-  "Reexport.swift"
   "Util/BoringSSL/Zeroization_boring.swift"
   "Util/BoringSSLHelpers.swift"
   "Util/CryptoKitErrors_boring.swift"
@@ -73,25 +73,18 @@ add_library(CryptoExtras
   "Util/PEMDocument.swift"
   "Util/PrettyBytes.swift"
   "Util/SubjectPublicKeyInfo.swift"
-  "Util/ThreadSpecific/ThreadOps.swift"
-  "Util/ThreadSpecific/ThreadPosix.swift"
-  "Util/ThreadSpecific/ThreadSpecific.swift"
-  "Util/ThreadSpecific/ThreadWASI.swift"
-  "Util/ThreadSpecific/ThreadWindows.swift"
   "ZKPs/DLEQ.swift"
   "ZKPs/Prover.swift"
   "ZKPs/Verifier.swift"
   "ZKPs/ZKPToolbox.swift"
 )
 
-target_compile_options(CryptoExtras PRIVATE -DCRYPTO_IN_SWIFTPM)
-
 target_include_directories(CryptoExtras PRIVATE
   $<TARGET_PROPERTY:CCryptoBoringSSL,INCLUDE_DIRECTORIES>
   $<TARGET_PROPERTY:CCryptoBoringSSLShims,INCLUDE_DIRECTORIES>)
 
 target_link_libraries(CryptoExtras PUBLIC
-  $<$<NOT:$<PLATFORM_ID:Darwin>>:Foundation>
+  ${SWIFT_CRYPTO_PLATFORM_LIBRARIES}
   Crypto
   CryptoBoringWrapper
   CCryptoBoringSSL

@@ -12,24 +12,25 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
 // MARK: - Generated file, do NOT edit
 // any edits of this file WILL be overwritten and thus discarded
 // see section `gyb` in `README` for details.
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
+internal import CCryptoBoringSSL
 %{
     parameter_sets = ["768", "1024"]
 }%
 % for parameter_set in parameter_sets:
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLKEM${parameter_set} {
     /// A ML-KEM-${parameter_set} private key.
     struct InternalPrivateKey: @unchecked Sendable {
@@ -171,7 +172,6 @@ extension MLKEM${parameter_set} {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLKEM${parameter_set} {
     /// A ML-KEM-${parameter_set} public key.
     struct InternalPublicKey: @unchecked Sendable {
@@ -283,7 +283,6 @@ extension MLKEM${parameter_set} {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLKEM${parameter_set} {
     /// The size of the encapsulated shared secret in bytes.
     private static let ciphertextByteCount = Int(MLKEM${parameter_set}_CIPHERTEXT_BYTES)

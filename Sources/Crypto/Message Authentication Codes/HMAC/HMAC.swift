@@ -20,7 +20,7 @@ import Foundation
 
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
 
 /// A hash-based message authentication algorithm.

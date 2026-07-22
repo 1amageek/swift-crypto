@@ -12,317 +12,373 @@
 //
 //===----------------------------------------------------------------------===//
 
+internal import CCryptoBoringSSL
+import Synchronization
 
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
-
-
-/// A context for performing mathematical operations on ArbitraryPrecisionIntegers over a finite field.
+/// Owns the modulus and reusable arithmetic workspace for finite-field operations.
 ///
-/// A common part of elliptic curve mathematics is to perform arithmetic operations over a finite field. These require
-/// performing modular arithmetic, and cannot be processed in the same way as regular math on these integers.
-///
-/// Most operations we perform over finite fields are part of repeated, larger arithmetic operations, so this object also
-/// manages the lifetime of a `BN_CTX`. While `BN_CTX` is a silly data type, it does still have the effect of caching existing
-/// `BIGNUM`s, so it's not a terrible idea to use it here.
-///
-/// Annoyingly, because of the way we have implemented ArbitraryPrecisionInteger, we can't actually use these temporary bignums
-/// ourselves.
+/// BoringSSL mutates `BN_CTX` while an operation is running. Keeping the modulus and
+/// workspace in one mutex makes every borrow scoped and prevents the workspace pointer
+/// from escaping into unsynchronized callers.
 @usableFromInline
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-package class FiniteFieldArithmeticContext: @unchecked Sendable {
-    private let fieldSize: ArbitraryPrecisionInteger
-    package let bnCtx: OpaquePointer
+package final class FiniteFieldArithmeticContext: Sendable {
+    private struct State {
+        let modulus: ArbitraryPrecisionInteger
+        let workspace: OpaquePointer
+    }
+
+    private let state: Mutex<State>
 
     @usableFromInline
-    package init(fieldSize: ArbitraryPrecisionInteger) throws(CryptoBoringWrapperError) {
-        self.fieldSize = fieldSize
-        guard let bnCtx = CCryptoBoringSSL_BN_CTX_new() else {
+    package init(modulus: ArbitraryPrecisionInteger) throws(CryptoBoringWrapperError) {
+        guard let workspace = CCryptoBoringSSL_BN_CTX_new() else {
             throw CryptoBoringWrapperError.internalBoringSSLError()
         }
-        CCryptoBoringSSL_BN_CTX_start(bnCtx)
-        self.bnCtx = bnCtx
+        CCryptoBoringSSL_BN_CTX_start(workspace)
+        self.state = Mutex(State(modulus: modulus, workspace: workspace))
     }
 
     deinit {
-        CCryptoBoringSSL_BN_CTX_end(self.bnCtx)
-        CCryptoBoringSSL_BN_CTX_free(self.bnCtx)
+        state.withLock { state in
+            CCryptoBoringSSL_BN_CTX_end(state.workspace)
+            CCryptoBoringSSL_BN_CTX_free(state.workspace)
+        }
+    }
+
+    /// Borrows the arithmetic workspace for one complete BoringSSL operation.
+    ///
+    /// The operation must not call another method on this context because `Mutex` is
+    /// intentionally non-recursive.
+    @usableFromInline
+    package func performWithArithmeticWorkspace(
+        _ operation: (OpaquePointer) -> Int32
+    ) -> Int32 {
+        state.withLock { state in
+            operation(state.workspace)
+        }
     }
 }
 
 // MARK: - Arithmetic operations
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension FiniteFieldArithmeticContext {
     @usableFromInline
-    package func residue(_ x: ArbitraryPrecisionInteger) throws(CryptoBoringWrapperError) -> ArbitraryPrecisionInteger {
+    package func residue(
+        _ value: ArbitraryPrecisionInteger
+    ) throws(CryptoBoringWrapperError) -> ArbitraryPrecisionInteger {
         var result = ArbitraryPrecisionInteger()
-
-        guard
-            x.withUnsafeBignumPointer({ xPtr in
-                self.fieldSize.withUnsafeBignumPointer { modPtr in
-                    result.withUnsafeMutableBignumPointer { resultPtr in
-                        CCryptoBoringSSL_BN_nnmod(resultPtr, xPtr, modPtr, self.bnCtx)
+        let returnCode = state.withLock { state in
+            value.withUnsafeBignumPointer { valuePointer in
+                state.modulus.withUnsafeBignumPointer { modulusPointer in
+                    result.withUnsafeMutableBignumPointer { resultPointer in
+                        CCryptoBoringSSL_BN_nnmod(
+                            resultPointer,
+                            valuePointer,
+                            modulusPointer,
+                            state.workspace
+                        )
                     }
-                }
-            }) == 1
-        else {
-            throw CryptoBoringWrapperError.internalBoringSSLError()
-        }
-
-        return result
-    }
-
-    @usableFromInline
-    package func square(_ input: ArbitraryPrecisionInteger) throws(CryptoBoringWrapperError) -> ArbitraryPrecisionInteger {
-        var output = ArbitraryPrecisionInteger()
-
-        let rc = input.withUnsafeBignumPointer { inputPointer in
-            self.fieldSize.withUnsafeBignumPointer { fieldSizePointer in
-                output.withUnsafeMutableBignumPointer { outputPointer in
-                    CCryptoBoringSSL_BN_mod_sqr(outputPointer, inputPointer, fieldSizePointer, self.bnCtx)
                 }
             }
         }
 
-        guard rc == 1 else {
+        guard returnCode == 1 else {
             throw CryptoBoringWrapperError.internalBoringSSLError()
         }
+        return result
+    }
 
-        return output
+    @usableFromInline
+    package func square(
+        _ value: ArbitraryPrecisionInteger
+    ) throws(CryptoBoringWrapperError) -> ArbitraryPrecisionInteger {
+        var result = ArbitraryPrecisionInteger()
+        let returnCode = state.withLock { state in
+            value.withUnsafeBignumPointer { valuePointer in
+                state.modulus.withUnsafeBignumPointer { modulusPointer in
+                    result.withUnsafeMutableBignumPointer { resultPointer in
+                        CCryptoBoringSSL_BN_mod_sqr(
+                            resultPointer,
+                            valuePointer,
+                            modulusPointer,
+                            state.workspace
+                        )
+                    }
+                }
+            }
+        }
+
+        guard returnCode == 1 else {
+            throw CryptoBoringWrapperError.internalBoringSSLError()
+        }
+        return result
     }
 
     @usableFromInline
     package func multiply(
-        _ x: ArbitraryPrecisionInteger,
-        _ y: ArbitraryPrecisionInteger
-    ) throws(CryptoBoringWrapperError)
-        -> ArbitraryPrecisionInteger
-    {
-        var output = ArbitraryPrecisionInteger()
-
-        let rc = x.withUnsafeBignumPointer { xPointer in
-            y.withUnsafeBignumPointer { yPointer in
-                self.fieldSize.withUnsafeBignumPointer { fieldSizePointer in
-                    output.withUnsafeMutableBignumPointer { outputPointer in
-                        CCryptoBoringSSL_BN_mod_mul(
-                            outputPointer,
-                            xPointer,
-                            yPointer,
-                            fieldSizePointer,
-                            self.bnCtx
-                        )
+        _ lhs: ArbitraryPrecisionInteger,
+        _ rhs: ArbitraryPrecisionInteger
+    ) throws(CryptoBoringWrapperError) -> ArbitraryPrecisionInteger {
+        var result = ArbitraryPrecisionInteger()
+        let returnCode = state.withLock { state in
+            lhs.withUnsafeBignumPointer { lhsPointer in
+                rhs.withUnsafeBignumPointer { rhsPointer in
+                    state.modulus.withUnsafeBignumPointer { modulusPointer in
+                        result.withUnsafeMutableBignumPointer { resultPointer in
+                            CCryptoBoringSSL_BN_mod_mul(
+                                resultPointer,
+                                lhsPointer,
+                                rhsPointer,
+                                modulusPointer,
+                                state.workspace
+                            )
+                        }
                     }
                 }
             }
         }
 
-        guard rc == 1 else {
+        guard returnCode == 1 else {
             throw CryptoBoringWrapperError.internalBoringSSLError()
         }
-
-        return output
+        return result
     }
 
     @usableFromInline
     package func add(
-        _ x: ArbitraryPrecisionInteger,
-        _ y: ArbitraryPrecisionInteger
-    ) throws(CryptoBoringWrapperError)
-        -> ArbitraryPrecisionInteger
-    {
-        var output = ArbitraryPrecisionInteger()
-
-        let rc = x.withUnsafeBignumPointer { xPointer in
-            y.withUnsafeBignumPointer { yPointer in
-                self.fieldSize.withUnsafeBignumPointer { fieldSizePointer in
-                    output.withUnsafeMutableBignumPointer { outputPointer in
-                        CCryptoBoringSSL_BN_mod_add(
-                            outputPointer,
-                            xPointer,
-                            yPointer,
-                            fieldSizePointer,
-                            self.bnCtx
-                        )
+        _ lhs: ArbitraryPrecisionInteger,
+        _ rhs: ArbitraryPrecisionInteger
+    ) throws(CryptoBoringWrapperError) -> ArbitraryPrecisionInteger {
+        var result = ArbitraryPrecisionInteger()
+        let returnCode = state.withLock { state in
+            lhs.withUnsafeBignumPointer { lhsPointer in
+                rhs.withUnsafeBignumPointer { rhsPointer in
+                    state.modulus.withUnsafeBignumPointer { modulusPointer in
+                        result.withUnsafeMutableBignumPointer { resultPointer in
+                            CCryptoBoringSSL_BN_mod_add(
+                                resultPointer,
+                                lhsPointer,
+                                rhsPointer,
+                                modulusPointer,
+                                state.workspace
+                            )
+                        }
                     }
                 }
             }
         }
 
-        guard rc == 1 else {
+        guard returnCode == 1 else {
             throw CryptoBoringWrapperError.internalBoringSSLError()
         }
-
-        return output
+        return result
     }
 
     @usableFromInline
     package func subtract(
-        _ x: ArbitraryPrecisionInteger,
-        from y: ArbitraryPrecisionInteger
-    ) throws(CryptoBoringWrapperError)
-        -> ArbitraryPrecisionInteger
-    {
-        var output = ArbitraryPrecisionInteger()
-
-        let rc = x.withUnsafeBignumPointer { xPointer in
-            y.withUnsafeBignumPointer { yPointer in
-                self.fieldSize.withUnsafeBignumPointer { fieldSizePointer in
-                    output.withUnsafeMutableBignumPointer { outputPointer in
-                        // Note the order of y and x.
-                        CCryptoBoringSSL_BN_mod_sub(
-                            outputPointer,
-                            yPointer,
-                            xPointer,
-                            fieldSizePointer,
-                            self.bnCtx
-                        )
+        _ value: ArbitraryPrecisionInteger,
+        from minuend: ArbitraryPrecisionInteger
+    ) throws(CryptoBoringWrapperError) -> ArbitraryPrecisionInteger {
+        var result = ArbitraryPrecisionInteger()
+        let returnCode = state.withLock { state in
+            value.withUnsafeBignumPointer { valuePointer in
+                minuend.withUnsafeBignumPointer { minuendPointer in
+                    state.modulus.withUnsafeBignumPointer { modulusPointer in
+                        result.withUnsafeMutableBignumPointer { resultPointer in
+                            CCryptoBoringSSL_BN_mod_sub(
+                                resultPointer,
+                                minuendPointer,
+                                valuePointer,
+                                modulusPointer,
+                                state.workspace
+                            )
+                        }
                     }
                 }
             }
         }
 
-        guard rc == 1 else {
+        guard returnCode == 1 else {
             throw CryptoBoringWrapperError.internalBoringSSLError()
         }
-
-        return output
+        return result
     }
 
     @usableFromInline
     package func positiveSquareRoot(
-        _ x: ArbitraryPrecisionInteger
-    ) throws(CryptoBoringWrapperError)
-        -> ArbitraryPrecisionInteger
-    {
-        let outputPointer = x.withUnsafeBignumPointer { xPointer in
-            self.fieldSize.withUnsafeBignumPointer { fieldSizePointer in
-                // We can't pass a pointer in as BN_mod_sqrt may attempt to free it.
-                CCryptoBoringSSL_BN_mod_sqrt(nil, xPointer, fieldSizePointer, self.bnCtx)
+        _ value: ArbitraryPrecisionInteger
+    ) throws(CryptoBoringWrapperError) -> ArbitraryPrecisionInteger {
+        let resultPointer = state.withLock { state in
+            value.withUnsafeBignumPointer { valuePointer in
+                state.modulus.withUnsafeBignumPointer { modulusPointer in
+                    CCryptoBoringSSL_BN_mod_sqrt(
+                        nil,
+                        valuePointer,
+                        modulusPointer,
+                        state.workspace
+                    )
+                }
             }
         }
 
-        guard let actualOutputPointer = outputPointer else {
+        guard let resultPointer else {
             throw CryptoBoringWrapperError.internalBoringSSLError()
         }
-
-        // Ok, we own this pointer now.
         defer {
-            CCryptoBoringSSL_BN_free(outputPointer)
+            CCryptoBoringSSL_BN_free(resultPointer)
         }
-
-        return try ArbitraryPrecisionInteger(copying: actualOutputPointer)
+        return try ArbitraryPrecisionInteger(copying: resultPointer)
     }
 
     @usableFromInline
-    package func inverse(_ x: ArbitraryPrecisionInteger) throws(CryptoBoringWrapperError) -> ArbitraryPrecisionInteger? {
+    package func inverse(
+        _ value: ArbitraryPrecisionInteger
+    ) throws(CryptoBoringWrapperError) -> ArbitraryPrecisionInteger? {
         var result = ArbitraryPrecisionInteger()
-
-        guard
-            result.withUnsafeMutableBignumPointer({ resultPtr in
-                x.withUnsafeBignumPointer { xPtr in
-                    self.fieldSize.withUnsafeBignumPointer { modPtr in
-                        CCryptoBoringSSL_BN_mod_inverse(resultPtr, xPtr, modPtr, self.bnCtx)
+        let outcome = state.withLock { state -> (succeeded: Bool, errorCode: UInt32) in
+            CCryptoBoringSSL_ERR_clear_error()
+            let resultPointer = result.withUnsafeMutableBignumPointer { resultPointer in
+                value.withUnsafeBignumPointer { valuePointer in
+                    state.modulus.withUnsafeBignumPointer { modulusPointer in
+                        CCryptoBoringSSL_BN_mod_inverse(
+                            resultPointer,
+                            valuePointer,
+                            modulusPointer,
+                            state.workspace
+                        )
                     }
                 }
-            }) != nil
-        else { return nil }
+            }
+            guard resultPointer == nil else {
+                return (true, 0)
+            }
+            return (false, CCryptoBoringSSL_ERR_get_error())
+        }
 
-        return result
+        if outcome.succeeded {
+            return result
+        }
+        if CCryptoBoringSSL_ERR_GET_REASON(outcome.errorCode) == BN_R_NO_INVERSE {
+            return nil
+        }
+        throw CryptoBoringWrapperError.underlyingCoreCryptoError(
+            error: Int32(bitPattern: outcome.errorCode)
+        )
     }
 
     @usableFromInline
     package func pow(
-        _ x: ArbitraryPrecisionInteger,
-        _ p: ArbitraryPrecisionInteger
-    ) throws(CryptoBoringWrapperError)
-        -> ArbitraryPrecisionInteger
-    {
-        try self.pow(x, p) { r, x, p, m, ctx, _ in CCryptoBoringSSL_BN_mod_exp(r, x, p, m, ctx) }
+        _ base: ArbitraryPrecisionInteger,
+        _ exponent: ArbitraryPrecisionInteger
+    ) throws(CryptoBoringWrapperError) -> ArbitraryPrecisionInteger {
+        try pow(base, exponent, mode: .general)
     }
 
     @usableFromInline
     package func pow(
-        secret x: ArbitraryPrecisionInteger,
-        _ p: ArbitraryPrecisionInteger
-    ) throws(CryptoBoringWrapperError)
-        -> ArbitraryPrecisionInteger
-    {
-        guard x < self.fieldSize else { throw CryptoBoringWrapperError.incorrectParameterSize }
-        return try self.pow(x, p, using: CCryptoBoringSSL_BN_mod_exp_mont)
+        secret base: ArbitraryPrecisionInteger,
+        _ exponent: ArbitraryPrecisionInteger
+    ) throws(CryptoBoringWrapperError) -> ArbitraryPrecisionInteger {
+        guard contains(base) else {
+            throw CryptoBoringWrapperError.incorrectParameterSize
+        }
+        return try pow(base, exponent, mode: .montgomery)
     }
 
     @usableFromInline
     package func pow(
-        secret x: ArbitraryPrecisionInteger,
-        secret p: ArbitraryPrecisionInteger
-    )
-        throws(CryptoBoringWrapperError) -> ArbitraryPrecisionInteger
-    {
-        guard x < self.fieldSize else { throw CryptoBoringWrapperError.incorrectParameterSize }
-        return try self.pow(x, p, using: CCryptoBoringSSL_BN_mod_exp_mont_consttime)
+        secret base: ArbitraryPrecisionInteger,
+        secret exponent: ArbitraryPrecisionInteger
+    ) throws(CryptoBoringWrapperError) -> ArbitraryPrecisionInteger {
+        guard contains(base) else {
+            throw CryptoBoringWrapperError.incorrectParameterSize
+        }
+        return try pow(base, exponent, mode: .constantTimeMontgomery)
     }
 
-    fileprivate func pow(
-        _ a: ArbitraryPrecisionInteger,
-        _ b: ArbitraryPrecisionInteger,
-        using method: (
-            _ rr: UnsafeMutablePointer<BIGNUM>?,
-            _ a: UnsafePointer<BIGNUM>?,
-            _ p: UnsafePointer<BIGNUM>?,
-            _ m: UnsafePointer<BIGNUM>?,
-            _ ctx: OpaquePointer?,
-            _ mont: OpaquePointer?
-        ) -> Int32
+    private func contains(_ value: ArbitraryPrecisionInteger) -> Bool {
+        state.withLock { state in
+            value < state.modulus
+        }
+    }
+
+    private enum ExponentiationMode {
+        case general
+        case montgomery
+        case constantTimeMontgomery
+    }
+
+    private func pow(
+        _ base: ArbitraryPrecisionInteger,
+        _ exponent: ArbitraryPrecisionInteger,
+        mode: ExponentiationMode
     ) throws(CryptoBoringWrapperError) -> ArbitraryPrecisionInteger {
         var result = ArbitraryPrecisionInteger()
-
-        guard
-            result.withUnsafeMutableBignumPointer({ resultPtr in
-                a.withUnsafeBignumPointer { aPtr in
-                    b.withUnsafeBignumPointer { bPtr in
-                        self.fieldSize.withUnsafeBignumPointer { modPtr in
-                            self.withUnsafeBN_MONT_CTX { montCtxPtr in
-                                method(resultPtr, aPtr, bPtr, modPtr, self.bnCtx, montCtxPtr)
+        let outcome = state.withLock { state -> (returnCode: Int32, allocationFailed: Bool) in
+            result.withUnsafeMutableBignumPointer { resultPointer in
+                base.withUnsafeBignumPointer { basePointer in
+                    exponent.withUnsafeBignumPointer { exponentPointer in
+                        state.modulus.withUnsafeBignumPointer { modulusPointer in
+                            if case .general = mode {
+                                return (
+                                    CCryptoBoringSSL_BN_mod_exp(
+                                        resultPointer,
+                                        basePointer,
+                                        exponentPointer,
+                                        modulusPointer,
+                                        state.workspace
+                                    ),
+                                    false
+                                )
                             }
+
+                            guard let montgomeryContext =
+                                CCryptoBoringSSL_BN_MONT_CTX_new_for_modulus(
+                                    modulusPointer,
+                                    state.workspace
+                                )
+                            else {
+                                return (0, true)
+                            }
+                            defer {
+                                CCryptoBoringSSL_BN_MONT_CTX_free(montgomeryContext)
+                            }
+                            let returnCode: Int32
+                            switch mode {
+                            case .general:
+                                preconditionFailure("General exponentiation does not use a Montgomery context")
+                            case .montgomery:
+                                returnCode = CCryptoBoringSSL_BN_mod_exp_mont(
+                                    resultPointer,
+                                    basePointer,
+                                    exponentPointer,
+                                    modulusPointer,
+                                    state.workspace,
+                                    montgomeryContext
+                                )
+                            case .constantTimeMontgomery:
+                                returnCode = CCryptoBoringSSL_BN_mod_exp_mont_consttime(
+                                    resultPointer,
+                                    basePointer,
+                                    exponentPointer,
+                                    modulusPointer,
+                                    state.workspace,
+                                    montgomeryContext
+                                )
+                            }
+                            return (
+                                returnCode,
+                                false
+                            )
                         }
                     }
                 }
-            }) == 1
-        else {
+            }
+        }
+
+        guard !outcome.allocationFailed, outcome.returnCode == 1 else {
             throw CryptoBoringWrapperError.internalBoringSSLError()
         }
-
         return result
-    }
-
-    /// Some functions require a `BN_MONT_CTX` parameter: this obtains one for the field modulus with a scoped lifetime.
-    fileprivate func withUnsafeBN_MONT_CTX<T>(
-        _ body: (OpaquePointer) -> T
-    )
-        -> T
-    {
-        self.fieldSize.withUnsafeBignumPointer { modPtr in
-            let montCtx = CCryptoBoringSSL_BN_MONT_CTX_new_for_modulus(modPtr, self.bnCtx)!
-            defer { CCryptoBoringSSL_BN_MONT_CTX_free(montCtx) }
-            return body(montCtx)
-        }
-    }
-
-    fileprivate func withUnsafeBN_MONT_CTX<T>(
-        _ body: (OpaquePointer) throws(CryptoBoringWrapperError) -> T
-    )
-        throws(CryptoBoringWrapperError) -> T
-    {
-        try self.fieldSize.withUnsafeBignumPointer { (modPtr) throws(CryptoBoringWrapperError) in
-            // We force unwrap here because this call can only fail if the allocator is broken, and if
-            // the allocator fails we don't have long to live anyway.
-            let montCtx = CCryptoBoringSSL_BN_MONT_CTX_new_for_modulus(modPtr, self.bnCtx)!
-            defer { CCryptoBoringSSL_BN_MONT_CTX_free(montCtx) }
-            return try body(montCtx)
-        }
     }
 }

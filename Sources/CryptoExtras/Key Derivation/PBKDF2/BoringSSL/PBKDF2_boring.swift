@@ -20,18 +20,9 @@ import Foundation
 #endif
 
 #if !canImport(CommonCrypto)
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
-#if hasFeature(Embedded)
-import CCryptoBoringSSLShims
-#else
-@_implementationOnly import CCryptoBoringSSLShims
-#endif
+internal import CCryptoBoringSSL
+internal import CCryptoBoringSSLShims
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 internal struct BoringSSLPBKDF2 {
     /// Derives a secure key using the provided hash function, passphrase and salt.
     ///
@@ -78,7 +69,6 @@ internal struct BoringSSLPBKDF2 {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension KDF.Insecure.PBKDF2.HashFunction {
     var digest: OpaquePointer {
         switch self {

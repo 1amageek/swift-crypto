@@ -23,5 +23,4 @@
 // See: https://github.com/apple/swift-crypto/issues/435
 
 @usableFromInline
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 internal func _cryptoModuleAnchor() {}

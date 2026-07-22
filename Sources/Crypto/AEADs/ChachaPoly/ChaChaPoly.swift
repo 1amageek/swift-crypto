@@ -20,7 +20,7 @@ import Foundation
 
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
 typealias ChaChaPolyImpl = OpenSSLChaChaPolyImpl
 
@@ -72,9 +72,6 @@ public enum ChaChaPoly: Sendable {
     ///   - nonce: The nonce the sealing process requires.
     ///   - authenticatedData: Additional data to be authenticated.
     ///   - tag: Will be updated with the 16-byte authentication tag.
-    #if swift(<6.3)
-    @_lifetime(message: copy message)
-    #endif
     public static func seal(
         inPlace message: inout MutableRawSpan,
         using key: SymmetricKey,
@@ -83,21 +80,6 @@ public enum ChaChaPoly: Sendable {
         tag: inout OutputRawSpan
     ) throws(CryptoKitMetaError) {
         try ChaChaPolyImpl.encrypt(key: key, inPlace: &message, nonce: nonce.bytes, authenticatedData: authenticatedData, tag: &tag)
-    }
-
-    // Note: historical version of the above, which should be removed once
-    // the above is API and clients move over to it.
-    #if swift(<6.3)
-    @_lifetime(message: copy message)
-    #endif
-    internal static func seal(
-        inplace message: inout MutableRawSpan,
-        using key: SymmetricKey,
-        nonce: RawSpan,
-        authenticating authenticatedData: RawSpan? = nil,
-        tag: inout OutputRawSpan
-    ) throws(CryptoKitMetaError) {
-        try ChaChaPolyImpl.encrypt(key: key, inPlace: &message, nonce: nonce, authenticatedData: authenticatedData, tag: &tag)
     }
 
     /// Decrypts the message and verifies the authenticity of both the encrypted
@@ -141,9 +123,6 @@ public enum ChaChaPoly: Sendable {
     ///   - authenticatedData: Additional data that was authenticated.
     ///
     /// The call throws an error if decryption or authentication fail.
-    #if swift(<6.3)
-    @_lifetime(message: copy message)
-    #endif
     public static func open(
         inPlace message: inout MutableRawSpan,
         using key: SymmetricKey,
@@ -154,20 +133,6 @@ public enum ChaChaPoly: Sendable {
         try ChaChaPolyImpl.decrypt(key: key, inPlace: &message, nonce: nonce.bytes, tag: tag, authenticatedData: authenticatedData)
     }
 
-    // Note: historical version of the above, which should be removed once
-    // the above is API and clients move over to it.
-    #if swift(<6.3)
-    @_lifetime(message: copy message)
-    #endif
-    public static func open(
-        inplace message: inout MutableRawSpan,
-        using key: SymmetricKey,
-        nonce: RawSpan,
-        tag: RawSpan,
-        authenticating authenticatedData: RawSpan? = nil
-    ) throws(CryptoKitMetaError) {
-        try ChaChaPolyImpl.decrypt(key: key, inPlace: &message, nonce: nonce, tag: tag, authenticatedData: authenticatedData)
-    }
 }
 
 extension ChaChaPoly {

@@ -21,7 +21,6 @@ import FoundationEssentials
 import Foundation
 #endif
 
-@available(iOS 14.0, macOS 11.0, watchOS 7.0, tvOS 14.0, *)
 extension Curve25519.Signing.PrivateKey {
     /// A Distinguished Encoding Rules (DER) encoded representation of the private key.
     public var derRepresentation: Data {
@@ -64,7 +63,6 @@ extension Curve25519.Signing.PrivateKey {
     }
 }
 
-@available(iOS 14.0, macOS 11.0, watchOS 7.0, tvOS 14.0, *)
 extension Curve25519.Signing.PublicKey {
     /// A Distinguished Encoding Rules (DER) encoded representation of the public key.
     public var derRepresentation: Data {
@@ -110,7 +108,6 @@ extension Curve25519.Signing.PublicKey {
     }
 }
 
-@available(iOS 14.0, macOS 11.0, watchOS 7.0, tvOS 14.0, *)
 extension Curve25519.KeyAgreement.PrivateKey {
     /// A Distinguished Encoding Rules (DER) encoded representation of the private key.
     public var derRepresentation: Data {
@@ -154,7 +151,6 @@ extension Curve25519.KeyAgreement.PrivateKey {
     }
 }
 
-@available(iOS 14.0, macOS 11.0, watchOS 7.0, tvOS 14.0, *)
 extension Curve25519.KeyAgreement.PublicKey {
     /// A Distinguished Encoding Rules (DER) encoded representation of the public key.
     public var derRepresentation: Data {

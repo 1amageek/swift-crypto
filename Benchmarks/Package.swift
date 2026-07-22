@@ -1,9 +1,9 @@
-// swift-tools-version:6.2
+// swift-tools-version:6.4
 import PackageDescription
 
 let package = Package(
     name: "swift-crypto-benchmarks",
-    platforms: [.macOS("14")],
+    platforms: [.macOS(.v26)],
     dependencies: [
         .package(name: "swift-crypto", path: "../"),
         .package(url: "https://github.com/ordo-one/package-benchmark", from: "1.22.0"),

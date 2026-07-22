@@ -18,7 +18,6 @@ import FoundationEssentials
 import Foundation
 #endif
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension Optional where Wrapped: DataProtocol {
 #if hasFeature(Embedded)
     func withUnsafeBytes<ReturnValue, E: Error>(_ body: (UnsafeRawBufferPointer) throws(E) -> ReturnValue) throws(E) -> ReturnValue {

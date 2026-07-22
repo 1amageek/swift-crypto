@@ -18,40 +18,77 @@ import FoundationEssentials
 import Foundation
 #endif
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 extension OPRF {
     struct Client<H2G: HashToGroup> {
         let mode: Mode
         let ciphersuite: Ciphersuite<H2G>
-        let v8CompatibilityMode: Bool
+        let context: Data
+        let hashToGroupDomainSeparationTag: Data
+        let hashToScalarDomainSeparationTag: Data
         typealias G = H2G.G
         
         init(ciphersuite: Ciphersuite<H2G>) {
             self = Self(mode: .base, ciphersuite: ciphersuite)
         }
         
-        internal init(mode: Mode, ciphersuite: Ciphersuite<H2G>, v8CompatibilityMode: Bool = false) {
+        internal init(mode: Mode, ciphersuite: Ciphersuite<H2G>) {
+            let context = protocolContext(mode: mode, ciphersuite: ciphersuite)
             self.mode = mode
             self.ciphersuite = ciphersuite
-            self.v8CompatibilityMode = v8CompatibilityMode
+            self.context = context
+            self.hashToGroupDomainSeparationTag = H2G.hashToGroupDomainSeparationTag(
+                context: context
+            )
+            self.hashToScalarDomainSeparationTag = H2G.hashToScalarDomainSeparationTag(
+                context: context
+            )
         }
         
-        func blindMessage(_ message: Data, blind: G.Scalar = G.Scalar.random) -> (blind: G.Scalar, blindedElement: G.Element) {
-            let dst = Data("HashToGroup-".utf8) + setupContext(mode: mode, suite: ciphersuite, v8CompatibilityMode: self.v8CompatibilityMode)
-            let P: G.Element = H2G.hashToGroup(message, domainSeparationString: dst)
-            let blindedElement = blind * P
+        func blindMessage(
+            _ message: Data,
+            blind: G.Scalar = G.Scalar.random
+        ) throws(CryptoKitMetaError) -> (blind: G.Scalar, blindedElement: G.Element) {
+            guard message.count <= Int(UInt16.max) else {
+                throw cryptoExtrasError(OPRF.Errors.messageTooLong)
+            }
+            guard blind != .zero else {
+                throw cryptoExtrasError(OPRF.Errors.invalidScalar)
+            }
+            let inputElement: G.Element = H2G.hashToGroup(
+                message,
+                domainSeparationString: hashToGroupDomainSeparationTag
+            )
+            let blindedElement = blind * inputElement
             return (blind: blind, blindedElement: blindedElement)
         }
         
-        func unblind(blind: G.Scalar, evaluatedElement: G.Element) -> G.Element {
-            return (blind ^ (-1)) * evaluatedElement
+        func unblind(
+            blind: G.Scalar,
+            evaluatedElement: G.Element
+        ) throws(CryptoKitMetaError) -> G.Element {
+            guard blind != .zero else {
+                throw cryptoExtrasError(OPRF.Errors.invalidScalar)
+            }
+            return try blind.inverted() * evaluatedElement
         }
         
         func finalize(message: Data, info: Data?, blind: G.Scalar, evaluatedElement: G.Element) throws(CryptoKitMetaError) -> Data {
-            let unblinded = unblind(blind: blind,
-                                    evaluatedElement: evaluatedElement)
+            if mode != .partiallyOblivious, info != nil {
+                throw cryptoExtrasError(OPRF.Errors.invalidModeForInfo)
+            }
+            let unblinded = try unblind(
+                blind: blind,
+                evaluatedElement: evaluatedElement
+            )
             
-            return Data(H2G.H.hash(data: composeFinalizeContext(message: message, info: info, unblindedElement: unblinded, ciphersuite: ciphersuite, mode: mode, v8CompatibilityMode: self.v8CompatibilityMode)))
+            let digest = try hashFinalizeTranscript(
+                message: message,
+                info: info,
+                unblindedElement: unblinded,
+                mode: mode,
+                using: H2G.H.self
+            )
+            return Data(digest)
         }
         
     }

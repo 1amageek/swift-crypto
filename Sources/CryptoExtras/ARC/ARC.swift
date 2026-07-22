@@ -21,10 +21,8 @@ import Foundation
 
 /// Anonymous Rate-Limited Credentials (ARC) using the CMZ14 MACGGM construction, as defined in
 /// https://chris-wood.github.io/draft-arc/draft-yun-cfrg-arc.html
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 enum ARC {}
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 extension ARC {
     enum Errors: Error {
         case invalidProof
@@ -47,21 +45,16 @@ extension ARC {
         let scalarByteCount: Int
         let pointByteCount: Int
 
-        init(_ h2g: H2G.Type) {
-            switch h2g.self {
-            case is HashToCurveImpl<P256>.Type:
-                self.suiteID = 3
-                self.domain = "ARCV1-P256"
-                self.scalarByteCount = P256.orderByteCount
-                self.pointByteCount = P256.compressedx962PointByteCount
-            case is HashToCurveImpl<P384>.Type:
-                self.suiteID = 4
-                self.domain = "ARCV1-P384"
-                self.scalarByteCount = P384.orderByteCount
-                self.pointByteCount = P384.compressedx962PointByteCount
-            default:
-                fatalError("Anonymous Rate-Limited Credentials (ARC) only support corecrypto H2G.")
-            }
+        private init(
+            suiteID: Int,
+            domain: String,
+            scalarByteCount: Int,
+            pointByteCount: Int
+        ) {
+            self.suiteID = suiteID
+            self.domain = domain
+            self.scalarByteCount = scalarByteCount
+            self.pointByteCount = pointByteCount
         }
     }
 
@@ -72,6 +65,15 @@ extension ARC {
         let generatorH = H2G.hashToGroup(generatorG.oprfRepresentation, domainSeparationString: Data(("HashToGroup-" + suite.domain + "generatorH").utf8))
         return (generatorG, generatorH)
     }
+}
+
+extension ARC.Ciphersuite where H2G == CurveHashToGroup<P256> {
+    static let arcV1 = Self(
+        suiteID: 3,
+        domain: "ARCV1-P256",
+        scalarByteCount: P256.orderByteCount,
+        pointByteCount: P256.compressedX962PointByteCount
+    )
 }
 
 #endif  // !hasFeature(Embedded)

@@ -15,17 +15,16 @@ import Crypto
 @testable import CryptoExtras
 import XCTest
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 class ARCTests: XCTestCase {
-    func endToEndWorkflow<Curve: SupportedCurveDetailsImpl>(CurveType _: Curve.Type) throws {
-        let ciphersuite = ARC.Ciphersuite(HashToCurveImpl<Curve>.self)
+    func assertEndToEndWorkflow() throws {
+        let ciphersuite = P256._ARCV1.ciphersuite
         let (generatorG, generatorH) = ARC.getGenerators(suite: ciphersuite)
 
         // Create a server, passing in the server keys and key blinding.
-        let x0 = GroupImpl<Curve>.Scalar.random
-        let x1 = GroupImpl<Curve>.Scalar.random
-        let x2 = GroupImpl<Curve>.Scalar.random
-        let x0Blinding = GroupImpl<Curve>.Scalar.random
+        let x0 = PrimeOrderCurveGroup<P256>.Scalar.random
+        let x1 = PrimeOrderCurveGroup<P256>.Scalar.random
+        let x2 = PrimeOrderCurveGroup<P256>.Scalar.random
+        let x0Blinding = PrimeOrderCurveGroup<P256>.Scalar.random
         let serverPrivateKey = ARC.ServerPrivateKey(x0: x0, x1: x1, x2: x2, x0Blinding: x0Blinding)
         let server = ARC.Server(ciphersuite: ciphersuite, x0: x0, x1: x1, x2: x2, x0Blinding: x0Blinding)
         let serverPublicKey = server.serverPublicKey
@@ -36,9 +35,9 @@ class ARCTests: XCTestCase {
         // Create a client with two private attributes.
         let presentationLimit = 2
         let requestContext = Data("test request context".utf8)
-        let m1 = GroupImpl<Curve>.Scalar.random
-        let r1 = GroupImpl<Curve>.Scalar.random
-        let r2 = GroupImpl<Curve>.Scalar.random
+        let m1 = PrimeOrderCurveGroup<P256>.Scalar.random
+        let r1 = PrimeOrderCurveGroup<P256>.Scalar.random
+        let r2 = PrimeOrderCurveGroup<P256>.Scalar.random
         let precredential = try ARC.Precredential(ciphersuite: ciphersuite, m1: m1, requestContext: requestContext, r1: r1, r2: r2, serverPublicKey: serverPublicKey)
 
         // Client makes an CredentialRequest using its private attributes.
@@ -153,9 +152,7 @@ class ARCTests: XCTestCase {
     }
 
     func testEndToEndWorkflow() throws {
-        try endToEndWorkflow(CurveType: P256.self)
-        try endToEndWorkflow(CurveType: P384.self)
-//        try endToEndWorkflow(CurveType: P521.self)
+        try assertEndToEndWorkflow()
     }
 
     func testPresentationState() throws {

@@ -12,15 +12,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
+internal import CCryptoBoringSSL
 import Crypto
 import CryptoBoringWrapper
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 @usableFromInline
 internal func cryptoExtrasError(_ error: CryptoKitError) -> CryptoKitMetaError {
     #if hasFeature(Embedded)
@@ -30,7 +25,6 @@ internal func cryptoExtrasError(_ error: CryptoKitError) -> CryptoKitMetaError {
     #endif
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 internal func cryptoExtrasError(_ error: CryptoKitASN1Error) -> CryptoKitMetaError {
     #if hasFeature(Embedded)
     return .asn1Error(underlyingError: error)
@@ -39,11 +33,7 @@ internal func cryptoExtrasError(_ error: CryptoKitASN1Error) -> CryptoKitMetaErr
     #endif
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 internal func cryptoExtrasError(_ error: CryptoBoringWrapperError) -> CryptoKitMetaError {
-    #if !hasFeature(Embedded)
-    return error
-    #else
     let cryptoError: CryptoKitError
     switch error {
     case .incorrectKeySize:
@@ -59,13 +49,11 @@ internal func cryptoExtrasError(_ error: CryptoBoringWrapperError) -> CryptoKitM
     case .unwrapFailure:
         cryptoError = .unwrapFailure
     case .invalidParameter:
-        cryptoError = .incorrectParameterSize
+        cryptoError = .invalidParameter
     }
     return cryptoExtrasError(cryptoError)
-    #endif
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 internal func withCryptoExtrasError<Result>(
     _ body: () throws(CryptoKitError) -> Result
 ) throws(CryptoKitMetaError) -> Result {
@@ -76,7 +64,6 @@ internal func withCryptoExtrasError<Result>(
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 internal func withCryptoExtrasBoringError<Result>(
     _ body: () throws(CryptoBoringWrapperError) -> Result
 ) throws(CryptoKitMetaError) -> Result {
@@ -87,7 +74,6 @@ internal func withCryptoExtrasBoringError<Result>(
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 internal func withCryptoExtrasInvalidParameter<Result, E: Error>(
     _ body: () throws(E) -> Result
 ) throws(CryptoKitMetaError) -> Result {
@@ -102,7 +88,6 @@ internal func withCryptoExtrasInvalidParameter<Result, E: Error>(
     #endif
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension CryptoKitError {
     /// A helper function that packs the value of `ERR_get_error` into the internal error field.
     @usableFromInline

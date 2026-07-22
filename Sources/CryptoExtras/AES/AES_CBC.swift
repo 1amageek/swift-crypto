@@ -19,11 +19,9 @@ import FoundationEssentials
 import Foundation
 #endif
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension AES {
     /// The Advanced Encryption Standard (AES) Cipher Block Chaining (CBC) cipher
     /// suite.
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     public enum _CBC {
         private static var blockSize: Int { 16 }
 
@@ -147,10 +145,8 @@ extension AES {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension AES._CBC {
     /// An initialization vector.
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     public struct IV: Sendable, Sequence {
         // AES CBC uses a 128-bit IV.
         @usableFromInline
@@ -208,7 +204,6 @@ extension AES._CBC {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension Data {
     fileprivate mutating func trimPadding() throws(CryptoKitMetaError) {
         guard let paddingBytes = self.last else {

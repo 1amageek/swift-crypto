@@ -17,20 +17,11 @@ import FoundationEssentials
 #elseif canImport(Foundation)
 import Foundation
 #endif
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
-#if hasFeature(Embedded)
-import CCryptoBoringSSLShims
-#else
-@_implementationOnly import CCryptoBoringSSLShims
-#endif
+internal import CCryptoBoringSSL
+internal import CCryptoBoringSSLShims
 
 
 /// An abstraction over a BoringSSL AEAD
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 public enum BoringSSLAEAD {
     /// The supported AEAD ciphers for BoringSSL.
     case aes128gcm
@@ -41,11 +32,9 @@ public enum BoringSSLAEAD {
     case chacha20
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension BoringSSLAEAD {
     // Arguably this class is excessive, but it's probably better for this API to be as safe as possible
     // rather than rely on defer statements for our cleanup.
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     public final class AEADContext {
         private var context: EVP_AEAD_CTX
 
@@ -97,7 +86,6 @@ extension BoringSSLAEAD {
 
 // MARK: - Sealing
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension BoringSSLAEAD.AEADContext {
     #if canImport(FoundationEssentials) || canImport(Foundation)
     /// The main entry point for sealing data. Covers the full gamut of types, including discontiguous data types. This must be inlinable.
@@ -176,9 +164,6 @@ extension BoringSSLAEAD.AEADContext {
 
     /// Lowest level seal operation that calls into BoringSSL directly and
     /// operates on already-allocated memory.
-    #if swift(<6.3)
-    @_lifetime(tag: copy tag)
-    #endif
     public func seal(
         message: inout MutableRawSpan,
         nonce: RawSpan,
@@ -268,7 +253,6 @@ extension BoringSSLAEAD.AEADContext {
 
 // MARK: - Opening
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension BoringSSLAEAD.AEADContext {
     #if canImport(FoundationEssentials) || canImport(Foundation)
     /// The main entry point for opening data. Covers the full gamut of types, including discontiguous data types. This must be inlinable.
@@ -330,9 +314,6 @@ extension BoringSSLAEAD.AEADContext {
     #endif
 
     /// Lowest level call into BoringSSL that decrypts in place.
-    #if swift(<6.3)
-    @_lifetime(message: copy message)
-    #endif
     public func open(
         message: inout MutableRawSpan,
         nonce: RawSpan,
@@ -363,7 +344,7 @@ extension BoringSSLAEAD.AEADContext {
         }
 
         guard rc == 1 else {
-            throw CryptoBoringWrapperError.internalBoringSSLError()
+            throw CryptoBoringWrapperError.authenticationFailure
         }
     }
 
@@ -377,16 +358,8 @@ extension BoringSSLAEAD.AEADContext {
         authenticatedData: RawSpan
     ) throws(CryptoBoringWrapperError) -> Data {
         var output = Data(copying: ciphertext)
-        if #available(visionOS 1.1, *) {
-            var outputSpan = output.mutableBytes
-            try open(message: &outputSpan, nonce: nonceBytes, tag: tagBytes, authenticatedData: authenticatedData)
-        } else {
-            // For some reason `Data.mutableBytes` is not available on visionOS 1.0 so we'll bounce through wUSMB.
-            try withCryptoBoringWrapperUnsafeMutableBytes(&output) { (bytes) throws(CryptoBoringWrapperError) in
-                var outputSpan = bytes.mutableBytes
-                try open(message: &outputSpan, nonce: nonceBytes, tag: tagBytes, authenticatedData: authenticatedData)
-            }
-        }
+        var outputSpan = output.mutableBytes
+        try open(message: &outputSpan, nonce: nonceBytes, tag: tagBytes, authenticatedData: authenticatedData)
         return output
     }
     #endif
@@ -475,7 +448,7 @@ extension BoringSSLAEAD.AEADContext {
         guard rc == 1 else {
             // Ooops, error. Free the memory we allocated before we throw.
             free(outputBuffer.baseAddress)
-            throw CryptoBoringWrapperError.internalBoringSSLError()
+            throw CryptoBoringWrapperError.authenticationFailure
         }
 
         let output = Data(
@@ -491,7 +464,6 @@ extension BoringSSLAEAD.AEADContext {
 
 // MARK: - Supported ciphers
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension BoringSSLAEAD {
     var boringSSLCipher: OpaquePointer {
         switch self {

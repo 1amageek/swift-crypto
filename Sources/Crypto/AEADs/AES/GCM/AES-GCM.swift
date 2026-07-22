@@ -20,7 +20,7 @@ import Foundation
 
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
 typealias AESGCMImpl = OpenSSLAESGCMImpl
 
@@ -74,9 +74,6 @@ extension AES {
         ///   - nonce: The nonce the sealing process requires.
         ///   - authenticatedData: Additional data to be authenticated, if provided.
         ///   - tag: receives the 16-byte authentication tag
-        #if swift(<6.3)
-        @_lifetime(message: copy message)
-        #endif
         public static func seal(
             inPlace message: inout MutableRawSpan,
             using key: SymmetricKey,
@@ -88,21 +85,6 @@ extension AES {
                 key: key, message: &message, nonce: nonce.bytes,
                 authenticatedData: authenticatedData, tag: &tag
             )
-        }
-
-        // Note: historical version of the above, which should be removed once
-        // the above is API and clients move over to it.
-        #if swift(<6.3)
-        @_lifetime(message: copy message)
-        #endif
-        internal static func seal(
-            inplace message: inout MutableRawSpan,
-            using key: SymmetricKey,
-            nonce: RawSpan,
-            authenticating authenticatedData: RawSpan? = nil,
-            tag: inout OutputRawSpan
-        ) throws(CryptoKitMetaError) {
-            return try AESGCMImpl.seal(key: key, message: &message, nonce: nonce, authenticatedData: authenticatedData, tag: &tag)
         }
 
         /// Decrypts the message and verifies the authenticity of both the
@@ -144,9 +126,6 @@ extension AES {
         ///   - authenticatedData: Additional data that was authenticated.
         ///
         /// The call throws an error if decryption or authentication fail.
-        #if swift(<6.3)
-        @_lifetime(message: copy message)
-        #endif
         public static func open(
             inPlace message: inout MutableRawSpan,
             using key: SymmetricKey,
@@ -164,27 +143,6 @@ extension AES {
                 )
         }
 
-        // Note: historical version of the above, which should be removed once
-        // the above is API and clients move over to it.
-        #if swift(<6.3)
-        @_lifetime(message: copy message)
-        #endif
-        internal static func open(
-            inplace message: inout MutableRawSpan,
-            using key: SymmetricKey,
-            nonce: RawSpan,
-            tag: RawSpan,
-            authenticating authenticatedData: RawSpan? = nil
-        ) throws(CryptoKitMetaError) {
-            try AESGCMImpl
-                .open(
-                    key: key,
-                    message: &message,
-                    nonce: nonce,
-                    authenticatedData: authenticatedData,
-                    tag: tag
-                )
-        }
     }
 }
 

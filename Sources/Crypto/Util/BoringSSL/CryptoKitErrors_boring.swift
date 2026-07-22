@@ -13,15 +13,10 @@
 //===----------------------------------------------------------------------===//
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
+internal import CCryptoBoringSSL
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension CryptoKitError {
     /// A helper function that packs the value of `ERR_get_error` into the internal error field.
     @usableFromInline

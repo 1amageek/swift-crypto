@@ -21,7 +21,6 @@ import FoundationEssentials
 import Foundation
 #endif
 
-@available(iOS 14.0, macOS 11.0, watchOS 7.0, tvOS 14.0, *)
 extension Curve25519.Signing.PrivateKey {
     /// A Distinguished Encoding Rules (DER) encoded representation of the private key in PKCS#8 format.
     public var pkcs8DERRepresentation: Data {
@@ -29,7 +28,6 @@ extension Curve25519.Signing.PrivateKey {
     }
 }
 
-@available(iOS 14.0, macOS 11.0, watchOS 7.0, tvOS 14.0, *)
 extension Curve25519.KeyAgreement.PrivateKey {
     /// A Distinguished Encoding Rules (DER) encoded representation of the private key in PKCS#8 format.
     public var pkcs8DERRepresentation: Data {
@@ -37,7 +35,6 @@ extension Curve25519.KeyAgreement.PrivateKey {
     }
 }
 
-@available(iOS 14.0, macOS 11.0, watchOS 7.0, tvOS 14.0, *)
 extension P256.Signing.PrivateKey {
     /// A Distinguished Encoding Rules (DER) encoded representation of the private key in PKCS#8 format.
     ///
@@ -48,7 +45,6 @@ extension P256.Signing.PrivateKey {
     }
 }
 
-@available(iOS 14.0, macOS 11.0, watchOS 7.0, tvOS 14.0, *)
 extension P384.Signing.PrivateKey {
     /// A Distinguished Encoding Rules (DER) encoded representation of the private key in PKCS#8 format.
     ///
@@ -59,7 +55,6 @@ extension P384.Signing.PrivateKey {
     }
 }
 
-@available(iOS 14.0, macOS 11.0, watchOS 7.0, tvOS 14.0, *)
 extension P521.Signing.PrivateKey {
     /// A Distinguished Encoding Rules (DER) encoded representation of the private key in PKCS#8 format.
     ///

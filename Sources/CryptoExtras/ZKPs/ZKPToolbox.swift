@@ -18,24 +18,20 @@ import Foundation
 #endif
 import Crypto
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 struct ScalarVar {
     var index: Int
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 struct PointVar {
     var index: Int
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 enum ZKPErrors: Error {
     case invalidVariableAllocation
     case invalidInputLength
     case invalidProofFields
 }
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 internal func cryptoExtrasError(_ error: ZKPErrors) -> CryptoKitMetaError {
     #if hasFeature(Embedded)
     cryptoExtrasError(CryptoKitError.incorrectParameterSize)
@@ -46,7 +42,6 @@ internal func cryptoExtrasError(_ error: ZKPErrors) -> CryptoKitMetaError {
 
 // A Schnorr proof, which stores the challenge instead of 
 // commitments to the prover's randomness (blindedPoints).
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 struct Proof<H2G: HashToGroup> {
     typealias Group = H2G.G
     public let challenge: Group.Scalar
@@ -68,11 +63,10 @@ struct Proof<H2G: HashToGroup> {
         }
 
         // Get the challenge output from the transcript.
-        return try H2G.hashToScalar(challengeInput, domainSeparationString: Data(label.utf8))
+        return try H2G.hashToScalar(challengeInput, domainSeparationContext: Data(label.utf8))
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 protocol ProofParticipant {
     associatedtype Point: GroupElement
     var label: String { get }
@@ -82,7 +76,6 @@ protocol ProofParticipant {
     var constraints: [(PointVar, [(ScalarVar, PointVar)])] { get set }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension ProofParticipant {
     mutating func constrain(result: PointVar, linearCombination: [(ScalarVar, PointVar)]) {
         self.constraints.append((result, linearCombination))

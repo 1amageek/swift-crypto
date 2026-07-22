@@ -16,6 +16,7 @@ import FoundationEssentials
 #elseif canImport(Foundation)
 import Foundation
 #endif
+import Crypto
 
 enum IntegerDecodingError: Error, Equatable {
     case incorrectNumberOfBytes(expected: Int, actual: Int)

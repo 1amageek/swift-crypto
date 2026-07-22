@@ -20,7 +20,7 @@ import Foundation
 
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
 
 extension HPKE {
@@ -31,11 +31,13 @@ extension HPKE {
     @nonexhaustive
     public enum KEM: CaseIterable, Hashable, Sendable {
         public static var allCases: [HPKE.KEM] {
-            var cases = [KEM.P256_HKDF_SHA256, KEM.P384_HKDF_SHA384, KEM.P521_HKDF_SHA512, KEM.Curve25519_HKDF_SHA256]
-            if #available(iOS 19.0, macOS 16.0, watchOS 12.0, tvOS 19.0, macCatalyst 19.0, *) {
-                cases.append(KEM.XWingMLKEM768X25519)
-            }
-            return cases
+            [
+                .P256_HKDF_SHA256,
+                .P384_HKDF_SHA384,
+                .P521_HKDF_SHA512,
+                .Curve25519_HKDF_SHA256,
+                .XWingMLKEM768X25519,
+            ]
         }
 
 		/// A key encapsulation mechanism using NIST P-256 elliptic curve key agreement

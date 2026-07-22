@@ -39,6 +39,10 @@ add_library(Crypto
   "CryptoError_boring.swift"
   "CryptoKitErrors.swift"
   "Digests/BoringSSL/Digest_boring.swift"
+  "Digests/BoringSSL/MD5DigestContext.swift"
+  "Digests/BoringSSL/SHA1DigestContext.swift"
+  "Digests/BoringSSL/SHA256DigestContext.swift"
+  "Digests/BoringSSL/SHA512FamilyDigestContext.swift"
   "Digests/Digest.swift"
   "Digests/DigestAlgorithm.swift"
   "Digests/Digests.swift"
@@ -46,6 +50,7 @@ add_library(Crypto
   "Digests/HashFunctions_SHA2.swift"
   "Digests/HashFunctions_SHA3.swift"
   "Digests/XKCP/Digest_xkcp.swift"
+  "Digests/XKCP/KeccakDigestContext.swift"
   "HPKE/Ciphersuite/HPKE-AEAD.swift"
   "HPKE/Ciphersuite/HPKE-Ciphersuite.swift"
   "HPKE/Ciphersuite/HPKE-KDF.swift"
@@ -104,17 +109,18 @@ add_library(Crypto
   "Util/BoringSSL/Optional+withUnsafeBytes_boring.swift"
   "Util/BoringSSL/RNG_boring.swift"
   "Util/BoringSSL/SafeCompare_boring.swift"
+  "Util/BoringSSL/UnsafeBytes_boring.swift"
   "Util/BoringSSL/Zeroization_boring.swift"
   "Util/BoringSSL/_CryptoModuleAnchor.swift"
+  "Util/ContiguousBytes.swift"
   "Util/Data+ArraySpan.swift"
+  "Util/Data+CryptoBoringWrapper.swift"
+  "Util/Data.swift"
   "Util/PrettyBytes.swift"
   "Util/SafeCompare.swift"
   "Util/SecureBytes.swift"
   "Util/Zeroization.swift"
 )
-
-target_compile_definitions(Crypto PRIVATE
-  "$<$<COMPILE_LANGUAGE:Swift>:CRYPTO_IN_SWIFTPM>")
 
 target_include_directories(Crypto PRIVATE
   $<TARGET_PROPERTY:CCryptoBoringSSL,INCLUDE_DIRECTORIES>
@@ -123,13 +129,13 @@ target_include_directories(Crypto PRIVATE
   $<TARGET_PROPERTY:CXKCP,INCLUDE_DIRECTORIES>
   $<TARGET_PROPERTY:CXKCPShims,INCLUDE_DIRECTORIES>)
 target_link_libraries(Crypto PUBLIC
-  $<$<NOT:$<PLATFORM_ID:Darwin>>:dispatch>
-  $<$<NOT:$<PLATFORM_ID:Darwin>>:Foundation>
+  ${SWIFT_CRYPTO_PLATFORM_LIBRARIES}
   CCryptoBoringSSL
   CCryptoBoringSSLShims
   CryptoBoringWrapper
   CXKCP
-  CXKCPShims)
+  CXKCPShims
+  SwiftASN1)
 target_compile_options(Crypto PRIVATE ${SWIFT_CRYPTO_COMPILE_OPTIONS})
 set_target_properties(Crypto PROPERTIES
   INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_Swift_MODULE_DIRECTORY})

@@ -13,16 +13,8 @@
 //===----------------------------------------------------------------------===//
 
 // NOTE: This file is unconditionally compiled because RSABSSA is implemented using BoringSSL on all platforms.
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
-#if hasFeature(Embedded)
-import CCryptoBoringSSLShims
-#else
-@_implementationOnly import CCryptoBoringSSLShims
-#endif
+internal import CCryptoBoringSSL
+internal import CCryptoBoringSSLShims
 import Crypto
 import CryptoBoringWrapper
 
@@ -46,7 +38,6 @@ import FoundationEssentials
 import Foundation
 #endif
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 internal struct BoringSSLRSAPublicKey: Sendable {
     private var backing: Backing
 
@@ -95,7 +86,6 @@ internal struct BoringSSLRSAPublicKey: Sendable {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 internal struct BoringSSLRSAPrivateKey: Sendable {
     private var backing: Backing
 
@@ -163,7 +153,6 @@ internal struct BoringSSLRSAPrivateKey: Sendable {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension BoringSSLRSAPrivateKey {
     internal func signature<D: Digest>(
         for digest: D,
@@ -187,7 +176,6 @@ extension BoringSSLRSAPrivateKey {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension BoringSSLRSAPublicKey {
     func isValidSignature<D: Digest>(
         _ signature: _RSA.Signing.RSASignature,
@@ -223,9 +211,7 @@ extension BoringSSLRSAPublicKey {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension BoringSSLRSAPublicKey {
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     fileprivate final class Backing: @unchecked Sendable {
         private let pointer: OpaquePointer
 
@@ -475,7 +461,7 @@ extension BoringSSLRSAPublicKey {
                 try ArbitraryPrecisionInteger(copying: CCryptoBoringSSL_RSA_get0_n(rsaPublicKey))
             }
             let finiteField = try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
-                try FiniteFieldArithmeticContext(fieldSize: n)
+                try FiniteFieldArithmeticContext(modulus: n)
             }
 
             // 1. encoded_msg = EMSA-PSS-ENCODE(msg, bit_len(n)) with Hash, MGF, and salt_len as defined in the parameters
@@ -538,7 +524,7 @@ extension BoringSSLRSAPublicKey {
                 try ArbitraryPrecisionInteger(copying: CCryptoBoringSSL_RSA_get0_n(rsaPublicKey))
             }
             let finiteField = try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
-                try FiniteFieldArithmeticContext(fieldSize: n)
+                try FiniteFieldArithmeticContext(modulus: n)
             }
 
             // 1. If len(blind_sig) != modulus_len, raise an "unexpected input size" error and stop
@@ -597,9 +583,7 @@ extension BoringSSLRSAPublicKey {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension BoringSSLRSAPrivateKey {
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     fileprivate final class Backing: @unchecked Sendable {
         private let pointer: OpaquePointer
 
@@ -705,13 +689,13 @@ extension BoringSSLRSAPrivateKey {
 
             // Compute the CRT params.
             let dp = try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
-                try FiniteFieldArithmeticContext(fieldSize: p - 1).residue(d)
+                try FiniteFieldArithmeticContext(modulus: p - 1).residue(d)
             }
             let dq = try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
-                try FiniteFieldArithmeticContext(fieldSize: q - 1).residue(d)
+                try FiniteFieldArithmeticContext(modulus: q - 1).residue(d)
             }
             guard let qi = try withCryptoExtrasBoringError({ () throws(CryptoBoringWrapperError) in
-                try FiniteFieldArithmeticContext(fieldSize: p).inverse(q)
+                try FiniteFieldArithmeticContext(modulus: p).inverse(q)
             }) else {
                 throw cryptoExtrasError(CryptoKitError.internalBoringSSLError())
             }
@@ -1106,7 +1090,6 @@ extension BoringSSLRSAPrivateKey {
 }
 
 /// This namespace enum just provides helper functions for some of the steps outlined in the RFC.
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 enum BlindSigningHelpers {
     fileprivate static func RSASSAPSSVerify<H: HashFunction>(
         rsaPublicKey: OpaquePointer!,

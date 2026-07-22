@@ -18,85 +18,149 @@ import FoundationEssentials
 import Foundation
 #endif
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 extension OPRF {
     struct VerifiableClient<H2G: HashToGroup> {
         fileprivate let client: OPRF.Client<H2G>
         typealias G = H2G.G
         
-        init(ciphersuite: Ciphersuite<H2G>, v8CompatibilityMode: Bool = false, mode: OPRF.Mode) throws(CryptoKitMetaError) {
+        init(ciphersuite: Ciphersuite<H2G>, mode: OPRF.Mode) throws(CryptoKitMetaError) {
             if mode != .partiallyOblivious && mode != .verifiable {
                 throw cryptoExtrasError(OPRF.Errors.incompatibleMode)
             }
             
-            self.client = .init(mode: mode, ciphersuite: ciphersuite, v8CompatibilityMode: v8CompatibilityMode)
+            self.client = .init(mode: mode, ciphersuite: ciphersuite)
         }
         
-        func blindMessage(_ message: Data, blind: G.Scalar = G.Scalar.random) -> (blind: G.Scalar, blindedElement: G.Element) {
-            self.client.blindMessage(message, blind: blind)
+        func blindMessage(
+            _ message: Data,
+            blind: G.Scalar = G.Scalar.random
+        ) throws(CryptoKitMetaError) -> (blind: G.Scalar, blindedElement: G.Element) {
+            try self.client.blindMessage(message, blind: blind)
         }
         
-        fileprivate func v8Finalize(message: Data, info: Data?, blind: G.Scalar, evaluatedElement: G.Element, proof: DLEQProof<G.Scalar>, publicKey: G.Element) throws(CryptoKitMetaError) -> Data {
-            precondition(self.client.mode == .verifiable)
-            let setupCtx = setupContext(mode: client.mode, suite: client.ciphersuite, v8CompatibilityMode: self.client.v8CompatibilityMode)
-            let contextDST = Data("Context-".utf8) + setupCtx
-            
-            let ctx = contextDST + I2OSP(value: (info?.count ?? 0), outputByteCount: 2) + (info ?? Data())
-            
-            let m = try H2G.hashToScalar(ctx, domainSeparationString: setupCtx)
-            let t = m * G.Element.generator
-            
-            let u = publicKey + t
-            
-            let blindedElement = self.blindMessage(message, blind: blind).blindedElement
-            guard try DLEQ<H2G>.verifyProof(A: H2G.G.Element.generator, B: u,
-                                            CDs: [(C: evaluatedElement, D: blindedElement)],
-                                            proof: proof,
-                                            dst: setupContext(mode: client.mode, suite: client.ciphersuite, v8CompatibilityMode: self.client.v8CompatibilityMode), v8CompatibilityMode: self.client.v8CompatibilityMode) else {
-                throw cryptoExtrasError(OPRF.Errors.invalidProof)
-            }
-            
-            return try self.client.finalize(message: message, info: info, blind: blind, evaluatedElement: evaluatedElement)
-            
-        }
-        
-        func finalize(message: Data, info: Data?, blind: G.Scalar, evaluatedElement: G.Element, proof: DLEQProof<G.Scalar>, publicKey: G.Element) throws(CryptoKitMetaError) -> Data {
-            if self.client.v8CompatibilityMode { return try v8Finalize(message: message, info: info, blind: blind, evaluatedElement: evaluatedElement, proof: proof, publicKey: publicKey) }
-            
-            let hasInfo = (info != nil)
-            if hasInfo && (self.client.mode == .verifiable) {
+        func finalize(
+            message: Data,
+            info: Data?,
+            blind: G.Scalar,
+            blindedElement: G.Element,
+            evaluatedElement: G.Element,
+            proof: DLEQProof<G.Scalar>,
+            publicKey: G.Element
+        ) throws(CryptoKitMetaError) -> Data {
+            if info != nil && self.client.mode == .verifiable {
                 throw cryptoExtrasError(OPRF.Errors.invalidModeForInfo)
             }
-            
-            let setupCtx = setupContext(mode: client.mode, suite: client.ciphersuite, v8CompatibilityMode: self.client.v8CompatibilityMode)
-            let blindedElement = self.blindMessage(message, blind: blind).blindedElement
-
             if self.client.mode == .verifiable {
-                guard try DLEQ<H2G>.verifyProof(A: H2G.G.Element.generator, B: publicKey,
-                                                CDs: [(C: blindedElement, D: evaluatedElement)],
-                                                proof: proof,
-                                                dst: setupContext(mode: client.mode, suite: client.ciphersuite, v8CompatibilityMode: self.client.v8CompatibilityMode), v8CompatibilityMode: self.client.v8CompatibilityMode) else {
+                guard try DLEQ<H2G>.verify(
+                    generator: H2G.G.Element.generator,
+                    publicKey: publicKey,
+                    inputs: CollectionOfOne(blindedElement),
+                    outputs: CollectionOfOne(evaluatedElement),
+                    proof: proof,
+                    context: client.context,
+                    hashToScalarDomainSeparationTag: client.hashToScalarDomainSeparationTag
+                ) else {
                     throw cryptoExtrasError(OPRF.Errors.invalidProof)
                 }
-                
+
                 return try self.client.finalize(message: message, info: info, blind: blind, evaluatedElement: evaluatedElement)
             }
             
-            precondition(self.client.mode == .partiallyOblivious)
-            let framedInfo = Data("Info".utf8) + I2OSP(value: info!.count, outputByteCount: 2) + info!
-            
-            let m = try H2G.hashToScalar(framedInfo, domainSeparationString: setupCtx)
-            let T = m * G.Element.generator
-            
-            let tweakedKey = T + publicKey
-            guard try DLEQ<H2G>.verifyProof(A: H2G.G.Element.generator, B: tweakedKey,
-                                            CDs: [(C: evaluatedElement, D: blindedElement)],
-                                            proof: proof,
-                                            dst: setupContext(mode: client.mode, suite: client.ciphersuite, v8CompatibilityMode: self.client.v8CompatibilityMode), v8CompatibilityMode: self.client.v8CompatibilityMode) else {
+            guard let info else {
+                throw cryptoExtrasError(OPRF.Errors.missingInfo)
+            }
+            let infoScalar = try OPRF.hashInfoToScalar(
+                info,
+                domainSeparationTag: client.hashToScalarDomainSeparationTag,
+                using: H2G.self
+            )
+            let tweakedPublicKey = (infoScalar * G.Element.generator) + publicKey
+            guard try DLEQ<H2G>.verify(
+                generator: H2G.G.Element.generator,
+                publicKey: tweakedPublicKey,
+                inputs: CollectionOfOne(evaluatedElement),
+                outputs: CollectionOfOne(blindedElement),
+                proof: proof,
+                context: client.context,
+                hashToScalarDomainSeparationTag: client.hashToScalarDomainSeparationTag
+            ) else {
                 throw cryptoExtrasError(OPRF.Errors.invalidProof)
             }
             
             return try self.client.finalize(message: message, info: info, blind: blind, evaluatedElement: evaluatedElement)
+        }
+
+        func finalize(
+            messages: [Data],
+            info: Data?,
+            blinds: [G.Scalar],
+            blindedElements: [G.Element],
+            evaluatedElements: [G.Element],
+            proof: DLEQProof<G.Scalar>,
+            publicKey: G.Element
+        ) throws(CryptoKitMetaError) -> [Data] {
+            guard !messages.isEmpty else {
+                throw cryptoExtrasError(OPRF.Errors.emptyBatch)
+            }
+            guard
+                messages.count == blinds.count,
+                messages.count == blindedElements.count,
+                messages.count == evaluatedElements.count
+            else {
+                throw cryptoExtrasError(OPRF.Errors.invalidBatchSize)
+            }
+            if info != nil && self.client.mode == .verifiable {
+                throw cryptoExtrasError(OPRF.Errors.invalidModeForInfo)
+            }
+
+            if self.client.mode == .verifiable {
+                guard try DLEQ<H2G>.verify(
+                    generator: G.Element.generator,
+                    publicKey: publicKey,
+                    inputs: blindedElements,
+                    outputs: evaluatedElements,
+                    proof: proof,
+                    context: client.context,
+                    hashToScalarDomainSeparationTag: client.hashToScalarDomainSeparationTag
+                ) else {
+                    throw cryptoExtrasError(OPRF.Errors.invalidProof)
+                }
+            } else {
+                guard let info else {
+                    throw cryptoExtrasError(OPRF.Errors.missingInfo)
+                }
+                let infoScalar = try OPRF.hashInfoToScalar(
+                    info,
+                    domainSeparationTag: client.hashToScalarDomainSeparationTag,
+                    using: H2G.self
+                )
+                let tweakedPublicKey = (infoScalar * G.Element.generator) + publicKey
+                guard try DLEQ<H2G>.verify(
+                    generator: G.Element.generator,
+                    publicKey: tweakedPublicKey,
+                    inputs: evaluatedElements,
+                    outputs: blindedElements,
+                    proof: proof,
+                    context: client.context,
+                    hashToScalarDomainSeparationTag: client.hashToScalarDomainSeparationTag
+                ) else {
+                    throw cryptoExtrasError(OPRF.Errors.invalidProof)
+                }
+            }
+
+            var outputs: [Data] = []
+            outputs.reserveCapacity(messages.count)
+            for index in messages.indices {
+                outputs.append(
+                    try self.client.finalize(
+                        message: messages[index],
+                        info: info,
+                        blind: blinds[index],
+                        evaluatedElement: evaluatedElements[index]
+                    )
+                )
+            }
+            return outputs
         }
         
     }

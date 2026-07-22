@@ -15,22 +15,20 @@
 
 #if !canImport(CryptoKit) && !canImport(FoundationEssentials) && !canImport(Foundation)
 import CryptoBoringWrapper
-#if hasFeature(Embedded)
-import CCryptoBoringSSLShims
-#else
-@_implementationOnly import CCryptoBoringSSLShims
-#endif
+internal import CCryptoBoringSSLShims
 
 extension Data: CryptoBoringWrapper.ContiguousBytes {
     public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) -> R) -> R {
-        self.storage.withUnsafeBytes(body)
+        self.storage.withUnsafeBytes { buffer in
+            body(UnsafeRawBufferPointer(rebasing: buffer[self.storageRange]))
+        }
     }
 
     public func withUnsafeBytes<R>(
         _ body: (UnsafeRawBufferPointer) throws(CryptoBoringWrapperError) -> R
     ) throws(CryptoBoringWrapperError) -> R {
         try self.storage.withUnsafeBytes { buffer throws(CryptoBoringWrapperError) in
-            try body(buffer)
+            try body(UnsafeRawBufferPointer(rebasing: buffer[self.storageRange]))
         }
     }
 }

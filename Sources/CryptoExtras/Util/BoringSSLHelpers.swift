@@ -13,16 +13,8 @@
 //===----------------------------------------------------------------------===//
 
 // NOTE: This file is unconditionally compiled because RSABSSA is implemented using BoringSSL on all platforms.
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
-#if hasFeature(Embedded)
-import CCryptoBoringSSLShims
-#else
-@_implementationOnly import CCryptoBoringSSLShims
-#endif
+internal import CCryptoBoringSSL
+internal import CCryptoBoringSSLShims
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #elseif canImport(Foundation)
@@ -53,6 +45,40 @@ extension ArbitraryPrecisionInteger {
         }
         #endif
     }
+
+    func writeBigEndianBytes(
+        paddedToSize paddedByteCount: Int,
+        into destination: UnsafeMutableRawBufferPointer
+    ) throws(CryptoKitMetaError) {
+        do throws(CryptoBoringWrapperError) {
+            let byteCount = self.byteCount
+            guard
+                paddedByteCount >= byteCount,
+                destination.count == paddedByteCount
+            else {
+                throw CryptoBoringWrapperError.incorrectParameterSize
+            }
+
+            destination.initializeMemory(as: UInt8.self, repeating: 0)
+            guard byteCount > 0 else {
+                return
+            }
+            let integerBytes = UnsafeMutableRawBufferPointer(
+                rebasing: destination.suffix(byteCount)
+            )
+            guard let baseAddress = integerBytes.baseAddress else {
+                throw CryptoBoringWrapperError.incorrectParameterSize
+            }
+            let written = self.withUnsafeBignumPointer { integerPointer in
+                CCryptoBoringSSLShims_BN_bn2bin(integerPointer, baseAddress)
+            }
+            guard written == byteCount else {
+                throw CryptoBoringWrapperError.internalBoringSSLError()
+            }
+        } catch {
+            throw cryptoExtrasError(error)
+        }
+    }
 }
 
 extension Data {
@@ -80,7 +106,6 @@ extension Data {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 internal enum BIOHelper {
     static func withReadOnlyMemoryBIO<ReturnValue, E: Error>(
         wrapping pointer: UnsafeRawBufferPointer, _ block: (OpaquePointer) throws(E) -> ReturnValue
@@ -114,7 +139,6 @@ internal enum BIOHelper {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension Data {
     init(copyingMemoryBIO bio: OpaquePointer) throws(CryptoKitMetaError) {
         var innerPointer: UnsafePointer<UInt8>? = nil
@@ -128,7 +152,6 @@ extension Data {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension String {
     init(copyingUTF8MemoryBIO bio: OpaquePointer) throws(CryptoKitMetaError) {
         var innerPointer: UnsafePointer<UInt8>? = nil
@@ -142,7 +165,6 @@ extension String {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension FixedWidthInteger {
     func withBignumPointer<ReturnType, E: Error>(_ block: (UnsafeMutablePointer<BIGNUM>) throws(E) -> ReturnType) throws(E) -> ReturnType {
         precondition(self.bitWidth <= UInt.bitWidth)

@@ -19,7 +19,7 @@ import Foundation
 #endif
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
 
 protocol SignatureVerification {

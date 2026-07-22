@@ -19,12 +19,6 @@ import Foundation
 #endif
 import Crypto
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
-typealias ARCP256 = HashToCurveImpl<P256>
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
-typealias ARCP384 = HashToCurveImpl<P384>
-
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 extension ARC.CredentialRequest {
     static func getScalarCount() -> Int { return 5 }
     static func getSerializedByteCount(_ ciphersuite: ARC.Ciphersuite<H2G>) -> Int {
@@ -54,7 +48,6 @@ extension ARC.CredentialRequest {
     }
 }
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 extension ARC.CredentialResponse {
     static func getScalarCount() -> Int { return 8 }
     static func getSerializedByteCount(_ ciphersuite: ARC.Ciphersuite<H2G>) -> Int {
@@ -95,7 +88,6 @@ extension ARC.CredentialResponse {
     }
 }
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 extension ARC.Presentation {
     static func getScalarCount() -> Int { return 5 }
     static func getPointCount() -> Int { return 4 }
@@ -132,7 +124,6 @@ extension ARC.Presentation {
     }
 }
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 extension ARC.ServerPublicKey {
     static func getSerializedByteCount(_ ciphersuite: ARC.Ciphersuite<H2G>) -> Int {
         return 3 * ciphersuite.pointByteCount
@@ -163,7 +154,6 @@ extension ARC.ServerPublicKey {
     }
 }
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 extension Proof {
     func serialize(ciphersuite: ARC.Ciphersuite<H2G>) -> Data {
         let scalarCount = self.responses.count + 1
@@ -186,13 +176,17 @@ extension Proof {
         var bytes = Data(proofData)
 
         // Deserialize challenge
-        let challenge = try H2G.G.Scalar(bytes: bytes.popFirst(ciphersuite.scalarByteCount), reductionIsModOrder: true)
+        let challenge = try H2G.G.Scalar(
+            canonicalRepresentation: bytes.popFirst(ciphersuite.scalarByteCount)
+        )
 
         // Deserialize responses
         var responses: [H2G.G.Scalar] = []
         responses.reserveCapacity(scalarCount - 1)
         for _ in (0..<scalarCount-1) {
-            let response = try H2G.G.Scalar(bytes: bytes.popFirst(ciphersuite.scalarByteCount), reductionIsModOrder: true)
+            let response = try H2G.G.Scalar(
+                canonicalRepresentation: bytes.popFirst(ciphersuite.scalarByteCount)
+            )
             responses.append(response)
         }
 
@@ -202,7 +196,6 @@ extension Proof {
 
 // Serialize a ARC credential, to save and restore client state.
 // This will only be called client-side, and never be sent over the wire.
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 extension ARC.Credential {
     static func getScalarCount() -> Int { return 1 }
     static func getPointCount() -> Int { return 5 }
@@ -233,7 +226,9 @@ extension ARC.Credential {
 
         var bytes = Data(credentialData)
 
-        let m1 = try H2G.G.Scalar(bytes: bytes.popFirst(ciphersuite.scalarByteCount), reductionIsModOrder: true)
+        let m1 = try H2G.G.Scalar(
+            canonicalRepresentation: bytes.popFirst(ciphersuite.scalarByteCount)
+        )
         let U = try H2G.G.Element(oprfRepresentation: bytes.popFirst(ciphersuite.pointByteCount))
         let UPrime = try H2G.G.Element(oprfRepresentation: bytes.popFirst(ciphersuite.pointByteCount))
         let X1 = try H2G.G.Element(oprfRepresentation: bytes.popFirst(ciphersuite.pointByteCount))
@@ -243,14 +238,12 @@ extension ARC.Credential {
         // Deserialize presentationState from remaining bytes.
         let presentationState = try ARC.PresentationState.deserialize(presentationStateData: bytes)
 
-        let ciphersuite = ARC.Ciphersuite(H2G.self)
         return ARC.Credential(m1: m1, U: U, UPrime: UPrime, X1: X1, ciphersuite: ciphersuite, generatorG: genG, generatorH: genH, presentationState: presentationState)
     }
 }
 
 // Serialize a ARC PresentationState, to help save and restore a credential.
 // This will only be called client-side, and never be sent over the wire.
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 extension ARC.PresentationState {
     func serialize() throws -> Data {
         let encoder = PropertyListEncoder()

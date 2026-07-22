@@ -12,16 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
-#if hasFeature(Embedded)
-import CCryptoBoringSSLShims
-#else
-@_implementationOnly import CCryptoBoringSSLShims
-#endif
+internal import CCryptoBoringSSL
+internal import CCryptoBoringSSLShims
 import Crypto
 import CryptoBoringWrapper
 #if canImport(FoundationEssentials)
@@ -30,13 +22,10 @@ import FoundationEssentials
 import Foundation
 #endif
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 typealias ChaCha20CTRImpl = OpenSSLChaCha20CTRImpl
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension Insecure {
     /// ChaCha20-CTR with 96-bit nonces and a 32 bit counter.
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     public enum ChaCha20CTR {
         static let keyBitsCount = 256
         static let nonceByteCount = 12
@@ -65,9 +54,7 @@ extension Insecure {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension Insecure.ChaCha20CTR {
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     public struct Nonce: Sendable, Crypto.ContiguousBytes, Sequence {
         let bytes: Data
 
@@ -100,7 +87,6 @@ extension Insecure.ChaCha20CTR {
         }
     }
 
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     public struct Counter: Sendable, Crypto.ContiguousBytes {
         let counter: UInt32
 

@@ -19,14 +19,8 @@ import FoundationEssentials
 import Foundation
 #endif
 
-@usableFromInline
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-typealias AESCTRImpl = OpenSSLAESCTRImpl
-
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension AES {
 
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     public enum _CTR {
         @inlinable
         public static func encrypt<Plaintext: DataProtocol>(
@@ -34,8 +28,7 @@ extension AES {
             using key: SymmetricKey,
             nonce: AES._CTR.Nonce
         ) throws(CryptoKitMetaError) -> Data {
-            let bytes = Data(plaintext)
-            return try AESCTRImpl.encrypt(bytes, using: key, nonce: nonce)
+            try AESCTRCipher.encrypt(plaintext, using: key, nonce: nonce)
         }
 
         @inlinable
@@ -50,9 +43,7 @@ extension AES {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension AES._CTR {
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     public struct Nonce: Sendable {
         // AES CTR uses a 128-bit counter. It's most usual to use a 96-bit nonce
         // and a 32-bit counter at the end, so we support that specific mode of

@@ -42,7 +42,6 @@ extension Insecure.MD5Digest {
     public static var _algorithm: _DigestAlgorithm { .unsupported }
 }
 
-#if !CRYPTOKIT_IN_SEP
 extension SHA3_256Digest {
     public static var _algorithm: _DigestAlgorithm { .unsupported }
 }
@@ -54,5 +53,4 @@ extension SHA3_384Digest {
 extension SHA3_512Digest {
     public static var _algorithm: _DigestAlgorithm { .unsupported }
 }
-#endif
 #endif

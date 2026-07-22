@@ -1,4 +1,4 @@
-// swift-tools-version:6.2
+// swift-tools-version:6.4
 //===----------------------------------------------------------------------===//
 //
 // This source file is part of the SwiftCrypto open source project
@@ -33,13 +33,12 @@ let nonDarwinPlatforms: [Platform] = [
     .windows,
     .wasi,
     .openbsd,
-    // The SwiftPM Platform symbol is not yet public but the underlying platform name is set.
-    // -- https://github.com/swiftlang/swift-package-manager/blob/swift-6.2.3-RELEASE/Sources/PackageDescription/SupportedPlatforms.swift#L75
+    // PackageDescription 6.4 exposes the typed FreeBSD constant as unavailable.
+    // The custom spelling is the current manifest representation of the FreeBSD platform.
     .custom("freebsd"),
 ]
 
 let swiftSettings: [SwiftSetting] = [
-    .define("CRYPTO_IN_SWIFTPM"),
     .enableExperimentalFeature("Lifetimes"),
 ]
 
@@ -60,10 +59,15 @@ let privacyManifestResource: [PackageDescription.Resource] =
 
 let package = Package(
     name: "swift-crypto",
+    platforms: [
+        .macOS(.v26),
+        .iOS(.v26),
+        .watchOS(.v26),
+        .tvOS(.v26),
+        .visionOS(.v26),
+    ],
     products: [
         .library(name: "Crypto", targets: ["Crypto"]),
-        // Kept for backward compatibility
-        .library(name: "_CryptoExtras", targets: ["_CryptoExtras"]),
         .library(name: "CryptoExtras", targets: ["CryptoExtras"]),
         /* This target is used only for symbol mangling. It's added and removed automatically because it emits build warnings. MANGLE_START
             .library(name: "CCryptoBoringSSL", type: .static, targets: ["CCryptoBoringSSL"]),
@@ -144,6 +148,7 @@ let package = Package(
             ],
             exclude: privacyManifestExclude + [
                 "CMakeLists.txt",
+                "Docs.docc",
                 "vendored-sources.txt",
                 "Signatures/BoringSSL/MLDSA_boring.swift.gyb",
                 "KEM/BoringSSL/MLKEM_boring.swift.gyb",
@@ -161,16 +166,10 @@ let package = Package(
                 .product(name: "SwiftASN1", package: "swift-asn1"),
             ],
             exclude: privacyManifestExclude + [
-                "CMakeLists.txt"
+                "CMakeLists.txt",
+                "Docs.docc"
             ],
             resources: privacyManifestResource,
-            swiftSettings: swiftSettings
-        ),
-        .target(
-            name: "_CryptoExtras",
-            dependencies: [
-                "CryptoExtras",
-            ],
             swiftSettings: swiftSettings
         ),
         .target(
@@ -186,6 +185,20 @@ let package = Package(
             swiftSettings: swiftSettings
         ),
         .executableTarget(name: "crypto-shasum", dependencies: ["Crypto"]),
+        .executableTarget(
+            name: "crypto-digest-validation",
+            dependencies: ["Crypto"]
+        ),
+        .executableTarget(
+            name: "crypto-capability-validation",
+            dependencies: [
+                "CCryptoBoringSSL",
+                "CCryptoBoringSSLShims",
+                "CryptoBoringWrapper",
+                "Crypto",
+                "CryptoExtras",
+            ]
+        ),
         .testTarget(
             name: "CryptoTests",
             dependencies: ["Crypto"],
@@ -203,13 +216,11 @@ let package = Package(
         ),
         .testTarget(
             name: "CryptoExtrasTests",
-            dependencies: ["CryptoExtras"],
+            dependencies: ["CryptoExtras", "Crypto"],
             resources: [
                 .copy("ECToolbox/H2CVectors/P256_XMD-SHA-256_SSWU_RO_.json"),
                 .copy("ECToolbox/H2CVectors/P384_XMD-SHA-384_SSWU_RO_.json"),
-                .copy("OPRFs/OPRFVectors/OPRFVectors-VOPRFDraft8.json"),
-                .copy("OPRFs/OPRFVectors/OPRFVectors-VOPRFDraft19.json"),
-                .copy("OPRFs/OPRFVectors/OPRFVectors-edgecases.json"),
+                .copy("OPRFs/OPRFVectors/OPRFVectors-RFC9497.json"),
             ],
             swiftSettings: swiftSettings
         ),
@@ -220,7 +231,10 @@ let package = Package(
 )
 
 package.dependencies += [
-    .package(url: "https://github.com/1amageek/swift-asn1.git", branch: "main")
+    .package(
+        url: "https://github.com/1amageek/swift-asn1.git",
+        revision: "b6ceb273cb9c35b7a44f853ddd9e6e5044938102"
+    )
 ]
 
 // ---    STANDARD CROSS-REPO SETTINGS DO NOT EDIT   --- //

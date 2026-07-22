@@ -20,7 +20,7 @@ import Dispatch
 
 // A testing utility that creates one contiguous and one discontiguous representation of the given Data.
 extension Array where Element == UInt8 {
-    func asDataProtocols() -> (contiguous: Data, discontiguous: DispatchData) {
+    func asDataProtocols(splitAt requestedPivot: Int? = nil) -> (contiguous: Data, discontiguous: DispatchData) {
         guard self.count > 0 else {
             // We can't really have discontiguous options here, so we just return empty versions
             // of both.
@@ -29,7 +29,8 @@ extension Array where Element == UInt8 {
 
         let contiguous = Data(self)
         let discontiguous: DispatchData = self.withUnsafeBytes { bytesPointer in
-            let pivot = bytesPointer.count / 2
+            let pivot = requestedPivot ?? bytesPointer.count / 2
+            precondition(pivot >= 0 && pivot <= bytesPointer.count)
             var data = DispatchData.empty
             data.append(DispatchData(bytes: UnsafeRawBufferPointer(rebasing: bytesPointer[..<pivot])))
             data.append(DispatchData(bytes: UnsafeRawBufferPointer(rebasing: bytesPointer[pivot...])))

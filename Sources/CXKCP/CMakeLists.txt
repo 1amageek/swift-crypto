@@ -25,10 +25,5 @@ target_include_directories(CXKCP PUBLIC
 target_compile_definitions(CXKCP PRIVATE
   $<$<PLATFORM_ID:Windows>:WIN32_LEAN_AND_MEAN>)
 target_link_libraries(CXKCP PUBLIC
-  $<$<NOT:$<PLATFORM_ID:Darwin>>:dispatch>
-  $<$<NOT:$<PLATFORM_ID:Darwin>>:Foundation>
-  SwiftASN1)
-set_target_properties(CXKCP PROPERTIES
-  INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/include;${CMAKE_Swift_MODULE_DIRECTORY}")
-
+  ${SWIFT_CRYPTO_PLATFORM_LIBRARIES})
 set_property(GLOBAL APPEND PROPERTY SWIFT_CRYPTO_EXPORTS CXKCP)

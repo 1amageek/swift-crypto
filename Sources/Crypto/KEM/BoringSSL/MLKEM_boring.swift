@@ -18,24 +18,17 @@ import FoundationEssentials
 import Foundation
 #endif
 
-
 // MARK: - Generated file, do NOT edit
 // any edits of this file WILL be overwritten and thus discarded
 // see section `gyb` in `README` for details.
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
+internal import CCryptoBoringSSL
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLKEM768 {
     /// A ML-KEM-768 private key.
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     struct InternalPrivateKey: @unchecked Sendable {
         private var backing: Backing
 
@@ -175,10 +168,8 @@ extension MLKEM768 {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLKEM768 {
     /// A ML-KEM-768 public key.
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     struct InternalPublicKey: @unchecked Sendable {
         private var backing: Backing
 
@@ -288,16 +279,13 @@ extension MLKEM768 {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLKEM768 {
     /// The size of the encapsulated shared secret in bytes.
     private static let ciphertextByteCount = Int(MLKEM768_CIPHERTEXT_BYTES)
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLKEM1024 {
     /// A ML-KEM-1024 private key.
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     struct InternalPrivateKey: @unchecked Sendable {
         private var backing: Backing
 
@@ -437,10 +425,8 @@ extension MLKEM1024 {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLKEM1024 {
     /// A ML-KEM-1024 public key.
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     struct InternalPublicKey: @unchecked Sendable {
         private var backing: Backing
 
@@ -550,13 +536,11 @@ extension MLKEM1024 {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLKEM1024 {
     /// The size of the encapsulated shared secret in bytes.
     private static let ciphertextByteCount = Int(MLKEM1024_CIPHERTEXT_BYTES)
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 enum MLKEM {
     /// The size of the seed in bytes.
     static let seedByteCount = 64

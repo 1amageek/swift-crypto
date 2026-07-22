@@ -18,15 +18,7 @@ import FoundationEssentials
 import Foundation
 #endif
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-typealias SupportedCurveDetailsImpl = OpenSSLSupportedNISTCurve
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-typealias GroupImpl = OpenSSLGroup
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
-typealias HashToCurveImpl = OpenSSLHashToCurve
-
 /// A prime-order group
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 protocol Group {
     /// Group element
     associatedtype Element: GroupElement
@@ -38,30 +30,93 @@ protocol Group {
     static var cofactor: Int { get }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 protocol HashToGroup {
     associatedtype H: HashFunction
     associatedtype G: Group where G.Element: OPRFGroupElement
 
-    static var suiteID: Int { get }
-    static func hashToScalar(_ data: Data, domainSeparationString: Data) throws(CryptoKitMetaError) -> G.Scalar
-    static func hashToGroup(_ data: Data, domainSeparationString: Data) -> G.Element
+    static var oprfCiphersuiteIdentifier: String { get }
+    static func hashToScalar(
+        _ data: Data,
+        domainSeparationTag: Data
+    ) throws(CryptoKitMetaError) -> G.Scalar
+    static func hashToScalar(
+        domainSeparationTag: Data,
+        updateInput: (inout H) throws(CryptoKitMetaError) -> Void
+    ) throws(CryptoKitMetaError) -> G.Scalar
+    static func hashToGroup<Bytes: Crypto.ContiguousBytes>(
+        _ data: Bytes,
+        domainSeparationString: Data
+    ) -> G.Element
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-protocol GroupScalar: Sendable {
-    init(bytes: Data, reductionIsModOrder: Bool) throws(CryptoKitMetaError)
+extension HashToGroup {
+    static func hashToScalar(
+        _ data: Data,
+        domainSeparationTag: Data
+    ) throws(CryptoKitMetaError) -> G.Scalar {
+        try hashToScalar(domainSeparationTag: domainSeparationTag) { hasher in
+            hasher.update(data: data)
+        }
+    }
+
+    static func hashToScalarDomainSeparationTag(context: Data) -> Data {
+        let prefix = Data("HashToScalar-".utf8)
+        var domainSeparationTag = Data(capacity: prefix.count + context.count)
+        domainSeparationTag.append(prefix)
+        domainSeparationTag.append(context)
+        return domainSeparationTag
+    }
+
+    static func hashToGroupDomainSeparationTag(context: Data) -> Data {
+        let prefix = Data("HashToGroup-".utf8)
+        var domainSeparationTag = Data(capacity: prefix.count + context.count)
+        domainSeparationTag.append(prefix)
+        domainSeparationTag.append(context)
+        return domainSeparationTag
+    }
+
+    static func hashToScalar(
+        _ data: Data,
+        domainSeparationContext: Data
+    ) throws(CryptoKitMetaError) -> G.Scalar {
+        try hashToScalar(
+            data,
+            domainSeparationTag: hashToScalarDomainSeparationTag(
+                context: domainSeparationContext
+            )
+        )
+    }
+}
+
+enum ScalarReductionModulus {
+    case groupOrder
+    case fieldPrime
+}
+
+protocol GroupScalar: Sendable, Equatable {
+    init(canonicalRepresentation: Data) throws(CryptoKitMetaError)
+
+    static func reducing<Bytes: Crypto.ContiguousBytes>(
+        _ uniformBytes: Bytes,
+        modulo modulus: ScalarReductionModulus
+    ) throws(CryptoKitMetaError) -> Self
 
     var rawRepresentation: Data { get }
 
+    func writeRawRepresentation(
+        into destination: UnsafeMutableRawBufferPointer
+    ) throws(CryptoKitMetaError)
+
     // Generates a Random Scalar Element
     static var random: Self { get }
+
+    static var zero: Self { get }
 
     static func + (left: Self, right: Self) -> Self
 
     static func - (left: Self, right: Self) -> Self
 
-    static func ^ (left: Self, right: Int) -> Self
+    func inverted() throws(CryptoKitMetaError) -> Self
 
     static func * (left: Self, right: Self) -> Self
 
@@ -71,11 +126,12 @@ protocol GroupScalar: Sendable {
     static func == (left: Self, right: Self) -> Bool
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 protocol GroupElement: Sendable {
     associatedtype Scalar: GroupScalar
 
     static var generator: Self { get }
+
+    var isIdentity: Bool { get }
 
     // Generates a Random Group Element
     static var random: Self { get }

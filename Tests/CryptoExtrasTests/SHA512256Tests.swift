@@ -87,6 +87,23 @@ final class SHA512256DigestTests: XCTestCase {
         XCTAssertEqual(digest, copyDigest)
     }
 
+    func testCopiesDivergeIndependently() {
+        let commonPrefix: [UInt8] = [1, 2, 3, 4]
+        var first = SHA512256()
+        first.update(data: commonPrefix)
+        var second = first
+
+        first.update(data: [5])
+        second.update(data: [6])
+
+        let firstDigest = first.finalize()
+        let secondDigest = second.finalize()
+        XCTAssertEqual(firstDigest, SHA512256.hash(data: commonPrefix + [5]))
+        XCTAssertEqual(secondDigest, SHA512256.hash(data: commonPrefix + [6]))
+        XCTAssertNotEqual(firstDigest, secondDigest)
+        XCTAssertEqual(first.finalize(), firstDigest)
+    }
+
     func testBlockSize() {
         XCTAssertEqual(SHA512256.blockByteCount, 128)
     }

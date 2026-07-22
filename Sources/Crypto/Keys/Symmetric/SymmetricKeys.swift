@@ -19,7 +19,7 @@ import Foundation
 #endif
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
 
 
@@ -102,17 +102,6 @@ public struct SymmetricKey: ContiguousBytes, Sendable {
     ///   - data: The contiguous bytes from which to create the key.
     public init<D: ContiguousBytes>(data: D) {
         self.init(key: SecureBytes(bytes: data))
-    }
-
-    /// Creates a key from the given data.
-    ///
-    /// - Parameters:
-    ///   - bytes: The span of bytes from which to create the key.
-    ///
-    /// Note: historical version of init(copying:) below, SPI only.
-    @inlinable
-    internal init(bytes: RawSpan) {
-        self = bytes.withUnsafeBytes { SymmetricKey(data: $0) }
     }
 
     /// Creates a key from the given data.

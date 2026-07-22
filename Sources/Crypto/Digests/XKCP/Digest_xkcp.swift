@@ -13,154 +13,131 @@
 //===----------------------------------------------------------------------===//
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
-#else
-#if hasFeature(Embedded)
-import CXKCP
-import CXKCPShims
+import CryptoKit
 #else
 import CXKCP
 import CXKCPShims
-#endif
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-protocol XKCPBackedHashFunction: HashFunctionImplementationDetails {
-    associatedtype Context
-    static var digestSize: Int { get }
-    static func initialize() -> Context?
-    static func update(_ context: inout Context, data: UnsafeRawBufferPointer) -> Bool
-    static func finalize(_ context: inout Context, digest: UnsafeMutableRawBufferPointer) -> Bool
-}
-
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-extension SHA3_256: XKCPBackedHashFunction {
+extension SHA3_256 {
     static var digestSize: Int { 32 }
 
-    static func initialize() -> Keccak_HashInstance? {
-        var context = Keccak_HashInstance()
-        guard CXKCPShims_Keccak_HashInitialize_SHA3_256(&context) == KECCAK_SUCCESS else {
+    static func makeContext() -> KeccakDigestContext? {
+        var state = Keccak_HashInstance()
+        guard CXKCPShims_Keccak_HashInitialize_SHA3_256(&state) == KECCAK_SUCCESS else {
             return nil
         }
-        return context
+        return KeccakDigestContext(state)
     }
 
-    static func update(_ context: inout Keccak_HashInstance, data: UnsafeRawBufferPointer) -> Bool {
-        guard let baseAddress = data.baseAddress else { return true }
-        return Keccak_HashUpdate(&context, baseAddress, data.count * 8) == KECCAK_SUCCESS
+    static func copyContext(_ context: KeccakDigestContext) -> KeccakDigestContext {
+        context.copy()
     }
 
-    static func finalize(_ context: inout Keccak_HashInstance, digest: UnsafeMutableRawBufferPointer) -> Bool {
-        guard let baseAddress = digest.baseAddress, digest.count == Self.digestSize else { return false }
-        return Keccak_HashFinal(&context, baseAddress) == KECCAK_SUCCESS
+    static func update(_ context: KeccakDigestContext, data: UnsafeRawBufferPointer) -> Bool {
+        guard let baseAddress = data.baseAddress else {
+            return true
+        }
+        return context.withState { state in
+            Keccak_HashUpdate(&state, baseAddress, data.count * 8) == KECCAK_SUCCESS
+        }
+    }
+
+    static func finalize(
+        _ context: KeccakDigestContext,
+        digest: UnsafeMutableRawBufferPointer
+    ) -> Bool {
+        guard let baseAddress = digest.baseAddress, digest.count == digestSize else {
+            return false
+        }
+        return context.withState { state in
+            var finalState = state
+            defer {
+                withUnsafeMutableBytes(of: &finalState) { $0.zeroize() }
+            }
+            return Keccak_HashFinal(&finalState, baseAddress) == KECCAK_SUCCESS
+        }
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-extension SHA3_384: XKCPBackedHashFunction {
+extension SHA3_384 {
     static var digestSize: Int { 48 }
 
-    static func initialize() -> Keccak_HashInstance? {
-        var context = Keccak_HashInstance()
-        guard CXKCPShims_Keccak_HashInitialize_SHA3_384(&context) == KECCAK_SUCCESS else {
+    static func makeContext() -> KeccakDigestContext? {
+        var state = Keccak_HashInstance()
+        guard CXKCPShims_Keccak_HashInitialize_SHA3_384(&state) == KECCAK_SUCCESS else {
             return nil
         }
-        return context
+        return KeccakDigestContext(state)
     }
 
-    static func update(_ context: inout Keccak_HashInstance, data: UnsafeRawBufferPointer) -> Bool {
-        guard let baseAddress = data.baseAddress else { return true }
-        return Keccak_HashUpdate(&context, baseAddress, data.count * 8) == KECCAK_SUCCESS
+    static func copyContext(_ context: KeccakDigestContext) -> KeccakDigestContext {
+        context.copy()
     }
 
-    static func finalize(_ context: inout Keccak_HashInstance, digest: UnsafeMutableRawBufferPointer) -> Bool {
-        guard let baseAddress = digest.baseAddress, digest.count == Self.digestSize else { return false }
-        return Keccak_HashFinal(&context, baseAddress) == KECCAK_SUCCESS
+    static func update(_ context: KeccakDigestContext, data: UnsafeRawBufferPointer) -> Bool {
+        guard let baseAddress = data.baseAddress else {
+            return true
+        }
+        return context.withState { state in
+            Keccak_HashUpdate(&state, baseAddress, data.count * 8) == KECCAK_SUCCESS
+        }
+    }
+
+    static func finalize(
+        _ context: KeccakDigestContext,
+        digest: UnsafeMutableRawBufferPointer
+    ) -> Bool {
+        guard let baseAddress = digest.baseAddress, digest.count == digestSize else {
+            return false
+        }
+        return context.withState { state in
+            var finalState = state
+            defer {
+                withUnsafeMutableBytes(of: &finalState) { $0.zeroize() }
+            }
+            return Keccak_HashFinal(&finalState, baseAddress) == KECCAK_SUCCESS
+        }
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-extension SHA3_512: XKCPBackedHashFunction {
+extension SHA3_512 {
     static var digestSize: Int { 64 }
 
-    static func initialize() -> Keccak_HashInstance? {
-        var context = Keccak_HashInstance()
-        guard CXKCPShims_Keccak_HashInitialize_SHA3_512(&context) == KECCAK_SUCCESS else {
+    static func makeContext() -> KeccakDigestContext? {
+        var state = Keccak_HashInstance()
+        guard CXKCPShims_Keccak_HashInitialize_SHA3_512(&state) == KECCAK_SUCCESS else {
             return nil
         }
-        return context
+        return KeccakDigestContext(state)
     }
 
-    static func update(_ context: inout Keccak_HashInstance, data: UnsafeRawBufferPointer) -> Bool {
-        guard let baseAddress = data.baseAddress else { return true }
-        return Keccak_HashUpdate(&context, baseAddress, data.count * 8) == KECCAK_SUCCESS
+    static func copyContext(_ context: KeccakDigestContext) -> KeccakDigestContext {
+        context.copy()
     }
 
-    static func finalize(_ context: inout Keccak_HashInstance, digest: UnsafeMutableRawBufferPointer) -> Bool {
-        guard let baseAddress = digest.baseAddress, digest.count == Self.digestSize else { return false }
-        return Keccak_HashFinal(&context, baseAddress) == KECCAK_SUCCESS
-    }
-}
-
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-struct XKCPDigestImpl<H: XKCPBackedHashFunction>: @unchecked Sendable {
-    private var context: XKCPDigestContext<H>
-
-    init() {
-        self.context = XKCPDigestContext()
-    }
-
-    internal mutating func update(data: UnsafeRawBufferPointer) {
-        if !isKnownUniquelyReferenced(&self.context) {
-            self.context = XKCPDigestContext(copying: self.context)
+    static func update(_ context: KeccakDigestContext, data: UnsafeRawBufferPointer) -> Bool {
+        guard let baseAddress = data.baseAddress else {
+            return true
         }
-        self.context.update(data: data)
-    }
-
-    internal func finalize() -> H.Digest {
-        self.context.finalize()
-    }
-}
-
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-private final class XKCPDigestContext<H: XKCPBackedHashFunction> {
-    private var context: H.Context
-
-    init() {
-        guard let context = H.initialize() else {
-            preconditionFailure("Unable to initialize digest state")
-        }
-        self.context = context
-    }
-
-    init(copying original: XKCPDigestContext) {
-        self.context = original.context
-    }
-
-    func update(data: UnsafeRawBufferPointer) {
-        guard H.update(&self.context, data: data) else {
-            preconditionFailure("Unable to update digest state")
+        return context.withState { state in
+            Keccak_HashUpdate(&state, baseAddress, data.count * 8) == KECCAK_SUCCESS
         }
     }
 
-    func finalize() -> H.Digest {
-        var copyContext = self.context
-        defer {
-            withUnsafeMutablePointer(to: &copyContext) { $0.zeroize() }
+    static func finalize(
+        _ context: KeccakDigestContext,
+        digest: UnsafeMutableRawBufferPointer
+    ) -> Bool {
+        guard let baseAddress = digest.baseAddress, digest.count == digestSize else {
+            return false
         }
-        return withUnsafeTemporaryAllocation(byteCount: H.digestSize, alignment: 1) { digestPointer in
+        return context.withState { state in
+            var finalState = state
             defer {
-                digestPointer.zeroize()
+                withUnsafeMutableBytes(of: &finalState) { $0.zeroize() }
             }
-            guard H.finalize(&copyContext, digest: digestPointer) else {
-                preconditionFailure("Unable to finalize digest state")
-            }
-            // We force unwrap here because if the digest size is wrong it's an internal error.
-            return H.Digest(copying: digestPointer.bytes)!
+            return Keccak_HashFinal(&finalState, baseAddress) == KECCAK_SUCCESS
         }
-    }
-
-    deinit {
-        withUnsafeMutablePointer(to: &self.context) { $0.zeroize() }
     }
 }
 #endif  // canImport(CryptoKit)

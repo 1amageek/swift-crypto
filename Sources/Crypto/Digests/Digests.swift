@@ -14,7 +14,7 @@
 
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
 // MARK: - Generated file, do NOT edit
 // any edits of this file WILL be overwritten and thus discarded
@@ -441,8 +441,6 @@ public struct MD5Digest: DigestPrivate {
 }
 
 
-#if !CRYPTOKIT_IN_SEP
-
 // MARK: - SHA3_256Digest + DigestPrivate
 /// The output of a Secure Hashing Algorithm 3 (SHA-2) hash with a 256-bit digest.
 public struct SHA3_256Digest: DigestPrivate {
@@ -692,5 +690,4 @@ public struct SHA3_512Digest: DigestPrivate {
         self.withUnsafeBytes { hasher.combine(bytes: $0) }
     }
 }
-#endif // !CRYPTOKIT_IN_SEP
 #endif // canImport(CryptoKit)

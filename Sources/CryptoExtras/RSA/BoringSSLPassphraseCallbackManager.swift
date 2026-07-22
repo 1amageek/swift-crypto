@@ -34,7 +34,6 @@ internal protocol CallbackManagerProtocol: AnyObject {
 
 /// This class exists primarily to work around the fact that Swift does not let us stuff
 /// a closure into an `Unmanaged`. Instead, we use this object to keep hold of it.
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 final class BoringSSLPassphraseCallbackManager<Bytes: Collection>: CallbackManagerProtocol
 where Bytes.Element == UInt8 {
     private let userCallback: _RSA.Signing.PrivateKey.PassphraseCallback<Bytes>

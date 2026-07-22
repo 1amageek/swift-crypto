@@ -13,16 +13,8 @@
 //===----------------------------------------------------------------------===//
 
 import Crypto
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
-#if hasFeature(Embedded)
-import CCryptoBoringSSLShims
-#else
-@_implementationOnly import CCryptoBoringSSLShims
-#endif
+internal import CCryptoBoringSSL
+internal import CCryptoBoringSSLShims
 import CryptoBoringWrapper
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -30,7 +22,6 @@ import FoundationEssentials
 import Foundation
 #endif
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension AES {
     private static let blockSize = 128 / 8
 
@@ -109,7 +100,6 @@ extension AES {
         }
     }
 
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     enum Permutation {
         case forward
         case backward
@@ -142,7 +132,6 @@ extension AES {
         }
     }
 
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     struct Block {
         private static var blockSize: Int { 16 }
 
@@ -239,7 +228,6 @@ extension AES {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension AES.Block: RandomAccessCollection, MutableCollection {
     var startIndex: Int {
         0

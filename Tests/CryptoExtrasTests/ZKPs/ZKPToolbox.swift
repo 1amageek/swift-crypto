@@ -15,13 +15,12 @@ import Crypto
 @testable import CryptoExtras
 import XCTest
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 class ZKPToolboxTests: XCTestCase {
-    typealias H2G = HashToCurveImpl<P384>
+    typealias H2G = CurveHashToGroup<P384>
     typealias Group = H2G.G
 
     /// Tests the workflow for proof creation and verification, for a simple DL proof: A=x*B for a secret scalar x
-    func DL1Workflow<Curve: SupportedCurveDetailsImpl>(CurveType _: Curve.Type) throws {
+    func runDiscreteLogWorkflow() throws {
         // Prover's scope
         let (proof, point, result) = try {
             let point = Group.Element.random
@@ -57,9 +56,7 @@ class ZKPToolboxTests: XCTestCase {
     }
 
     func testDL1() throws {
-        try DL1Workflow(CurveType: P256.self)
-        try DL1Workflow(CurveType: P384.self)
-        try DL1Workflow(CurveType: P521.self)
+        try runDiscreteLogWorkflow()
     }
 
     /// Allocate group element variables and define the constraints for a DLEQ proof:
@@ -78,7 +75,7 @@ class ZKPToolboxTests: XCTestCase {
 
     /// Tests the workflow for proof creation and verification, for a simple DLEQ proof:
     /// For a secret scalar x, the relation between B=x*A and D=x*C is such that log_A(B)==log_C(D)
-    func DLEqualityWorkflow<Curve: SupportedCurveDetailsImpl>(CurveType _: Curve.Type) throws {
+    func runDiscreteLogEqualityWorkflow() throws {
         // Prover's scope
         let (proof, point1, point2, result1, result2) = try {
             let point1 = Group.Element.random
@@ -110,13 +107,11 @@ class ZKPToolboxTests: XCTestCase {
     }
 
     func testDLEquality() throws {
-        try DLEqualityWorkflow(CurveType: P256.self)
-        try DLEqualityWorkflow(CurveType: P384.self)
-        try DLEqualityWorkflow(CurveType: P521.self)
+        try runDiscreteLogEqualityWorkflow()
     }
 
     /// Tests the workflow for proof creation and verification, for a commitment proof: A=x*B+y*C for secret scalars x, y
-    func DL2Workflow<Curve: SupportedCurveDetailsImpl>(CurveType _: Curve.Type) throws {
+    func runTwoScalarDiscreteLogWorkflow() throws {
         // Prover's scope
         let (proof, point1, point2, result) = try {
             let point1 = Group.Element.random
@@ -149,13 +144,11 @@ class ZKPToolboxTests: XCTestCase {
     }
 
     func testDL2() throws {
-        try DL2Workflow(CurveType: P256.self)
-        try DL2Workflow(CurveType: P384.self)
-        try DL2Workflow(CurveType: P521.self)
+        try runTwoScalarDiscreteLogWorkflow()
     }
 
     /// Tests an empty workflow, where no variables are allocated.
-    func EmptyWorkflow<Curve: SupportedCurveDetailsImpl>(CurveType _: Curve.Type) throws {
+    func runEmptyWorkflow() throws {
         // Prover's scope
         let proof = try {
             let prover = Prover<H2G>(label: "EmptyTest")
@@ -170,8 +163,6 @@ class ZKPToolboxTests: XCTestCase {
     }
 
     func testEmpty() throws {
-        try EmptyWorkflow(CurveType: P256.self)
-        try EmptyWorkflow(CurveType: P384.self)
-        try EmptyWorkflow(CurveType: P521.self)
+        try runEmptyWorkflow()
     }
 }

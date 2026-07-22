@@ -13,16 +13,8 @@
 //===----------------------------------------------------------------------===//
 
 import Crypto
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
-#if hasFeature(Embedded)
-import CCryptoBoringSSLShims
-#else
-@_implementationOnly import CCryptoBoringSSLShims
-#endif
+internal import CCryptoBoringSSL
+internal import CCryptoBoringSSLShims
 import CryptoBoringWrapper
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -31,10 +23,8 @@ import Foundation
 #endif
 
 /// Types associated with the AES GCM SIV algorithm
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension AES.GCM {
     /// AES in GCM SIV mode with 128-bit tags.
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     public enum _SIV {
         static let tagByteCount = 16
         static let nonceByteCount = 12
@@ -50,7 +40,7 @@ extension AES.GCM {
         /// - Throws: CipherError errors
         public static func seal<Plaintext: DataProtocol, AuthenticatedData: DataProtocol>
             (_ message: Plaintext, using key: SymmetricKey, nonce: Nonce? = nil, authenticating authenticatedData: AuthenticatedData) throws(CryptoKitMetaError) -> SealedBox {
-            return try OpenSSLAESGCMSIVImpl.seal(key: key, message: message, nonce: nonce, authenticatedData: authenticatedData)
+            return try AESGCMSIVCipher.seal(key: key, message: message, nonce: nonce, authenticatedData: authenticatedData)
         }
 
         /// Encrypts and authenticates data using AES-GCM-SIV.
@@ -63,7 +53,7 @@ extension AES.GCM {
         /// - Throws: CipherError errors
         public static func seal<Plaintext: DataProtocol>
             (_ message: Plaintext, using key: SymmetricKey, nonce: Nonce? = nil) throws(CryptoKitMetaError) -> SealedBox {
-            return try OpenSSLAESGCMSIVImpl.seal(key: key, message: message, nonce: nonce, authenticatedData: Optional<Data>.none)
+            return try AESGCMSIVCipher.seal(key: key, message: message, nonce: nonce, authenticatedData: Optional<Data>.none)
         }
 
         /// Authenticates and decrypts data using AES-GCM-SIV.
@@ -77,7 +67,7 @@ extension AES.GCM {
         /// - Throws: CipherError errors. If the authentication of the sealed box failed, incorrectTag is thrown.
         public static func open<AuthenticatedData: DataProtocol>
             (_ sealedBox: SealedBox, using key: SymmetricKey, authenticating authenticatedData: AuthenticatedData) throws(CryptoKitMetaError) -> Data {
-            return try OpenSSLAESGCMSIVImpl.open(key: key, sealedBox: sealedBox, authenticatedData: authenticatedData)
+            return try AESGCMSIVCipher.open(key: key, sealedBox: sealedBox, authenticatedData: authenticatedData)
         }
 
         /// Authenticates and decrypts data using AES-GCM-SIV.
@@ -89,14 +79,12 @@ extension AES.GCM {
         /// - Returns: The ciphertext if opening was successful
         /// - Throws: CipherError errors. If the authentication of the sealed box failed, incorrectTag is thrown.
         public static func open(_ sealedBox: SealedBox, using key: SymmetricKey) throws(CryptoKitMetaError) -> Data {
-            return try OpenSSLAESGCMSIVImpl.open(key: key, sealedBox: sealedBox, authenticatedData: Optional<Data>.none)
+            return try AESGCMSIVCipher.open(key: key, sealedBox: sealedBox, authenticatedData: Optional<Data>.none)
         }
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension AES.GCM._SIV {
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     public struct Nonce: Sendable, Crypto.ContiguousBytes, Sequence {
         let bytes: Data
 
@@ -118,6 +106,11 @@ extension AES.GCM._SIV {
             self.bytes = Data(data)
         }
 
+        init(validatedData data: Data) {
+            precondition(data.count == AES.GCM._SIV.nonceByteCount)
+            self.bytes = data
+        }
+
         public func withUnsafeBytes<R, E: Error>(_ body: (UnsafeRawBufferPointer) throws(E) -> R) throws(E) -> R {
             return try self.bytes.withUnsafeBytes(body)
         }
@@ -130,9 +123,7 @@ extension AES.GCM._SIV {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension AES.GCM._SIV {
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     public struct SealedBox: Sendable {
         /// The combined representation ( nonce || ciphertext || tag)
         public let combined: Data
@@ -146,7 +137,9 @@ extension AES.GCM._SIV {
         }
         /// The Nonce
         public var nonce: AES.GCM._SIV.Nonce {
-            return try! AES.GCM._SIV.Nonce(data: combined.prefix(AES.GCM._SIV.nonceByteCount))
+            AES.GCM._SIV.Nonce(
+                validatedData: combined.prefix(AES.GCM._SIV.nonceByteCount)
+            )
         }
 
         @inlinable

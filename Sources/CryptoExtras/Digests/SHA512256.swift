@@ -28,14 +28,13 @@ import Crypto
 /// in memory, you can compute the digest iteratively by creating a new hash
 /// instance, calling the ``update(data:)`` method repeatedly with blocks of
 /// data, and then calling the ``finalize()`` method to get the result.
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-public struct SHA512256: HashFunction, @unchecked Sendable {
+public struct SHA512256: HashFunction, Sendable {
     /// The number of bytes that represents the hash function's internal state.
     public static var blockByteCount: Int {
         128
     }
 
-    private var context = BoringSSLSHA512256Context()
+    private var context = SHA512256DigestContext()
 
     /// Creates a SHA512-256 hash function.
     ///
@@ -68,7 +67,7 @@ public struct SHA512256: HashFunction, @unchecked Sendable {
     /// digest calculation.
     public mutating func update(bufferPointer data: UnsafeRawBufferPointer) {
         if !isKnownUniquelyReferenced(&self.context) {
-            self.context = BoringSSLSHA512256Context(copying: self.context)
+            self.context = self.context.copy()
         }
         self.context.update(bufferPointer: data)
     }

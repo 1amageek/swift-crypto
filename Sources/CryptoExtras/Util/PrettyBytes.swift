@@ -16,24 +16,20 @@ import FoundationEssentials
 #elseif canImport(Foundation)
 import Foundation
 #endif
+import Crypto
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 enum ByteHexEncodingErrors: Error {
     case incorrectHexValue
     case incorrectString
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 let charA = UInt8(UnicodeScalar("a").value)
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 let char0 = UInt8(UnicodeScalar("0").value)
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 private func itoh(_ value: UInt8) -> UInt8 {
     return (value > 9) ? (charA + value - 10) : (char0 + value)
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 private func htoi(_ value: UInt8) throws(ByteHexEncodingErrors) -> UInt8 {
     switch value {
     case char0...char0 + 9:
@@ -45,7 +41,6 @@ private func htoi(_ value: UInt8) throws(ByteHexEncodingErrors) -> UInt8 {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension DataProtocol {
     var hexString: String {
         let hexLen = self.count * 2
@@ -64,14 +59,12 @@ extension DataProtocol {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MutableDataProtocol {
     mutating func appendByte(_ byte: UInt64) {
         withUnsafePointer(to: byte.littleEndian, { self.append(contentsOf: UnsafeRawBufferPointer(start: $0, count: 8)) })
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension Data {
     init(hexString: String) throws(ByteHexEncodingErrors) {
         self.init()
@@ -91,7 +84,6 @@ extension Data {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension Array where Element == UInt8 {
     init(hexString: String) throws(ByteHexEncodingErrors) {
         self.init()

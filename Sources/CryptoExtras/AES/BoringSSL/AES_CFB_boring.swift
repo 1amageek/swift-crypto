@@ -12,11 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
+internal import CCryptoBoringSSL
 import Crypto
 
 #if canImport(FoundationEssentials)
@@ -26,15 +22,14 @@ import Foundation
 #endif
 
 @usableFromInline
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-enum OpenSSLAESCFBImpl {
+enum AESCFBCipher {
     @usableFromInline
     enum Mode {
         case encrypt
         case decrypt
 
         @usableFromInline
-        var _boringSSLParameter: Int32 {
+        var encryptionDirection: Int32 {
             switch self {
             case .encrypt: return AES_ENCRYPT
             case .decrypt: return AES_DECRYPT
@@ -42,8 +37,8 @@ enum OpenSSLAESCFBImpl {
         }
     }
 
-    @inlinable
-    static func encryptOrDecrypt<Plaintext: Crypto.ContiguousBytes>(
+    @usableFromInline
+    static func encryptOrDecrypt<Plaintext: DataProtocol>(
         _ mode: Mode,
         _ plaintext: Plaintext,
         using key: SymmetricKey,
@@ -52,25 +47,23 @@ enum OpenSSLAESCFBImpl {
         guard [128, 192, 256].contains(key.bitCount) else {
             throw cryptoExtrasError(CryptoKitError.incorrectKeySize)
         }
-        return plaintext.withUnsafeBytes { plaintextBufferPtr in
-            Self._encryptOrDecrypt(mode, plaintextBufferPtr, using: key, iv: iv)
-        }
-    }
 
-    @usableFromInline
-    static func _encryptOrDecrypt(
-        _ mode: Mode,
-        _ plaintextBufferPtr: UnsafeRawBufferPointer,
-        using key: SymmetricKey,
-        iv: AES._CFB.IV
-    ) -> Data {
-        var ciphertext = Data(repeating: 0, count: plaintextBufferPtr.count)
+        var ciphertext = Data(repeating: 0, count: plaintext.count)
         ciphertext.withUnsafeMutableBytes { ciphertextBufferPtr in
             var iv = iv
             var num = UInt32.zero
+            var outputOffset = 0
             key.withUnsafeBytes { keyBufferPtr in
                 iv.withUnsafeMutableBytes { ivBufferPtr in
                     var key = AES_KEY()
+                    defer {
+                        withUnsafeMutableBytes(of: &key) { bytes in
+                            guard let baseAddress = bytes.baseAddress else {
+                                return
+                            }
+                            CCryptoBoringSSL_OPENSSL_cleanse(baseAddress, bytes.count)
+                        }
+                    }
                     precondition(
                         CCryptoBoringSSL_AES_set_encrypt_key(
                             keyBufferPtr.baseAddress,
@@ -78,15 +71,27 @@ enum OpenSSLAESCFBImpl {
                             &key
                         ) == 0
                     )
-                    CCryptoBoringSSL_AES_cfb128_encrypt(
-                        plaintextBufferPtr.baseAddress,
-                        ciphertextBufferPtr.baseAddress,
-                        plaintextBufferPtr.count,
-                        &key,
-                        ivBufferPtr.baseAddress,
-                        &num,
-                        mode._boringSSLParameter
-                    )
+
+                    for region in plaintext.regions {
+                        region.withUnsafeBytes { plaintextBufferPtr in
+                            guard !plaintextBufferPtr.isEmpty else {
+                                return
+                            }
+
+                            precondition(outputOffset <= ciphertextBufferPtr.count - plaintextBufferPtr.count)
+                            CCryptoBoringSSL_AES_cfb128_encrypt(
+                                plaintextBufferPtr.baseAddress,
+                                ciphertextBufferPtr.baseAddress?.advanced(by: outputOffset),
+                                plaintextBufferPtr.count,
+                                &key,
+                                ivBufferPtr.baseAddress,
+                                &num,
+                                mode.encryptionDirection
+                            )
+                            outputOffset += plaintextBufferPtr.count
+                        }
+                    }
+                    precondition(outputOffset == ciphertextBufferPtr.count)
                 }
             }
         }

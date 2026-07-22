@@ -53,7 +53,7 @@ class NISTECDHTests: XCTestCase {
         XCTAssertEqual(ss1, ss2)
         
         XCTAssertThrowsError(try P256.KeyAgreement.PublicKey(compactRepresentation: fipsKey.publicKey.rawRepresentation))
-        let compactRepresentation = try unwrap(compactKey.publicKey.compactRepresentation)
+        let compactRepresentation = try XCTUnwrap(compactKey.publicKey.compactRepresentation)
         XCTAssertNotNil(try P256.KeyAgreement.PublicKey(compactRepresentation: compactRepresentation))
     }
     

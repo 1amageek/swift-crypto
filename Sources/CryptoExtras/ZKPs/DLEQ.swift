@@ -18,138 +18,225 @@ import Foundation
 #endif
 import Crypto
 
-/// A DLEQ Proof as described in https://cfrg.github.io/draft-irtf-cfrg-voprf/draft-irtf-cfrg-voprf.html#name-generateproof
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-struct DLEQProof<GS: GroupScalar> {
-    var c: GS
-    var s: GS
+private let dleqSeedLabel = Data("Seed-".utf8)
+private let dleqCompositeLabel = Data("Composite".utf8)
+private let dleqChallengeLabel = Data("Challenge".utf8)
 
-    internal init(c: GS, s: GS) {
-        self.c = c
-        self.s = s
+/// A DLEQ proof as described in RFC 9497.
+/// https://www.rfc-editor.org/rfc/rfc9497.html#name-generateproof
+struct DLEQProof<GS: GroupScalar> {
+    var challenge: GS
+    var response: GS
+
+    internal init(challenge: GS, response: GS) {
+        self.challenge = challenge
+        self.response = response
     }
 }
 
 // Discrete Log Equivalence Proof
 // Proves that for a value kept secret k, the relation between B=k*A and D=k*C is such that log_A(B)==log_C(D)
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 struct DLEQ<H2G: HashToGroup> {
     typealias GE = H2G.G.Element
-    
-    static func composites(k: GE.Scalar? = nil, B: GE, dst: Data, CDs: [(C: GE, D: GE)], v8CompatibilityMode: Bool) throws(CryptoKitMetaError) -> (M: GE, Z: GE) {
-        let seedDST = Data("Seed-".utf8) + dst
-        
-        let Bm = B.oprfRepresentation
-        
-        let h1Input = I2OSP(value: Bm.count, outputByteCount: 2) + Bm
-        + I2OSP(value: seedDST.count, outputByteCount: 2) + seedDST
-        let seed = Data(H2G.H.hash(data: h1Input))
 
-        var M: GE?
-        var Z: GE?
+    private static func update<H: HashFunction>(
+        _ hasher: inout H,
+        withTwoByteLengthPrefixed element: GE
+    ) throws(CryptoKitMetaError) {
+        try OPRF.update(
+            &hasher,
+            withTwoByteInteger: GE.oprfRepresentationByteCount
+        )
+        try withUnsafeTemporaryAllocation(
+            byteCount: GE.oprfRepresentationByteCount,
+            alignment: 1
+        ) {
+            (representation: UnsafeMutableRawBufferPointer) throws(CryptoKitMetaError) in
+            try element.writeOPRFRepresentation(into: representation)
+            hasher.update(
+                bufferPointer: UnsafeRawBufferPointer(representation)
+            )
+        }
+    }
 
-        for i in 0..<CDs.count {
-            let pair = CDs[i]
-            let Ci = pair.C
-            let Di = pair.D
+    static func composites<Inputs: Collection, Outputs: Collection>(
+        secretScalar: GE.Scalar? = nil,
+        publicKey: GE,
+        context: Data,
+        hashToScalarDomainSeparationTag: Data,
+        inputs: Inputs,
+        outputs: Outputs
+    ) throws(CryptoKitMetaError) -> (input: GE, output: GE)
+    where Inputs.Element == GE, Outputs.Element == GE {
+        guard !inputs.isEmpty else {
+            throw cryptoExtrasError(OPRF.Errors.emptyBatch)
+        }
+        guard inputs.count == outputs.count else {
+            throw cryptoExtrasError(OPRF.Errors.invalidBatchSize)
+        }
+        guard inputs.count <= Int(UInt16.max) + 1 else {
+            throw cryptoExtrasError(OPRF.Errors.batchTooLarge)
+        }
+        guard !publicKey.isIdentity else {
+            throw cryptoExtrasError(OPRF.Errors.invalidProof)
+        }
 
-            let Cim = Ci.oprfRepresentation
-            let Dim = Di.oprfRepresentation
-            
-            var h2input = I2OSP(value: seed.count, outputByteCount: 2) + seed
-            + I2OSP(value: i, outputByteCount: 2)
-            + I2OSP(value: Cim.count, outputByteCount: 2) + Cim
-            + I2OSP(value: Dim.count, outputByteCount: 2) + Dim
-            if v8CompatibilityMode {
-                let compositeDST = Data("Composite-".utf8) + dst
-                h2input = h2input + I2OSP(value: compositeDST.count, outputByteCount: 2) + compositeDST
-            } else {
-                h2input = h2input + Data("Composite".utf8)
+        var seedHasher = H2G.H()
+        try update(&seedHasher, withTwoByteLengthPrefixed: publicKey)
+        try OPRF.update(
+            &seedHasher,
+            withTwoByteInteger: dleqSeedLabel.count + context.count
+        )
+        seedHasher.update(data: dleqSeedLabel)
+        seedHasher.update(data: context)
+        let seed = seedHasher.finalize()
+        var inputComposite: GE?
+        var outputComposite: GE?
+        for (index, pair) in zip(inputs, outputs).enumerated() {
+            guard !pair.0.isIdentity, !pair.1.isIdentity else {
+                throw cryptoExtrasError(OPRF.Errors.invalidProof)
             }
-
-            let di = try H2G.hashToScalar(h2input, domainSeparationString: dst)
-            if let m = M {
-                M = (di * Ci) + m
-            } else {
-                M = (di * Ci)
-            }
-            
-            if k == nil {
-                if let z = Z {
-                    Z = (di * Di) + z
-                } else {
-                    Z = (di * Di)
+            let coefficient = try H2G.hashToScalar(
+                domainSeparationTag: hashToScalarDomainSeparationTag
+            ) { (hasher: inout H2G.H) throws(CryptoKitMetaError) in
+                try OPRF.update(
+                    &hasher,
+                    withTwoByteInteger: H2G.H.Digest.byteCount
+                )
+                seed.withUnsafeBytes { bytes in
+                    hasher.update(bufferPointer: bytes)
                 }
+                try OPRF.update(&hasher, withTwoByteInteger: index)
+                try update(&hasher, withTwoByteLengthPrefixed: pair.0)
+                try update(&hasher, withTwoByteLengthPrefixed: pair.1)
+                hasher.update(data: dleqCompositeLabel)
+            }
+            let weightedInput = coefficient * pair.0
+            inputComposite = inputComposite.map { weightedInput + $0 } ?? weightedInput
+            if secretScalar == nil {
+                let weightedOutput = coefficient * pair.1
+                outputComposite = outputComposite.map { weightedOutput + $0 } ?? weightedOutput
             }
         }
 
-        if k != nil {
-            Z = k! * M!
+        guard let inputComposite else {
+            throw cryptoExtrasError(OPRF.Errors.emptyBatch)
         }
-
-        return (M: M!, Z: Z!)
-    }
-    
-    static func composeChallenge(dst: Data, B: GE, M: GE, Z: GE, T2: GE, T3: GE, v8CompatibilityMode: Bool) throws(CryptoKitMetaError) -> GE.Scalar {
-        let Bm = B.oprfRepresentation
-        let A0 = M.oprfRepresentation
-        let A1 = Z.oprfRepresentation
-        let A2 = T2.oprfRepresentation
-        let A3 = T3.oprfRepresentation
-        
-        var h2Input = I2OSP(value: Bm.count, outputByteCount: 2) + Bm +
-        I2OSP(value: A0.count, outputByteCount: 2) + A0 +
-        I2OSP(value: A1.count, outputByteCount: 2) + A1 +
-        I2OSP(value: A2.count, outputByteCount: 2) + A2 +
-        I2OSP(value: A3.count, outputByteCount: 2) + A3
-        
-        if v8CompatibilityMode {
-            let challengeDST = Data("Challenge-".utf8) + dst
-            h2Input = h2Input + I2OSP(value: challengeDST.count, outputByteCount: 2) + challengeDST
-            
-        } else {
-            let challengeDST = Data("Challenge".utf8)
-            h2Input = h2Input + challengeDST
+        guard !inputComposite.isIdentity else {
+            throw cryptoExtrasError(OPRF.Errors.invalidProof)
         }
-        
-        return try H2G.hashToScalar(h2Input, domainSeparationString: dst)
+        if let secretScalar {
+            let outputComposite = secretScalar * inputComposite
+            guard !outputComposite.isIdentity else {
+                throw cryptoExtrasError(OPRF.Errors.invalidProof)
+            }
+            return (input: inputComposite, output: outputComposite)
+        }
+        guard let outputComposite else {
+            throw cryptoExtrasError(OPRF.Errors.emptyBatch)
+        }
+        guard !outputComposite.isIdentity else {
+            throw cryptoExtrasError(OPRF.Errors.invalidProof)
+        }
+        return (input: inputComposite, output: outputComposite)
     }
-    
-    static func proveEquivalenceBetween(k: GE.Scalar,
-                                        A: GE,
-                                        B: GE,
-                                        CDs: [(C: GE, D: GE)],
-                                        dst: Data,
-                                        proofScalar: GE.Scalar, v8CompatibilityMode: Bool) throws(CryptoKitMetaError) -> DLEQProof<GE.Scalar> {
-        var M: GE
-        var Z: GE
-        
-        let comp = try composites(k: k, B: B, dst: dst, CDs: CDs, v8CompatibilityMode: v8CompatibilityMode)
-        M = comp.M
-        Z = comp.Z
-        
-        let r = proofScalar
 
-        let t2 = r * A
-        let t3 = r * M
-        
-        let c = try composeChallenge(dst: dst, B: B, M: M, Z: Z, T2: t2, T3: t3, v8CompatibilityMode: v8CompatibilityMode)
-        
-        let s = (r - c * k)
-        
-        return DLEQProof<GE.Scalar>(c: c, s: s)
+    static func challenge(
+        context: Data,
+        hashToScalarDomainSeparationTag: Data,
+        publicKey: GE,
+        inputComposite: GE,
+        outputComposite: GE,
+        generatorCommitment: GE,
+        compositeCommitment: GE
+    ) throws(CryptoKitMetaError) -> GE.Scalar {
+        guard
+            !publicKey.isIdentity,
+            !inputComposite.isIdentity,
+            !outputComposite.isIdentity,
+            !generatorCommitment.isIdentity,
+            !compositeCommitment.isIdentity
+        else {
+            throw cryptoExtrasError(OPRF.Errors.invalidProof)
+        }
+        return try H2G.hashToScalar(
+            domainSeparationTag: hashToScalarDomainSeparationTag
+        ) { (hasher: inout H2G.H) throws(CryptoKitMetaError) in
+            try update(&hasher, withTwoByteLengthPrefixed: publicKey)
+            try update(&hasher, withTwoByteLengthPrefixed: inputComposite)
+            try update(&hasher, withTwoByteLengthPrefixed: outputComposite)
+            try update(&hasher, withTwoByteLengthPrefixed: generatorCommitment)
+            try update(&hasher, withTwoByteLengthPrefixed: compositeCommitment)
+            hasher.update(data: dleqChallengeLabel)
+        }
     }
-    
-    static func verifyProof(A: GE,
-                            B: GE,
-                            CDs: [(C: GE, D: GE)],
-                            proof: DLEQProof<GE.Scalar>, dst: Data, v8CompatibilityMode: Bool) throws(CryptoKitMetaError) -> Bool {
-        let composites = try composites(B: B, dst: dst, CDs: CDs, v8CompatibilityMode: v8CompatibilityMode)
-        let t2 = (proof.s * A) + (proof.c * B)
-        let t3 = ((proof.s * composites.M) + (proof.c * composites.Z))
-        
-        let c = try composeChallenge(dst: dst, B: B, M: composites.M, Z: composites.Z, T2: t2, T3: t3, v8CompatibilityMode: v8CompatibilityMode)
-        
-        return c == proof.c
+
+    static func prove<Inputs: Collection, Outputs: Collection>(
+        secretScalar: GE.Scalar,
+        generator: GE,
+        publicKey: GE,
+        inputs: Inputs,
+        outputs: Outputs,
+        context: Data,
+        hashToScalarDomainSeparationTag: Data,
+        proofScalar: GE.Scalar
+    ) throws(CryptoKitMetaError) -> DLEQProof<GE.Scalar>
+    where Inputs.Element == GE, Outputs.Element == GE {
+        guard secretScalar != .zero, proofScalar != .zero else {
+            throw cryptoExtrasError(OPRF.Errors.invalidScalar)
+        }
+        let composites = try composites(
+            secretScalar: secretScalar,
+            publicKey: publicKey,
+            context: context,
+            hashToScalarDomainSeparationTag: hashToScalarDomainSeparationTag,
+            inputs: inputs,
+            outputs: outputs
+        )
+        let generatorCommitment = proofScalar * generator
+        let compositeCommitment = proofScalar * composites.input
+        let challenge = try challenge(
+            context: context,
+            hashToScalarDomainSeparationTag: hashToScalarDomainSeparationTag,
+            publicKey: publicKey,
+            inputComposite: composites.input,
+            outputComposite: composites.output,
+            generatorCommitment: generatorCommitment,
+            compositeCommitment: compositeCommitment
+        )
+        let response = proofScalar - challenge * secretScalar
+        return DLEQProof(challenge: challenge, response: response)
+    }
+
+    static func verify<Inputs: Collection, Outputs: Collection>(
+        generator: GE,
+        publicKey: GE,
+        inputs: Inputs,
+        outputs: Outputs,
+        proof: DLEQProof<GE.Scalar>,
+        context: Data,
+        hashToScalarDomainSeparationTag: Data
+    ) throws(CryptoKitMetaError) -> Bool
+    where Inputs.Element == GE, Outputs.Element == GE {
+        let composites = try composites(
+            publicKey: publicKey,
+            context: context,
+            hashToScalarDomainSeparationTag: hashToScalarDomainSeparationTag,
+            inputs: inputs,
+            outputs: outputs
+        )
+        let generatorCommitment = (proof.response * generator) + (proof.challenge * publicKey)
+        let compositeCommitment =
+            (proof.response * composites.input) + (proof.challenge * composites.output)
+        let challenge = try challenge(
+            context: context,
+            hashToScalarDomainSeparationTag: hashToScalarDomainSeparationTag,
+            publicKey: publicKey,
+            inputComposite: composites.input,
+            outputComposite: composites.output,
+            generatorCommitment: generatorCommitment,
+            compositeCommitment: compositeCommitment
+        )
+        return challenge == proof.challenge
     }
 }

@@ -20,10 +20,9 @@ import Foundation
 
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
-typealias DigestImpl = OpenSSLDigestImpl
-typealias DigestImplSHA3 = XKCPDigestImpl
+protocol DigestHashFunction: HashFunction where Digest: DigestPrivate {}
 
 
 /// A type that performs cryptographically secure hashing.

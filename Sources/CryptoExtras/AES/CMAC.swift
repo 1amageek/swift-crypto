@@ -11,11 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
+internal import CCryptoBoringSSL
 import Crypto
 
 #if canImport(FoundationEssentials)
@@ -24,7 +20,6 @@ import FoundationEssentials
 import Foundation
 #endif
 
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, *)
 extension AES {
     /// A cipher-based message authentication code.
     ///
@@ -69,10 +64,6 @@ extension AES {
             self.backing.update(bufferPointer)
         }
 
-        // This enhancement can only be present on 6.1 or later because of the
-        // absence of https://github.com/swiftlang/swift/pull/76186 in older
-        // compilers.
-        #if compiler(>=6.1)
         /// Finalizes the message authentication computation and returns the
         /// computed code.
         ///
@@ -85,16 +76,6 @@ extension AES {
             self.cowIfNeeded()
             return self.backing.finalize()
         }
-        #else
-        /// Finalizes the message authentication computation and returns the
-        /// computed code.
-        ///
-        /// - Returns: The message authentication code.
-        public func finalize() -> AES.CMAC.MAC {
-            var `self` = self
-            return self.backing.finalize()
-        }
-        #endif
 
         /// Updates the MAC with data.
         ///
@@ -115,7 +96,6 @@ extension AES {
     }
 }
 
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, *)
 extension AES.CMAC {
     /// A cipher-based message authentication code.
     public struct MAC: MessageAuthenticationCode {
@@ -142,7 +122,6 @@ extension AES.CMAC {
     }
 }
 
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, *)
 extension AES.CMAC {
     fileprivate final class Backing {
         private let key: SymmetricKey
@@ -201,7 +180,6 @@ extension AES.CMAC {
     }
 }
 
-@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, *)
 extension SymmetricKey {
     fileprivate var aesEVP: OpaquePointer {
         switch self.bitCount {

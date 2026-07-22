@@ -14,7 +14,7 @@
 
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #endif
 
 #if canImport(FoundationEssentials)
@@ -30,30 +30,52 @@ public protocol ContiguousBytes {
 }
 
 extension UnsafeRawBufferPointer: ContiguousBytes {
+    public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) -> R) -> R {
+        body(self)
+    }
+
     public func withUnsafeBytes<R, E: Error>(_ body: (UnsafeRawBufferPointer) throws(E) -> R) throws(E) -> R {
         try body(self)
     }
 }
 
 extension UnsafeMutableRawBufferPointer: ContiguousBytes {
+    public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) -> R) -> R {
+        body(UnsafeRawBufferPointer(self))
+    }
+
     public func withUnsafeBytes<R, E: Error>(_ body: (UnsafeRawBufferPointer) throws(E) -> R) throws(E) -> R {
         try body(UnsafeRawBufferPointer(self))
     }
 }
 
 extension UnsafeBufferPointer: ContiguousBytes where Element == UInt8 {
+    public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) -> R) -> R {
+        body(UnsafeRawBufferPointer(start: self.baseAddress, count: self.count))
+    }
+
     public func withUnsafeBytes<R, E: Error>(_ body: (UnsafeRawBufferPointer) throws(E) -> R) throws(E) -> R {
         try body(UnsafeRawBufferPointer(start: self.baseAddress, count: self.count))
     }
 }
 
 extension UnsafeMutableBufferPointer: ContiguousBytes where Element == UInt8 {
+    public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) -> R) -> R {
+        body(UnsafeRawBufferPointer(start: self.baseAddress, count: self.count))
+    }
+
     public func withUnsafeBytes<R, E: Error>(_ body: (UnsafeRawBufferPointer) throws(E) -> R) throws(E) -> R {
         try body(UnsafeRawBufferPointer(start: self.baseAddress, count: self.count))
     }
 }
 
 extension Array: ContiguousBytes where Element == UInt8 {
+    public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) -> R) -> R {
+        self.withUnsafeBufferPointer { buffer in
+            body(UnsafeRawBufferPointer(start: buffer.baseAddress, count: buffer.count))
+        }
+    }
+
     public func withUnsafeBytes<R, E: Error>(_ body: (UnsafeRawBufferPointer) throws(E) -> R) throws(E) -> R {
         try self.withUnsafeBufferPointer { buffer throws(E) in
             try body(UnsafeRawBufferPointer(start: buffer.baseAddress, count: buffer.count))
@@ -62,6 +84,12 @@ extension Array: ContiguousBytes where Element == UInt8 {
 }
 
 extension ArraySlice: ContiguousBytes where Element == UInt8 {
+    public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) -> R) -> R {
+        self.withUnsafeBufferPointer { buffer in
+            body(UnsafeRawBufferPointer(start: buffer.baseAddress, count: buffer.count))
+        }
+    }
+
     public func withUnsafeBytes<R, E: Error>(_ body: (UnsafeRawBufferPointer) throws(E) -> R) throws(E) -> R {
         try self.withUnsafeBufferPointer { buffer throws(E) in
             try body(UnsafeRawBufferPointer(start: buffer.baseAddress, count: buffer.count))
@@ -70,6 +98,12 @@ extension ArraySlice: ContiguousBytes where Element == UInt8 {
 }
 
 extension ContiguousArray: ContiguousBytes where Element == UInt8 {
+    public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) -> R) -> R {
+        self.withUnsafeBufferPointer { buffer in
+            body(UnsafeRawBufferPointer(start: buffer.baseAddress, count: buffer.count))
+        }
+    }
+
     public func withUnsafeBytes<R, E: Error>(_ body: (UnsafeRawBufferPointer) throws(E) -> R) throws(E) -> R {
         try self.withUnsafeBufferPointer { buffer throws(E) in
             try body(UnsafeRawBufferPointer(start: buffer.baseAddress, count: buffer.count))

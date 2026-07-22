@@ -20,7 +20,7 @@ import Foundation
 
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
 
 nonisolated(unsafe) private let emptyStorage:SecureBytes.Backing = SecureBytes.Backing.createEmpty()
@@ -135,6 +135,9 @@ extension SecureBytes: Collection {
             return self.backing[offset: index.offset]
         }
         set {
+            if !isKnownUniquelyReferenced(&self.backing) {
+                self.backing = Backing.create(copying: self.backing)
+            }
             self.backing[offset: index.offset] = newValue
         }
     }

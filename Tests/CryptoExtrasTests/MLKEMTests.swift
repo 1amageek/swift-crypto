@@ -11,8 +11,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if !canImport(Darwin) || canImport(CryptoKit, _version: 324.0.4)
-
 import Crypto
 import XCTest
 
@@ -20,9 +18,6 @@ import XCTest
 
 final class MLKEMTests: XCTestCase {
     func testMLKEM768() throws {
-        guard #available(iOS 19.0, macOS 16.0, watchOS 12.0, tvOS 19.0, visionOS 3.0, *) else {
-            throw XCTSkip("MLDSA is only available on iOS 19.0+, macOS 16.0+, watchOS 12.0+, tvOS 19.0+, visionOS 3.0+")
-        }
         // Generate a key pair
         let privateKey = try MLKEM768.PrivateKey()
         let publicKey = privateKey.publicKey
@@ -72,9 +67,6 @@ final class MLKEMTests: XCTestCase {
     }
 
     func testMLKEM1024() throws {
-        guard #available(iOS 19.0, macOS 16.0, watchOS 12.0, tvOS 19.0, visionOS 3.0, *) else {
-            throw XCTSkip("MLDSA is only available on iOS 19.0+, macOS 16.0+, watchOS 12.0+, tvOS 19.0+, visionOS 3.0+")
-        }
         // Generate a key pair
         let privateKey = try MLKEM1024.PrivateKey()
         let publicKey = privateKey.publicKey
@@ -123,5 +115,3 @@ final class MLKEMTests: XCTestCase {
         XCTAssertEqual(sharedSecret1, sharedSecret2)
     }
 }
-
-#endif  // SDK has MLKEM

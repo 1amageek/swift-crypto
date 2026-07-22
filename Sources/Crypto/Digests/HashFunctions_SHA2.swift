@@ -14,7 +14,7 @@
 
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
 /// An implementation of Secure Hashing Algorithm 2 (SHA-2) hashing with a
 /// 256-bit digest.
@@ -42,7 +42,7 @@ public typealias SHA2_256 = SHA256
 /// in memory, you can compute the digest iteratively by creating a new hash
 /// instance, calling the ``update(data:)`` method repeatedly with blocks of
 /// data, and then calling the ``finalize()`` method to get the result.
-public struct SHA256: HashFunctionImplementationDetails, Sendable {
+public struct SHA256: DigestHashFunction, Sendable {
     /// The number of bytes that represents the hash function’s internal state.
     public static let blockByteCount: Int = 64
     /// The number of bytes in a SHA256 digest.
@@ -50,7 +50,7 @@ public struct SHA256: HashFunctionImplementationDetails, Sendable {
     /// The digest type for a SHA256 hash function.
     public typealias Digest = SHA256Digest
     
-    var impl: DigestImpl<SHA256>
+    private var context: SHA256DigestContext
 
     /// Creates a SHA256 hash function.
     ///
@@ -63,7 +63,10 @@ public struct SHA256: HashFunctionImplementationDetails, Sendable {
     /// If your data fits into a single buffer, you can use the ``hash(data:)``
     /// method instead, to compute the digest in a single call.
     public init() {
-        impl = DigestImpl()
+        guard let context = Self.makeContext() else {
+            preconditionFailure("Unable to initialize SHA-256 state")
+        }
+        self.context = context
     }
 
     /// Incrementally updates the hash function with the contents of the buffer.
@@ -84,7 +87,12 @@ public struct SHA256: HashFunctionImplementationDetails, Sendable {
     ///   - bufferPointer: A pointer to the next block of data for the ongoing
     /// digest calculation.
     public mutating func update(bufferPointer: UnsafeRawBufferPointer) {
-        impl.update(data: bufferPointer)
+        if !isKnownUniquelyReferenced(&context) {
+            context = Self.copyContext(context)
+        }
+        guard Self.update(context, data: bufferPointer) else {
+            preconditionFailure("Unable to update SHA-256 state")
+        }
     }
 
     /// Finalizes the hash function and returns the computed digest.
@@ -97,7 +105,19 @@ public struct SHA256: HashFunctionImplementationDetails, Sendable {
     ///
     /// - Returns: The computed digest of the data.
     public func finalize() -> Self.Digest {
-        return impl.finalize()
+        withUnsafeTemporaryAllocation(
+            byteCount: Self.digestSize,
+            alignment: 1
+        ) { digestPointer in
+            defer { digestPointer.zeroize() }
+            guard Self.finalize(context, digest: digestPointer) else {
+                preconditionFailure("Unable to finalize SHA-256 state")
+            }
+            guard let digest = SHA256Digest(copying: digestPointer.bytes) else {
+                preconditionFailure("Invalid SHA-256 digest size")
+            }
+            return digest
+        }
     }
 }
 
@@ -127,7 +147,7 @@ public typealias SHA2_384 = SHA384
 /// in memory, you can compute the digest iteratively by creating a new hash
 /// instance, calling the ``update(data:)`` method repeatedly with blocks of
 /// data, and then calling the ``finalize()`` method to get the result.
-public struct SHA384: HashFunctionImplementationDetails, Sendable {
+public struct SHA384: DigestHashFunction, Sendable {
     /// The number of bytes that represents the hash function’s internal state.
     public static let blockByteCount: Int = 128
     /// The number of bytes in a SHA384 digest.
@@ -135,7 +155,7 @@ public struct SHA384: HashFunctionImplementationDetails, Sendable {
     
     /// The digest type for a SHA384 hash function.
     public typealias Digest = SHA384Digest
-    var impl: DigestImpl<SHA384>
+    private var context: SHA512FamilyDigestContext
 
     /// Creates a SHA384 hash function.
     ///
@@ -149,7 +169,10 @@ public struct SHA384: HashFunctionImplementationDetails, Sendable {
     /// If your data fits into a single buffer, you can use the ``hash(data:)``
     /// method instead, to compute the digest in a single call.
     public init() {
-        impl = DigestImpl()
+        guard let context = Self.makeContext() else {
+            preconditionFailure("Unable to initialize SHA-384 state")
+        }
+        self.context = context
     }
 
     /// Incrementally updates the hash function with the contents of the buffer.
@@ -170,7 +193,12 @@ public struct SHA384: HashFunctionImplementationDetails, Sendable {
     ///   - bufferPointer: A pointer to the next block of data for the ongoing
     /// digest calculation.
     public mutating func update(bufferPointer: UnsafeRawBufferPointer) {
-        impl.update(data: bufferPointer)
+        if !isKnownUniquelyReferenced(&context) {
+            context = Self.copyContext(context)
+        }
+        guard Self.update(context, data: bufferPointer) else {
+            preconditionFailure("Unable to update SHA-384 state")
+        }
     }
 
     /// Finalizes the hash function and returns the computed digest.
@@ -183,7 +211,19 @@ public struct SHA384: HashFunctionImplementationDetails, Sendable {
     ///
     /// - Returns: The computed digest of the data.
     public func finalize() -> Self.Digest {
-        return impl.finalize()
+        withUnsafeTemporaryAllocation(
+            byteCount: Self.digestSize,
+            alignment: 1
+        ) { digestPointer in
+            defer { digestPointer.zeroize() }
+            guard Self.finalize(context, digest: digestPointer) else {
+                preconditionFailure("Unable to finalize SHA-384 state")
+            }
+            guard let digest = SHA384Digest(copying: digestPointer.bytes) else {
+                preconditionFailure("Invalid SHA-384 digest size")
+            }
+            return digest
+        }
     }
 }
 
@@ -213,7 +253,7 @@ public typealias SHA2_512 = SHA512
 /// in memory, you can compute the digest iteratively by creating a new hash
 /// instance, calling the ``update(data:)`` method repeatedly with blocks of
 /// data, and then calling the ``finalize()`` method to get the result.
-public struct SHA512: HashFunctionImplementationDetails, Sendable {
+public struct SHA512: DigestHashFunction, Sendable {
     /// The number of bytes that represents the hash function’s internal state.
     public static let blockByteCount: Int = 128
     /// The number of bytes in a SHA512 digest.
@@ -221,7 +261,7 @@ public struct SHA512: HashFunctionImplementationDetails, Sendable {
     /// The digest type for a SHA512 hash function.
     public typealias Digest = SHA512Digest
     
-    var impl: DigestImpl<SHA512>
+    private var context: SHA512FamilyDigestContext
 
     /// Creates a SHA512 hash function.
     ///
@@ -235,7 +275,10 @@ public struct SHA512: HashFunctionImplementationDetails, Sendable {
     /// If your data fits into a single buffer, you can use the ``hash(data:)``
     /// method instead, to compute the digest in a single call.
     public init() {
-        impl = DigestImpl()
+        guard let context = Self.makeContext() else {
+            preconditionFailure("Unable to initialize SHA-512 state")
+        }
+        self.context = context
     }
 
     /// Incrementally updates the hash function with the contents of the buffer.
@@ -256,7 +299,12 @@ public struct SHA512: HashFunctionImplementationDetails, Sendable {
     ///   - bufferPointer: A pointer to the next block of data for the ongoing
     /// digest calculation.
     public mutating func update(bufferPointer: UnsafeRawBufferPointer) {
-        impl.update(data: bufferPointer)
+        if !isKnownUniquelyReferenced(&context) {
+            context = Self.copyContext(context)
+        }
+        guard Self.update(context, data: bufferPointer) else {
+            preconditionFailure("Unable to update SHA-512 state")
+        }
     }
 
     /// Finalizes the hash function and returns the computed digest.
@@ -269,7 +317,19 @@ public struct SHA512: HashFunctionImplementationDetails, Sendable {
     ///
     /// - Returns: The computed digest of the data.
     public func finalize() -> Self.Digest {
-        return impl.finalize()
+        withUnsafeTemporaryAllocation(
+            byteCount: Self.digestSize,
+            alignment: 1
+        ) { digestPointer in
+            defer { digestPointer.zeroize() }
+            guard Self.finalize(context, digest: digestPointer) else {
+                preconditionFailure("Unable to finalize SHA-512 state")
+            }
+            guard let digest = SHA512Digest(copying: digestPointer.bytes) else {
+                preconditionFailure("Invalid SHA-512 digest size")
+            }
+            return digest
+        }
     }
 }
 #endif // canImport(CryptoKit)

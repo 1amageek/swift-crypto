@@ -19,22 +19,13 @@ import Foundation
 #endif
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
-#if hasFeature(Embedded)
-import CCryptoBoringSSLShims
-#else
-@_implementationOnly import CCryptoBoringSSLShims
-#endif
+internal import CCryptoBoringSSL
+internal import CCryptoBoringSSLShims
 import CryptoBoringWrapper
 
 /// A wrapper around BoringSSL's ECDSA_SIG with some lifetime management.
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 final class ECDSASignature {
     private var _baseSig: UnsafeMutablePointer<ECDSA_SIG>
 

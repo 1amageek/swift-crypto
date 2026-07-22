@@ -15,10 +15,8 @@ import Crypto
 @testable import CryptoExtras
 import XCTest
 
-@available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 2.0, *)
 final class ARCAPITests: XCTestCase {
 
-    @available(*, deprecated, message: "ARC(P-384) has been removed from the IETF draft; use ARC(P-256) instead.")
     func testVectors() throws {
         let data = ARCEncodedTestVector.data(using: .utf8)!
         let decoder = JSONDecoder()
@@ -27,7 +25,6 @@ final class ARCAPITests: XCTestCase {
         for vector in vectors {
             switch vector.suite {
             case "ARCV1-P256": try testVector(vector, using: P256.self)
-            case "ARCV1-P384": try testVector(vector, using: P384.self)
             default: XCTFail("Test vector suite not supported: \(vector.suite)")
             }
         }
@@ -64,9 +61,9 @@ final class ARCAPITests: XCTestCase {
         // [Client] Prepare a credential request using fixed values from test vector.
         let precredential = try publicKey.prepareCredentialRequest(
             requestContext: requestContext,
-            m1: Curve._ARCV1.H2G.G.Scalar(bytes: Data(hexString: vector.CredentialRequest.m1)),
-            r1: Curve._ARCV1.H2G.G.Scalar(bytes: Data(hexString: vector.CredentialRequest.r1)),
-            r2: Curve._ARCV1.H2G.G.Scalar(bytes: Data(hexString: vector.CredentialRequest.r2))
+            m1: Curve._ARCV1.H2G.G.Scalar(canonicalRepresentation: Data(hexString: vector.CredentialRequest.m1)),
+            r1: Curve._ARCV1.H2G.G.Scalar(canonicalRepresentation: Data(hexString: vector.CredentialRequest.r1)),
+            r2: Curve._ARCV1.H2G.G.Scalar(canonicalRepresentation: Data(hexString: vector.CredentialRequest.r2))
         )
 
         // [Client -> Issuer] Send the credential request.
@@ -74,7 +71,7 @@ final class ARCAPITests: XCTestCase {
 
         // [CHECK] Credential request scalars match test vector.
         XCTAssertEqual(
-            credentialRequestBytes[..<(2 * Curve.compressedx962PointByteCount)].hexString,
+            credentialRequestBytes[..<(2 * Curve.compressedX962PointByteCount)].hexString,
             vector.CredentialRequest.m1_enc + vector.CredentialRequest.m2_enc
         )
 
@@ -84,7 +81,7 @@ final class ARCAPITests: XCTestCase {
         // [Issuer] Generate a credential response with fixed value from test vector.
         let credentialResponse = try privateKey.issue(
             credentialRequest,
-            b: Curve._ARCV1.H2G.G.Scalar(bytes: Data(hexString: vector.CredentialResponse.b))
+            b: Curve._ARCV1.H2G.G.Scalar(canonicalRepresentation: Data(hexString: vector.CredentialResponse.b))
         )
 
         // [Issuer -> Client] Send the credential response.
@@ -92,7 +89,7 @@ final class ARCAPITests: XCTestCase {
 
         // [CHECK] Credential response scalars match test vector, excluding proof.
         XCTAssertEqual(
-            credentialResponseBytes[..<(6 * Curve.compressedx962PointByteCount)].hexString,
+            credentialResponseBytes[..<(6 * Curve.compressedX962PointByteCount)].hexString,
             vector.CredentialResponse.U
             + vector.CredentialResponse.enc_U_prime
             + vector.CredentialResponse.X0_aux
@@ -118,9 +115,9 @@ final class ARCAPITests: XCTestCase {
             context: presentationContext,
             presentationLimit: presentationLimit,
             fixedNonce: Int(vector.Presentation1.nonce.dropFirst(2), radix: 16)!,
-            a: Curve._ARCV1.H2G.G.Scalar(bytes: Data(hexString: vector.Presentation1.a)),
-            r: Curve._ARCV1.H2G.G.Scalar(bytes: Data(hexString: vector.Presentation1.r)),
-            z: Curve._ARCV1.H2G.G.Scalar(bytes: Data(hexString: vector.Presentation1.z))
+            a: Curve._ARCV1.H2G.G.Scalar(canonicalRepresentation: Data(hexString: vector.Presentation1.a)),
+            r: Curve._ARCV1.H2G.G.Scalar(canonicalRepresentation: Data(hexString: vector.Presentation1.r)),
+            z: Curve._ARCV1.H2G.G.Scalar(canonicalRepresentation: Data(hexString: vector.Presentation1.z))
         )
 
         // NOTE: The presentation proof depends on randomly generated blinding factors. This layer doesn't expose
@@ -142,14 +139,14 @@ final class ARCAPITests: XCTestCase {
 
         // [CHECK]: Serialization of presentation (ecluding proof) matches spec.
         XCTAssertEqual(
-            presentation.rawRepresentation[..<(4 * Curve.compressedx962PointByteCount)].hexString,
+            presentation.rawRepresentation[..<(4 * Curve.compressedX962PointByteCount)].hexString,
             vector.Presentation1.U
             + vector.Presentation1.U_prime_commit
             + vector.Presentation1.m1_commit
             + vector.Presentation1.tag
         )
         XCTAssertEqual(
-            presentation.rawRepresentation[(4 * Curve.compressedx962PointByteCount)...].hexString.count,
+            presentation.rawRepresentation[(4 * Curve.compressedX962PointByteCount)...].hexString.count,
             vector.Presentation1.proof.count
         )
 
@@ -194,7 +191,6 @@ fileprivate protocol ARCCredentialResponse {
     var rawRepresentation: Data { get }
 }
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 fileprivate protocol ARCPresentation<H2G> {
     associatedtype H2G: HashToGroup
     var backing: ARC.Presentation<H2G> { get }
@@ -202,7 +198,6 @@ fileprivate protocol ARCPresentation<H2G> {
     var rawRepresentation: Data { get }
 }
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 fileprivate protocol ARCCredential<H2G, Presentation> {
     associatedtype H2G: HashToGroup
     associatedtype Presentation: ARCPresentation
@@ -218,7 +213,6 @@ fileprivate protocol ARCCredential<H2G, Presentation> {
     mutating func makePresentation(context: some DataProtocol, presentationLimit: Int) throws -> (presentation: Presentation, nonce: Int)
 }
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 fileprivate protocol ARCPrivateKey<H2G, CredentialRequest, CredentialResponse, Credential, Presentation> {
     associatedtype H2G: HashToGroup
     associatedtype Credential
@@ -239,7 +233,6 @@ fileprivate protocol ARCPrivateKey<H2G, CredentialRequest, CredentialResponse, C
     ) throws -> Bool
 }
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 fileprivate protocol ARCPublicKey<H2G, CredentialResponse, Credential> {
     associatedtype H2G: HashToGroup
     associatedtype Precredential: ARCPrecredential
@@ -257,7 +250,6 @@ fileprivate protocol ARCPrecredential {
     var credentialRequest: CredentialRequest { get }
 }
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 fileprivate protocol ARCV1<H2G> {
     associatedtype H2G: HashToGroup
     associatedtype CredentialRequest: ARCCredentialRequest
@@ -268,85 +260,19 @@ fileprivate protocol ARCV1<H2G> {
     associatedtype PublicKey: ARCPublicKey<H2G, CredentialResponse, Credential>
 }
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
-fileprivate protocol ARCCurve: OpenSSLSupportedNISTCurve {
-    associatedtype H2G: HashToGroup where H2G == OpenSSLHashToCurve<Self>
+fileprivate protocol ARCCurve: HashToGroupCurve {
+    associatedtype H2G: HashToGroup where H2G == CurveHashToGroup<Self>
     associatedtype _ARCV1: ARCV1<H2G>
 }
 
-@available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 2.0, *)
 extension P256._ARCV1.Precredential: ARCPrecredential {}
-@available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 2.0, *)
 extension P256._ARCV1.CredentialRequest: ARCCredentialRequest {}
-@available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 2.0, *)
 extension P256._ARCV1.CredentialResponse: ARCCredentialResponse {}
-@available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 2.0, *)
 extension P256._ARCV1.Credential: ARCCredential {}
-@available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 2.0, *)
 extension P256._ARCV1.Presentation: ARCPresentation {}
-@available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 2.0, *)
 extension P256._ARCV1.PublicKey: ARCPublicKey {
     typealias H2G = P256._ARCV1.H2G
 }
-@available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 2.0, *)
 extension P256._ARCV1.PrivateKey: ARCPrivateKey {}
-@available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 2.0, *)
 extension P256._ARCV1: ARCV1 {}
-@available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 2.0, *)
 extension P256: ARCCurve {}
-
-
-@available(*, deprecated, message: "ARC(P-384) has been removed from the IETF draft; use ARC(P-256) instead.")
-@available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 2.0, *)
-extension P384._ARCV1.Precredential: ARCPrecredential {}
-@available(*, deprecated, message: "ARC(P-384) has been removed from the IETF draft; use ARC(P-256) instead.")
-@available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 2.0, *)
-extension P384._ARCV1.CredentialRequest: ARCCredentialRequest {}
-@available(*, deprecated, message: "ARC(P-384) has been removed from the IETF draft; use ARC(P-256) instead.")
-@available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 2.0, *)
-extension P384._ARCV1.CredentialResponse: ARCCredentialResponse {}
-@available(*, deprecated, message: "ARC(P-384) has been removed from the IETF draft; use ARC(P-256) instead.")
-@available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 2.0, *)
-extension P384._ARCV1.Credential: ARCCredential {}
-@available(*, deprecated, message: "ARC(P-384) has been removed from the IETF draft; use ARC(P-256) instead.")
-@available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 2.0, *)
-extension P384._ARCV1.Presentation: ARCPresentation {}
-@available(*, deprecated, message: "ARC(P-384) has been removed from the IETF draft; use ARC(P-256) instead.")
-@available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 2.0, *)
-extension P384._ARCV1.PublicKey: ARCPublicKey {
-    typealias H2G = P384._ARCV1.H2G
-}
-@available(*, deprecated, message: "ARC(P-384) has been removed from the IETF draft; use ARC(P-256) instead.")
-@available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 2.0, *)
-extension P384._ARCV1.PrivateKey: ARCPrivateKey {}
-@available(*, deprecated, message: "ARC(P-384) has been removed from the IETF draft; use ARC(P-256) instead.")
-@available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 2.0, *)
-extension P384._ARCV1: ARCV1 {}
-@available(*, deprecated, message: "ARC(P-384) has been removed from the IETF draft; use ARC(P-256) instead.")
-@available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 2.0, *)
-extension P384: ARCCurve {}
-
-
-// Swift 5.10 compiler needs a little more help to infer the conformances.
-#if swift(<6.0)
-@available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 2.0, *)
-fileprivate extension P256._ARCV1.PrivateKey {
-    typealias H2G = P256._ARCV1.H2G
-    typealias Credential = P256._ARCV1.Credential
-    typealias PublicKey = P256._ARCV1.PublicKey
-    typealias CredentialRequest = P256._ARCV1.CredentialRequest
-    typealias CredentialResponse = P256._ARCV1.CredentialResponse
-    typealias Presentation = P256._ARCV1.Presentation
-}
-
-@available(*, deprecated, message: "ARC(P-384) has been removed from the IETF draft; use ARC(P-256) instead.")
-@available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, macCatalyst 16.0, visionOS 2.0, *)
-fileprivate extension P384._ARCV1.PrivateKey {
-    typealias H2G = P384._ARCV1.H2G
-    typealias Credential = P384._ARCV1.Credential
-    typealias PublicKey = P384._ARCV1.PublicKey
-    typealias CredentialRequest = P384._ARCV1.CredentialRequest
-    typealias CredentialResponse = P384._ARCV1.CredentialResponse
-    typealias Presentation = P384._ARCV1.Presentation
-}
-#endif

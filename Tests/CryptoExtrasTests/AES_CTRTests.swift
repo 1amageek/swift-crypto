@@ -53,6 +53,28 @@ final class AESCTRTests: XCTestCase {
         XCTAssertEqual(encryptedBytes, ciphertextBytes)
     }
 
+    func testEncryptionMaintainsStateAcrossDiscontiguousRegions() throws {
+        let key = SymmetricKey(hexEncoded: "2b7e151628aed2a6abf7158809cf4f3c")
+        let nonce = try AES._CTR.Nonce(
+            nonceBytes: Array(hexString: "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff")
+        )
+        let (_, discontiguousPlaintext) = Array(Self.plaintextBytes).asDataProtocols(splitAt: 7)
+        let expectedCiphertext = try Data(hexString: """
+        874d6191b620e3261bef6864990db6ce\
+        9806f66b7970fdff8617187bb9fffdff\
+        5ae4df3edbd5d35e5b4f09020db03eab\
+        1e031dda2fbe03d1792170a0f3009cee
+        """)
+
+        let ciphertext = try AES._CTR.encrypt(
+            discontiguousPlaintext,
+            using: key,
+            nonce: nonce
+        )
+
+        XCTAssertEqual(ciphertext, expectedCiphertext)
+    }
+
     func testDecryptionVectorF52() throws {
         let hexKey = "2b7e151628aed2a6abf7158809cf4f3c"
         let key = SymmetricKey(hexEncoded: hexKey)

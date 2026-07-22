@@ -67,6 +67,17 @@ final class SecureBytesTests: XCTestCase {
         XCTAssertEqual(Array(base), [0, 0, 5, 0, 0])
     }
 
+    func testSubscriptMutationPerformsACoW() {
+        let original = SecureBytes([0, 1, 2, 3])
+        var copy = original
+        let index = copy.index(copy.startIndex, offsetBy: 2)
+
+        copy[index] = 0xff
+
+        XCTAssertEqual(Array(original), [0, 1, 2, 3])
+        XCTAssertEqual(Array(copy), [0, 1, 0xff, 3])
+    }
+
     func testSimpleRangeReplaceableCollection() {
         // This test validates RangeReplaceableCollection and the value semantics all at once.
         let base = SecureBytes(repeating: 0, count: 10)

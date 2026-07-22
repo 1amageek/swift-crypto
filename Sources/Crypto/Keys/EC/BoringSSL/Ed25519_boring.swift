@@ -19,24 +19,14 @@ import Foundation
 #endif
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
-#if hasFeature(Embedded)
-import CCryptoBoringSSLShims
-#else
-@_implementationOnly import CCryptoBoringSSLShims
-#endif
+internal import CCryptoBoringSSL
+internal import CCryptoBoringSSLShims
 
 // For signing and verifying, we use BoringSSL's Ed25519, not the X25519 stuff.
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension Curve25519.Signing {
     @usableFromInline
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     struct OpenSSLCurve25519PrivateKeyImpl: Sendable {
         var _privateKey: SecureBytes
         @usableFromInline var _publicKey: [UInt8]
@@ -109,7 +99,6 @@ extension Curve25519.Signing {
     }
 
     @usableFromInline
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     struct OpenSSLCurve25519PublicKeyImpl: Sendable {
         @usableFromInline
         var keyBytes: [UInt8]

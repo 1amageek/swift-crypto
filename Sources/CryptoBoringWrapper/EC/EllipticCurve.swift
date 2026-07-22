@@ -12,16 +12,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
+internal import CCryptoBoringSSL
 
 /// A wrapper around BoringSSL's EC_GROUP object that handles reference counting and
 /// liveness.
 @usableFromInline
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 package final class BoringSSLEllipticCurveGroup: @unchecked Sendable {
     @usableFromInline var _group: OpaquePointer
 
@@ -50,7 +45,6 @@ package final class BoringSSLEllipticCurveGroup: @unchecked Sendable {
 
 // MARK: - Helpers
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension BoringSSLEllipticCurveGroup {
     @usableFromInline
     package var coordinateByteCount: Int {
@@ -114,10 +108,8 @@ extension BoringSSLEllipticCurveGroup {
 
 // MARK: - CurveName
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension BoringSSLEllipticCurveGroup {
     @usableFromInline
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     package enum CurveName {
         case p256
         case p384
@@ -139,7 +131,6 @@ extension BoringSSLEllipticCurveGroup {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension BoringSSLEllipticCurveGroup.CurveName {
     @usableFromInline
     var baseNID: CInt {

@@ -20,38 +20,35 @@ import Foundation
 
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
 
 protocol Zeroization {
     mutating func zeroize()
 }
 
-extension UnsafeMutablePointer: Zeroization {
-    /// Zeroizes the pointee
-    func zeroize() {
-        let size = MemoryLayout.size(ofValue: Pointee.self)
-        memset_s(self, size, 0, size)
-    }
-}
-
 extension UnsafeMutableRawBufferPointer: Zeroization {
     func zeroize() {
-        memset_s(self.baseAddress!, self.count, 0, self.count)
+        guard let baseAddress, count > 0 else {
+            return
+        }
+        memset_s(baseAddress, count, 0, count)
     }
 }
 
 extension Array: Zeroization where Element == UInt8 {
     /// Zeroizes the array
     mutating func zeroize() {
-        memset_s(&self, self.count, 0, self.count)
+        withUnsafeMutableBytes { bytes in
+            bytes.zeroize()
+        }
     }
 }
 
 extension Data: Zeroization {
     internal mutating func zeroize() {
-        _ = self.withUnsafeMutableBytes {
-            memset_s($0.baseAddress!, $0.count, 0, $0.count)
+        self.withUnsafeMutableBytes {
+            $0.zeroize()
         }
     }
 }

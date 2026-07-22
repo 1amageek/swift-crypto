@@ -19,16 +19,11 @@ import Foundation
 #endif
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
+internal import CCryptoBoringSSL
 import CryptoBoringWrapper
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 enum OpenSSLAESGCMImpl {
     @inlinable
     static func seal<Plaintext: DataProtocol, AuthenticatedData: DataProtocol>(
@@ -61,9 +56,6 @@ enum OpenSSLAESGCMImpl {
         return AES.GCM.SealedBox(combined: combined, nonceByteCount: nonce.count)
     }
 
-    #if swift(<6.3)
-    @_lifetime(message: copy message)
-    #endif
     @inlinable
     static func seal(
         key: SymmetricKey,
@@ -121,9 +113,6 @@ enum OpenSSLAESGCMImpl {
     }
 
     /// Open a given message in place.
-    #if swift(<6.3)
-    @_lifetime(message: copy message)
-    #endif
     @inlinable
     static func open(
         key: SymmetricKey,

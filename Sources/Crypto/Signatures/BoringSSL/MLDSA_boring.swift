@@ -18,27 +18,15 @@ import FoundationEssentials
 import Foundation
 #endif
 
-
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
+internal import CCryptoBoringSSL
 
 // MARK: - Generated file, do NOT edit
 // any edits of this file WILL be overwritten and thus discarded
 // see section `gyb` in `README` for details.
 
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
-
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLDSA65 {
     /// A ML-DSA-65 private key.
     struct InternalPrivateKey: @unchecked Sendable {
@@ -110,13 +98,12 @@ extension MLDSA65 {
                         of: UInt8.self,
                         capacity: MLDSA65.InternalPublicKey.Backing.byteCount
                     ) { publicKeyPtr in
-                        guard
-                            CCryptoBoringSSL_MLDSA65_generate_key(
-                                publicKeyPtr.baseAddress,
-                                seedPtr.baseAddress,
-                                &self.key
-                            ) == 1
-                        else {
+                        let rc = CCryptoBoringSSL_MLDSA65_generate_key(
+                            publicKeyPtr.baseAddress,
+                            seedPtr.baseAddress,
+                            &self.key
+                        )
+                        guard rc == 1 else {
                             return nil
                         }
 
@@ -198,7 +185,6 @@ extension MLDSA65 {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLDSA65 {
     /// A ML-DSA-65 public key.
     struct InternalPublicKey: @unchecked Sendable {
@@ -331,13 +317,11 @@ extension MLDSA65 {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLDSA65 {
     /// The size of the signature in bytes.
     private static let signatureByteCount = Int(MLDSA65_SIGNATURE_BYTES)
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLDSA87 {
     /// A ML-DSA-87 private key.
     struct InternalPrivateKey: @unchecked Sendable {
@@ -409,13 +393,12 @@ extension MLDSA87 {
                         of: UInt8.self,
                         capacity: MLDSA87.InternalPublicKey.Backing.byteCount
                     ) { publicKeyPtr in
-                        guard
-                            CCryptoBoringSSL_MLDSA87_generate_key(
-                                publicKeyPtr.baseAddress,
-                                seedPtr.baseAddress,
-                                &self.key
-                            ) == 1
-                        else {
+                        let rc = CCryptoBoringSSL_MLDSA87_generate_key(
+                            publicKeyPtr.baseAddress,
+                            seedPtr.baseAddress,
+                            &self.key
+                        )
+                        guard rc == 1 else {
                             return nil
                         }
 
@@ -497,7 +480,6 @@ extension MLDSA87 {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLDSA87 {
     /// A ML-DSA-87 public key.
     struct InternalPublicKey: @unchecked Sendable {
@@ -630,7 +612,6 @@ extension MLDSA87 {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLDSA87 {
     /// The size of the signature in bytes.
     private static let signatureByteCount = Int(MLDSA87_SIGNATURE_BYTES)

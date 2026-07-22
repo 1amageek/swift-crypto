@@ -15,10 +15,9 @@
 import XCTest
 import Crypto
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 class ARCEncodingTests: XCTestCase {
-    func serverPublicKeyEncoding<Curve: SupportedCurveDetailsImpl>(CurveType _: Curve.Type) throws {
-        let ciphersuite = ARC.Ciphersuite(HashToCurveImpl<Curve>.self)
+    func assertServerPublicKeyEncoding() throws {
+        let ciphersuite = P256._ARCV1.ciphersuite
         let server = ARC.Server(ciphersuite: ciphersuite)
         let publicKey = server.serverPublicKey
 
@@ -33,12 +32,11 @@ class ARCEncodingTests: XCTestCase {
     }
 
     func testServerPublicKeyEncoding() throws {
-        try serverPublicKeyEncoding(CurveType: P256.self)
-        try serverPublicKeyEncoding(CurveType: P384.self)
+        try assertServerPublicKeyEncoding()
     }
 
-    func requestEncoding<Curve: SupportedCurveDetailsImpl>(CurveType _: Curve.Type) throws {
-        let ciphersuite = ARC.Ciphersuite(HashToCurveImpl<Curve>.self)
+    func assertRequestEncoding() throws {
+        let ciphersuite = P256._ARCV1.ciphersuite
         let server = ARC.Server(ciphersuite: ciphersuite)
         let requestContext = Data("test request context".utf8)
         let precredential = try ARC.Precredential(ciphersuite: ciphersuite, requestContext: requestContext, serverPublicKey: server.serverPublicKey)
@@ -58,12 +56,11 @@ class ARCEncodingTests: XCTestCase {
     }
 
     func testRequestEncoding() throws {
-        try requestEncoding(CurveType: P256.self)
-        try requestEncoding(CurveType: P384.self)
+        try assertRequestEncoding()
     }
 
-    func responseEncoding<Curve: SupportedCurveDetailsImpl>(CurveType _: Curve.Type) throws {
-        let ciphersuite = ARC.Ciphersuite(HashToCurveImpl<Curve>.self)
+    func assertResponseEncoding() throws {
+        let ciphersuite = P256._ARCV1.ciphersuite
         let server = ARC.Server(ciphersuite: ciphersuite)
         let requestContext = Data("test request context".utf8)
         let precredential = try ARC.Precredential(ciphersuite: ciphersuite, requestContext: requestContext, serverPublicKey: server.serverPublicKey)
@@ -88,12 +85,11 @@ class ARCEncodingTests: XCTestCase {
     }
 
     func testResponseEncoding() throws {
-        try responseEncoding(CurveType: P256.self)
-        try responseEncoding(CurveType: P384.self)
+        try assertResponseEncoding()
     }
 
-    func credentialEncoding<Curve: SupportedCurveDetailsImpl>(CurveType _: Curve.Type) throws {
-        let ciphersuite = ARC.Ciphersuite(HashToCurveImpl<Curve>.self)
+    func assertCredentialEncoding() throws {
+        let ciphersuite = P256._ARCV1.ciphersuite
         let server = ARC.Server(ciphersuite: ciphersuite)
         let requestContext = Data("test request context".utf8)
         let precredential = try ARC.Precredential(ciphersuite: ciphersuite, requestContext: requestContext, serverPublicKey: server.serverPublicKey)
@@ -119,12 +115,11 @@ class ARCEncodingTests: XCTestCase {
     }
 
     func testCredentialEncoding() throws {
-        try credentialEncoding(CurveType: P256.self)
-        try credentialEncoding(CurveType: P384.self)
+        try assertCredentialEncoding()
     }
 
-    func presentationEncoding<Curve: SupportedCurveDetailsImpl>(CurveType _: Curve.Type) throws {
-        let ciphersuite = ARC.Ciphersuite(HashToCurveImpl<Curve>.self)
+    func assertPresentationEncoding() throws {
+        let ciphersuite = P256._ARCV1.ciphersuite
         let server = ARC.Server(ciphersuite: ciphersuite)
         let requestContext = Data("test request context".utf8)
         let precredential = try ARC.Precredential(ciphersuite: ciphersuite, requestContext: requestContext, serverPublicKey: server.serverPublicKey)
@@ -149,8 +144,7 @@ class ARCEncodingTests: XCTestCase {
     }
 
     func testPresentationEncoding() throws {
-        try presentationEncoding(CurveType: P256.self)
-        try presentationEncoding(CurveType: P384.self)
+        try assertPresentationEncoding()
     }
 
     func testPresentationStateEncoding() throws {

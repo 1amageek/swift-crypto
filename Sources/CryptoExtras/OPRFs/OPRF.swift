@@ -18,28 +18,39 @@ import Foundation
 #endif
 import Crypto
 
-/// (Verifiable Partly-)Oblivious Pseudorandom Functions
-/// https://cfrg.github.io/draft-irtf-cfrg-voprf/draft-irtf-cfrg-voprf.html
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
+/// (Verifiable Partly-)Oblivious Pseudorandom Functions from RFC 9497.
+/// https://www.rfc-editor.org/rfc/rfc9497.html
 enum OPRF {}
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 extension OPRF {
-    enum Errors: Error {
+    private static let finalizeLabel = Data("Finalize".utf8)
+    private static let infoLabel = Data("Info".utf8)
+
+    enum Errors: Error, Equatable {
         case invalidProof
-        case incorrectProofSize
         case invalidModeForInfo
         case incompatibleMode
+        case missingInfo
+        case emptyBatch
+        case invalidBatchSize
+        case invalidScalar
+        case invalidSeed
+        case messageTooLong
+        case infoTooLong
+        case batchTooLarge
+        case transcriptElementTooLong
+        case keyDerivationFailed
     }
 }
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 internal func cryptoExtrasError(_ error: OPRF.Errors) -> CryptoKitMetaError {
     #if hasFeature(Embedded)
     switch error {
     case .invalidProof:
         return cryptoExtrasError(CryptoKitError.authenticationFailure)
-    case .incorrectProofSize, .invalidModeForInfo, .incompatibleMode:
+    case .invalidModeForInfo, .incompatibleMode, .missingInfo, .emptyBatch,
+        .invalidBatchSize, .invalidScalar, .invalidSeed, .messageTooLong, .infoTooLong, .batchTooLarge,
+        .transcriptElementTooLong, .keyDerivationFailed:
         return cryptoExtrasError(CryptoKitError.incorrectParameterSize)
     }
     #else
@@ -48,22 +59,16 @@ internal func cryptoExtrasError(_ error: OPRF.Errors) -> CryptoKitMetaError {
 }
 
 /// Defines the IETF Serializations for OPRFs
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 protocol OPRFGroupElement: GroupElement {
+    static var oprfRepresentationByteCount: Int { get }
     init(oprfRepresentation: Data) throws(CryptoKitMetaError)
     var oprfRepresentation: Data { get }
+    func writeOPRFRepresentation(
+        into destination: UnsafeMutableRawBufferPointer
+    ) throws(CryptoKitMetaError)
 }
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 extension OPRF {
-    static func oprfVersion(v8CompatibilityMode: Bool) -> String {
-        if v8CompatibilityMode {
-            return "VOPRF08-"
-        } else {
-            return "OPRFV1-"
-        }
-    }
-    
     /// OPRF Modes
     enum Mode: Int, CaseIterable {
         // Base mode corresponds to an OPRF
@@ -76,65 +81,169 @@ extension OPRF {
     
     /// IETF Ciphersuites defined for OPRFs
     struct Ciphersuite<H2G: HashToGroup> {
-        let suiteID: Int
-        
-        init(_ h2g: H2G.Type) {
-            suiteID = H2G.suiteID
+        let identifier: String
+
+        init() {
+            self.identifier = H2G.oprfCiphersuiteIdentifier
         }
-        
-        var stringIdentifier: String {
-            get {
-                switch suiteID {
-                case 3:
-                    return "P256-SHA256"
-                case 4:
-                    return "P384-SHA384"
-                case 5:
-                    return "P521-SHA512"
-                default:
-                    fatalError("Unsupported H2G ciphersuite.")
-                }
+    }
+
+    internal static func protocolContext<H2G: HashToGroup>(mode: Mode, ciphersuite: Ciphersuite<H2G>) -> Data {
+        let version = Data("OPRFV1-".utf8)
+        let identifier = Data("-\(ciphersuite.identifier)".utf8)
+        var context = Data(capacity: version.count + 1 + identifier.count)
+        context.append(version)
+        context.append(UInt8(mode.rawValue))
+        context.append(identifier)
+        return context
+    }
+
+    internal static func update<H: HashFunction>(
+        _ hasher: inout H,
+        withByte byte: UInt8
+    ) {
+        var byte = byte
+        withUnsafeBytes(of: &byte) { bytes in
+            hasher.update(bufferPointer: bytes)
+        }
+    }
+
+    internal static func update<H: HashFunction>(
+        _ hasher: inout H,
+        withTwoByteInteger value: Int
+    ) throws(CryptoKitMetaError) {
+        guard value >= 0, value <= Int(UInt16.max) else {
+            throw cryptoExtrasError(OPRF.Errors.transcriptElementTooLong)
+        }
+        update(
+            &hasher,
+            withByte: UInt8(truncatingIfNeeded: value >> 8)
+        )
+        update(&hasher, withByte: UInt8(truncatingIfNeeded: value))
+    }
+
+    internal static func update<H: HashFunction, Bytes: DataProtocol>(
+        _ hasher: inout H,
+        withTwoByteLengthPrefixed bytes: Bytes
+    ) throws(CryptoKitMetaError) {
+        try update(&hasher, withTwoByteInteger: bytes.count)
+        hasher.update(data: bytes)
+    }
+
+    internal static func hashInfoToScalar<
+        H2G: HashToGroup,
+        Info: DataProtocol
+    >(
+        _ info: Info,
+        domainSeparationTag: Data,
+        using hashToGroup: H2G.Type
+    ) throws(CryptoKitMetaError) -> H2G.G.Scalar {
+        guard info.count <= Int(UInt16.max) else {
+            throw cryptoExtrasError(OPRF.Errors.infoTooLong)
+        }
+        return try H2G.hashToScalar(
+            domainSeparationTag: domainSeparationTag
+        ) { (hasher: inout H2G.H) throws(CryptoKitMetaError) in
+            hasher.update(data: infoLabel)
+            try update(
+                &hasher,
+                withTwoByteLengthPrefixed: info
+            )
+        }
+    }
+
+    internal static func deriveKeyPair<
+        H2G: HashToGroup,
+        Seed: DataProtocol,
+        Info: DataProtocol
+    >(
+        seed: Seed,
+        info: Info,
+        mode: Mode,
+        ciphersuite: Ciphersuite<H2G>
+    ) throws(CryptoKitMetaError) -> (privateKey: H2G.G.Scalar, publicKey: H2G.G.Element) {
+        guard seed.count == 32 else {
+            throw cryptoExtrasError(OPRF.Errors.invalidSeed)
+        }
+        guard info.count <= Int(UInt16.max) else {
+            throw cryptoExtrasError(OPRF.Errors.infoTooLong)
+        }
+
+        let context = protocolContext(mode: mode, ciphersuite: ciphersuite)
+        let domainPrefix = Data("DeriveKeyPair".utf8)
+        var domainSeparationTag = Data(capacity: domainPrefix.count + context.count)
+        domainSeparationTag.append(domainPrefix)
+        domainSeparationTag.append(context)
+
+        for counter in UInt8.min...UInt8.max {
+            let privateKey = try H2G.hashToScalar(
+                domainSeparationTag: domainSeparationTag
+            ) { (hasher: inout H2G.H) throws(CryptoKitMetaError) in
+                hasher.update(data: seed)
+                try update(
+                    &hasher,
+                    withTwoByteLengthPrefixed: info
+                )
+                update(&hasher, withByte: counter)
+            }
+            if privateKey != .zero {
+                return (
+                    privateKey: privateKey,
+                    publicKey: privateKey * H2G.G.Element.generator
+                )
             }
         }
+        throw cryptoExtrasError(OPRF.Errors.keyDerivationFailed)
     }
-    
-    internal static func suiteIdentifier<H2G: HashToGroup>(suite: Ciphersuite<H2G>, v8CompatibilityMode: Bool) -> Data {
-        if v8CompatibilityMode {
-            return I2OSP(value: suite.suiteID, outputByteCount: 2)
-        } else {
-            return Data("-\(suite.stringIdentifier)".utf8)
+
+    internal static func hashFinalizeTranscript<
+        H: HashFunction,
+        Element: OPRFGroupElement,
+        Message: DataProtocol
+    >(
+        message: Message,
+        info: Data?,
+        unblindedElement: Element,
+        mode: Mode,
+        using hashFunction: H.Type
+    ) throws(CryptoKitMetaError) -> H.Digest {
+        guard message.count <= Int(UInt16.max) else {
+            throw cryptoExtrasError(OPRF.Errors.messageTooLong)
         }
-    }
-    
-    internal static func setupContext<H2G: HashToGroup>(mode: Mode, suite: Ciphersuite<H2G>, v8CompatibilityMode: Bool) -> Data {
-        return Data(oprfVersion(v8CompatibilityMode: v8CompatibilityMode).utf8)
-        + I2OSP(value: mode.rawValue, outputByteCount: 1)
-        + suiteIdentifier(suite: suite, v8CompatibilityMode: v8CompatibilityMode)
-    }
-    
-    internal static func composeFinalizeContext<H2G: HashToGroup>(message: Data,
-                                                                  info: Data?,
-                                                                  unblindedElement: H2G.G.Element,
-                                                                  ciphersuite: Ciphersuite<H2G>,
-                                                                  mode: Mode,
-                                                                  v8CompatibilityMode: Bool) -> Data {
-        if v8CompatibilityMode {
-            let finalizeCTX = Data("Finalize-".utf8) + setupContext(mode: mode, suite: ciphersuite, v8CompatibilityMode: v8CompatibilityMode)
-            let hashInput = I2OSP(value: message.count, outputByteCount: 2) + message
-            + I2OSP(value: info?.count ?? 0, outputByteCount: 2) + (info ?? Data())
-            + I2OSP(value: unblindedElement.oprfRepresentation.count, outputByteCount: 2) + unblindedElement.oprfRepresentation
-            + I2OSP(value: finalizeCTX.count, outputByteCount: 2) + finalizeCTX
-            
-            return hashInput
-        } else {
-            var hashInput = I2OSP(value: message.count, outputByteCount: 2) + message
-            
-            if mode == .partiallyOblivious {
-                hashInput = hashInput + I2OSP(value: info!.count, outputByteCount: 2) + info!
+        if mode == .partiallyOblivious {
+            guard let info else {
+                throw cryptoExtrasError(OPRF.Errors.missingInfo)
             }
-            
-            hashInput = hashInput + I2OSP(value: unblindedElement.oprfRepresentation.count, outputByteCount: 2) + unblindedElement.oprfRepresentation + Data("Finalize".utf8)
-            return hashInput
+            guard info.count <= Int(UInt16.max) else {
+                throw cryptoExtrasError(OPRF.Errors.infoTooLong)
+            }
         }
+
+        var hasher = H()
+        try update(&hasher, withTwoByteLengthPrefixed: message)
+        if mode == .partiallyOblivious {
+            guard let info else {
+                throw cryptoExtrasError(OPRF.Errors.missingInfo)
+            }
+            try update(&hasher, withTwoByteLengthPrefixed: info)
+        }
+        try update(
+            &hasher,
+            withTwoByteInteger: Element.oprfRepresentationByteCount
+        )
+        try withUnsafeTemporaryAllocation(
+            byteCount: Element.oprfRepresentationByteCount,
+            alignment: 1
+        ) {
+            (representation: UnsafeMutableRawBufferPointer) throws(CryptoKitMetaError) in
+            try unblindedElement.writeOPRFRepresentation(
+                into: representation
+            )
+            hasher.update(
+                bufferPointer: UnsafeRawBufferPointer(representation)
+            )
+        }
+        hasher.update(data: finalizeLabel)
+        return hasher.finalize()
     }
 }

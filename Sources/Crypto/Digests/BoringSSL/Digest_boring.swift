@@ -13,206 +13,207 @@
 //===----------------------------------------------------------------------===//
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
+internal import CCryptoBoringSSL
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-protocol HashFunctionImplementationDetails: HashFunction where Digest: DigestPrivate {}
-
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-protocol BoringSSLBackedHashFunction: HashFunctionImplementationDetails {
-    associatedtype Context
-    static var digestSize: Int { get }
-    static func initialize() -> Context?
-    static func update(_ context: inout Context, data: UnsafeRawBufferPointer) -> Bool
-    static func finalize(_ context: inout Context, digest: UnsafeMutableRawBufferPointer) -> Bool
-}
-
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-extension Insecure.MD5: BoringSSLBackedHashFunction {
+extension Insecure.MD5 {
     static var digestSize: Int {
         Int(MD5_DIGEST_LENGTH)
     }
 
-    static func initialize() -> MD5_CTX? {
-        var context = MD5_CTX()
-        guard CCryptoBoringSSL_MD5_Init(&context) == 1 else {
+    static func makeContext() -> MD5DigestContext? {
+        var state = MD5_CTX()
+        guard CCryptoBoringSSL_MD5_Init(&state) == 1 else {
             return nil
         }
-        return context
+        return MD5DigestContext(state)
     }
 
-    static func update(_ context: inout MD5_CTX, data: UnsafeRawBufferPointer) -> Bool {
-        CCryptoBoringSSL_MD5_Update(&context, data.baseAddress, data.count) == 1
+    static func copyContext(_ context: MD5DigestContext) -> MD5DigestContext {
+        context.copy()
     }
 
-    static func finalize(_ context: inout MD5_CTX, digest: UnsafeMutableRawBufferPointer) -> Bool {
-        guard let baseAddress = digest.baseAddress, digest.count == Self.digestSize else { return false }
-        return CCryptoBoringSSL_MD5_Final(baseAddress, &context) == 1
+    static func update(_ context: MD5DigestContext, data: UnsafeRawBufferPointer) -> Bool {
+        context.withState { state in
+            CCryptoBoringSSL_MD5_Update(&state, data.baseAddress, data.count) == 1
+        }
+    }
+
+    static func finalize(
+        _ context: MD5DigestContext,
+        digest: UnsafeMutableRawBufferPointer
+    ) -> Bool {
+        guard let baseAddress = digest.baseAddress, digest.count == digestSize else {
+            return false
+        }
+        return context.withState { state in
+            var finalState = state
+            defer {
+                withUnsafeMutableBytes(of: &finalState) { $0.zeroize() }
+            }
+            return CCryptoBoringSSL_MD5_Final(baseAddress, &finalState) == 1
+        }
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-extension Insecure.SHA1: BoringSSLBackedHashFunction {
+extension Insecure.SHA1 {
     static var digestSize: Int {
         Int(SHA_DIGEST_LENGTH)
     }
 
-    static func initialize() -> SHA_CTX? {
-        var context = SHA_CTX()
-        guard CCryptoBoringSSL_SHA1_Init(&context) == 1 else {
+    static func makeContext() -> SHA1DigestContext? {
+        var state = SHA_CTX()
+        guard CCryptoBoringSSL_SHA1_Init(&state) == 1 else {
             return nil
         }
-        return context
+        return SHA1DigestContext(state)
     }
 
-    static func update(_ context: inout SHA_CTX, data: UnsafeRawBufferPointer) -> Bool {
-        CCryptoBoringSSL_SHA1_Update(&context, data.baseAddress, data.count) == 1
+    static func copyContext(_ context: SHA1DigestContext) -> SHA1DigestContext {
+        context.copy()
     }
 
-    static func finalize(_ context: inout SHA_CTX, digest: UnsafeMutableRawBufferPointer) -> Bool {
-        guard let baseAddress = digest.baseAddress, digest.count == Self.digestSize else { return false }
-        return CCryptoBoringSSL_SHA1_Final(baseAddress, &context) == 1
+    static func update(_ context: SHA1DigestContext, data: UnsafeRawBufferPointer) -> Bool {
+        context.withState { state in
+            CCryptoBoringSSL_SHA1_Update(&state, data.baseAddress, data.count) == 1
+        }
+    }
+
+    static func finalize(
+        _ context: SHA1DigestContext,
+        digest: UnsafeMutableRawBufferPointer
+    ) -> Bool {
+        guard let baseAddress = digest.baseAddress, digest.count == digestSize else {
+            return false
+        }
+        return context.withState { state in
+            var finalState = state
+            defer {
+                withUnsafeMutableBytes(of: &finalState) { $0.zeroize() }
+            }
+            return CCryptoBoringSSL_SHA1_Final(baseAddress, &finalState) == 1
+        }
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-extension SHA256: BoringSSLBackedHashFunction {
+extension SHA256 {
     static var digestSize: Int {
         Int(SHA256_DIGEST_LENGTH)
     }
 
-    static func initialize() -> SHA256_CTX? {
-        var context = SHA256_CTX()
-        guard CCryptoBoringSSL_SHA256_Init(&context) == 1 else {
+    static func makeContext() -> SHA256DigestContext? {
+        var state = SHA256_CTX()
+        guard CCryptoBoringSSL_SHA256_Init(&state) == 1 else {
             return nil
         }
-        return context
+        return SHA256DigestContext(state)
     }
 
-    static func update(_ context: inout SHA256_CTX, data: UnsafeRawBufferPointer) -> Bool {
-        CCryptoBoringSSL_SHA256_Update(&context, data.baseAddress, data.count) == 1
+    static func copyContext(_ context: SHA256DigestContext) -> SHA256DigestContext {
+        context.copy()
     }
 
-    static func finalize(_ context: inout SHA256_CTX, digest: UnsafeMutableRawBufferPointer) -> Bool {
-        guard let baseAddress = digest.baseAddress, digest.count == Self.digestSize else { return false }
-        return CCryptoBoringSSL_SHA256_Final(baseAddress, &context) == 1
+    static func update(_ context: SHA256DigestContext, data: UnsafeRawBufferPointer) -> Bool {
+        context.withState { state in
+            CCryptoBoringSSL_SHA256_Update(&state, data.baseAddress, data.count) == 1
+        }
+    }
+
+    static func finalize(
+        _ context: SHA256DigestContext,
+        digest: UnsafeMutableRawBufferPointer
+    ) -> Bool {
+        guard let baseAddress = digest.baseAddress, digest.count == digestSize else {
+            return false
+        }
+        return context.withState { state in
+            var finalState = state
+            defer {
+                withUnsafeMutableBytes(of: &finalState) { $0.zeroize() }
+            }
+            return CCryptoBoringSSL_SHA256_Final(baseAddress, &finalState) == 1
+        }
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-extension SHA384: BoringSSLBackedHashFunction {
+extension SHA384 {
     static var digestSize: Int {
         Int(SHA384_DIGEST_LENGTH)
     }
 
-    static func initialize() -> SHA512_CTX? {
-        var context = SHA512_CTX()
-        guard CCryptoBoringSSL_SHA384_Init(&context) == 1 else {
+    static func makeContext() -> SHA512FamilyDigestContext? {
+        var state = SHA512_CTX()
+        guard CCryptoBoringSSL_SHA384_Init(&state) == 1 else {
             return nil
         }
-        return context
+        return SHA512FamilyDigestContext(state)
     }
 
-    static func update(_ context: inout SHA512_CTX, data: UnsafeRawBufferPointer) -> Bool {
-        CCryptoBoringSSL_SHA384_Update(&context, data.baseAddress, data.count) == 1
+    static func copyContext(_ context: SHA512FamilyDigestContext) -> SHA512FamilyDigestContext {
+        context.copy()
     }
 
-    static func finalize(_ context: inout SHA512_CTX, digest: UnsafeMutableRawBufferPointer) -> Bool {
-        guard let baseAddress = digest.baseAddress, digest.count == Self.digestSize else { return false }
-        return CCryptoBoringSSL_SHA384_Final(baseAddress, &context) == 1
+    static func update(_ context: SHA512FamilyDigestContext, data: UnsafeRawBufferPointer) -> Bool {
+        context.withState { state in
+            CCryptoBoringSSL_SHA384_Update(&state, data.baseAddress, data.count) == 1
+        }
+    }
+
+    static func finalize(
+        _ context: SHA512FamilyDigestContext,
+        digest: UnsafeMutableRawBufferPointer
+    ) -> Bool {
+        guard let baseAddress = digest.baseAddress, digest.count == digestSize else {
+            return false
+        }
+        return context.withState { state in
+            var finalState = state
+            defer {
+                withUnsafeMutableBytes(of: &finalState) { $0.zeroize() }
+            }
+            return CCryptoBoringSSL_SHA384_Final(baseAddress, &finalState) == 1
+        }
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-extension SHA512: BoringSSLBackedHashFunction {
+extension SHA512 {
     static var digestSize: Int {
         Int(SHA512_DIGEST_LENGTH)
     }
 
-    static func initialize() -> SHA512_CTX? {
-        var context = SHA512_CTX()
-        guard CCryptoBoringSSL_SHA512_Init(&context) == 1 else {
+    static func makeContext() -> SHA512FamilyDigestContext? {
+        var state = SHA512_CTX()
+        guard CCryptoBoringSSL_SHA512_Init(&state) == 1 else {
             return nil
         }
-        return context
+        return SHA512FamilyDigestContext(state)
     }
 
-    static func update(_ context: inout SHA512_CTX, data: UnsafeRawBufferPointer) -> Bool {
-        CCryptoBoringSSL_SHA512_Update(&context, data.baseAddress, data.count) == 1
+    static func copyContext(_ context: SHA512FamilyDigestContext) -> SHA512FamilyDigestContext {
+        context.copy()
     }
 
-    static func finalize(_ context: inout SHA512_CTX, digest: UnsafeMutableRawBufferPointer) -> Bool {
-        guard let baseAddress = digest.baseAddress, digest.count == Self.digestSize else { return false }
-        return CCryptoBoringSSL_SHA512_Final(baseAddress, &context) == 1
-    }
-}
-
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-struct OpenSSLDigestImpl<H: BoringSSLBackedHashFunction>: @unchecked Sendable {
-    private var context: DigestContext<H>
-
-    init() {
-        self.context = DigestContext()
-    }
-
-    internal mutating func update(data: UnsafeRawBufferPointer) {
-        if !isKnownUniquelyReferenced(&self.context) {
-            self.context = DigestContext(copying: self.context)
-        }
-        self.context.update(data: data)
-    }
-
-    internal func finalize() -> H.Digest {
-        self.context.finalize()
-    }
-}
-
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-private final class DigestContext<H: BoringSSLBackedHashFunction> {
-    private var context: H.Context
-
-    init() {
-        guard let context = H.initialize() else {
-            preconditionFailure("Unable to initialize digest state")
-        }
-        self.context = context
-    }
-
-    init(copying original: DigestContext) {
-        self.context = original.context
-    }
-
-    func update(data: UnsafeRawBufferPointer) {
-        guard H.update(&self.context, data: data) else {
-            preconditionFailure("Unable to update digest state")
+    static func update(_ context: SHA512FamilyDigestContext, data: UnsafeRawBufferPointer) -> Bool {
+        context.withState { state in
+            CCryptoBoringSSL_SHA512_Update(&state, data.baseAddress, data.count) == 1
         }
     }
 
-    func finalize() -> H.Digest {
-        var copyContext = self.context
-        defer {
-            withUnsafeMutablePointer(to: &copyContext) { $0.zeroize() }
+    static func finalize(
+        _ context: SHA512FamilyDigestContext,
+        digest: UnsafeMutableRawBufferPointer
+    ) -> Bool {
+        guard let baseAddress = digest.baseAddress, digest.count == digestSize else {
+            return false
         }
-        return withUnsafeTemporaryAllocation(byteCount: H.digestSize, alignment: 1) { digestPointer in
+        return context.withState { state in
+            var finalState = state
             defer {
-                digestPointer.zeroize()
+                withUnsafeMutableBytes(of: &finalState) { $0.zeroize() }
             }
-            guard H.finalize(&copyContext, digest: digestPointer) else {
-                preconditionFailure("Unable to finalize digest state")
-            }
-            // We force unwrap here because if the digest size is wrong it's an internal error.
-            return H.Digest(copying: digestPointer.bytes)!
+            return CCryptoBoringSSL_SHA512_Final(baseAddress, &finalState) == 1
         }
-    }
-
-    deinit {
-        withUnsafeMutablePointer(to: &self.context) { $0.zeroize() }
     }
 }
 #endif  // canImport(CryptoKit)

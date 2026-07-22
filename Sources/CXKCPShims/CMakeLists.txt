@@ -23,7 +23,4 @@ target_include_directories(CXKCPShims PUBLIC
 target_link_libraries(CXKCPShims PUBLIC
   CXKCP)
 
-set_target_properties(CXKCPShims PROPERTIES
-  INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_Swift_MODULE_DIRECTORY})
-
 set_property(GLOBAL APPEND PROPERTY SWIFT_CRYPTO_EXPORTS CXKCPShims)

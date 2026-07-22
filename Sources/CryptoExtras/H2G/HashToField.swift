@@ -11,20 +11,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-#if os(Windows)
-import ucrt
-#elseif canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#elseif canImport(Musl)
-import Musl
-#elseif canImport(Android)
-import Android
-#elseif canImport(WASILibc)
-import WASILibc
-#endif
-
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #elseif canImport(Foundation)
@@ -32,70 +18,221 @@ import Foundation
 #endif
 import Crypto
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-extension Data {
-    static func ^ (left: Data, right: Data) -> Data {
-        precondition(left.count == right.count)
-        var result = Data()
-        result.reserveCapacity(left.count)
-        for value in zip(left, right) {
-            result.append(value.0 ^ value.1)
+/// Hashes a byte string into one or more finite-field elements.
+struct HashToField<C: HashToGroupCurve> {
+    private static func update(_ hasher: inout C.H, byte: UInt8) {
+        var byte = byte
+        withUnsafeBytes(of: &byte) { bytes in
+            hasher.update(bufferPointer: bytes)
         }
-        return result
     }
-}
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-enum Hash2FieldErrors: Error {
-    case outputSizeIsTooLarge
-}
-
-/// HashToField hashes a byte string msg of arbitrary length into one or more elements of a finite field
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
-struct HashToField<C: SupportedCurveDetailsImpl> {
-    static func expandMessageXMD(_ msg: Data, DST: Data, outputByteCount L: Int) throws(CryptoKitMetaError) -> Data {
-        typealias H = C.H
-        let digestByteCount = H.Digest.byteCount
-        
-        let ell = Int(ceil(Double(L) / Double(digestByteCount)))
-        
-        if ell > 255 {
+    private static func updateTwoByteInteger(
+        _ hasher: inout C.H,
+        value: Int
+    ) throws(CryptoKitMetaError) {
+        guard value >= 0, value <= Int(UInt16.max) else {
             throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
         }
-        
-        let DST_prime = DST + I2OSP(value: DST.count, outputByteCount: 1)
-        let z_pad = Data(repeating: 0, count: H.blockByteCount)
-        let l_i_b_str = I2OSP(value: L, outputByteCount: 2)
-        let msg_prime = z_pad + msg + l_i_b_str + I2OSP(value: 0, outputByteCount: 1) + DST_prime
-        
-        let b0 = Data(H.hash(data: msg_prime))
-        var bis = Data()
-        
-        for i in 1...ell {
-            let chaining = ((i == 1) ? b0 : (b0 ^ bis.suffix(digestByteCount)))
-            bis.append(Data(H.hash(data: (chaining + I2OSP(value: i, outputByteCount: 1) + DST_prime))))
-        }
-        
-        return Data(bis.prefix(L))
+        update(&hasher, byte: UInt8(truncatingIfNeeded: value >> 8))
+        update(&hasher, byte: UInt8(truncatingIfNeeded: value))
     }
-    
-    static func hashToField(_ data: Data, outputElementCount: Int, dst: Data, outputSize L: Int, reductionIsModOrder: Bool) throws(CryptoKitMetaError) -> [GroupImpl<C>.Scalar] {
-        precondition(outputElementCount > 0)
-        let byteCount = outputElementCount * L
-        let uniformBytes = try expandMessageXMD(data,
-                                                DST: dst,
-                                                outputByteCount: byteCount)
-        
-        var u_i = [GroupImpl<C>.Scalar]()
-        u_i.reserveCapacity(outputElementCount)
-        
-        for i in 0..<outputElementCount {
-            let offset = i * L
-            let tv = uniformBytes.subdata(in: offset..<(offset + L))
-            u_i.append(try GroupImpl<C>.Scalar(bytes: tv, reductionIsModOrder: reductionIsModOrder))
+
+    private static func normalizedDomainSeparationTag(_ domainSeparationTag: Data) -> Data {
+        guard domainSeparationTag.count > Int(UInt8.max) else {
+            return domainSeparationTag
         }
-        
-        precondition(u_i.count == outputElementCount)
-        return u_i
+
+        var hasher = C.H()
+        hasher.update(data: Data("H2C-OVERSIZE-DST-".utf8))
+        hasher.update(data: domainSeparationTag)
+        return Data(hasher.finalize())
+    }
+
+    static func expandMessageXMD<Message: DataProtocol>(
+        _ message: Message,
+        DST domainSeparationTag: Data,
+        outputByteCount: Int
+    ) throws(CryptoKitMetaError) -> Data {
+        try expandMessageXMD(
+            DST: domainSeparationTag,
+            outputByteCount: outputByteCount
+        ) { hasher in
+            hasher.update(data: message)
+        }
+    }
+
+    private static func expandMessageXMD(
+        DST domainSeparationTag: Data,
+        outputByteCount: Int,
+        updateInput: (inout C.H) throws(CryptoKitMetaError) -> Void
+    ) throws(CryptoKitMetaError) -> Data {
+        guard outputByteCount > 0, outputByteCount <= Int(UInt16.max) else {
+            throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
+        }
+        var output = Data(count: outputByteCount)
+        try output.withUnsafeMutableBytes {
+            (destination: UnsafeMutableRawBufferPointer) throws(CryptoKitMetaError) in
+            try expandMessageXMD(
+                DST: domainSeparationTag,
+                into: destination,
+                updateInput: updateInput
+            )
+        }
+        return output
+    }
+
+    private static func expandMessageXMD(
+        DST domainSeparationTag: Data,
+        into output: UnsafeMutableRawBufferPointer,
+        updateInput: (inout C.H) throws(CryptoKitMetaError) -> Void
+    ) throws(CryptoKitMetaError) {
+        typealias H = C.H
+        let digestByteCount = H.Digest.byteCount
+        let outputByteCount = output.count
+        guard outputByteCount > 0, outputByteCount <= Int(UInt16.max) else {
+            throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
+        }
+
+        let blockCount = (outputByteCount + digestByteCount - 1) / digestByteCount
+        guard blockCount <= Int(UInt8.max) else {
+            throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
+        }
+
+        let normalizedDomainSeparationTag = normalizedDomainSeparationTag(domainSeparationTag)
+        guard normalizedDomainSeparationTag.count <= Int(UInt8.max) else {
+            throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
+        }
+
+        var initialHasher = H()
+        withUnsafeTemporaryAllocation(
+            of: UInt8.self,
+            capacity: H.blockByteCount
+        ) { zeroPadding in
+            zeroPadding.initialize(repeating: 0)
+            initialHasher.update(bufferPointer: UnsafeRawBufferPointer(zeroPadding))
+        }
+        try updateInput(&initialHasher)
+        try updateTwoByteInteger(&initialHasher, value: outputByteCount)
+        update(&initialHasher, byte: 0)
+        initialHasher.update(data: normalizedDomainSeparationTag)
+        update(
+            &initialHasher,
+            byte: UInt8(normalizedDomainSeparationTag.count)
+        )
+        let initialDigest = initialHasher.finalize()
+
+        var outputOffset = 0
+        var previousDigest: H.Digest?
+        for blockIndex in 1...blockCount {
+            var blockHasher = H()
+            if let previousDigest {
+                withUnsafeTemporaryAllocation(
+                    of: UInt8.self,
+                    capacity: digestByteCount
+                ) { chainingValue in
+                    initialDigest.withUnsafeBytes { initialBytes in
+                        previousDigest.withUnsafeBytes { previousBytes in
+                            for index in 0..<digestByteCount {
+                                chainingValue.initializeElement(
+                                    at: index,
+                                    to: initialBytes[index] ^ previousBytes[index]
+                                )
+                            }
+                        }
+                    }
+                    blockHasher.update(
+                        bufferPointer: UnsafeRawBufferPointer(chainingValue)
+                    )
+                }
+            } else {
+                initialDigest.withUnsafeBytes { bytes in
+                    blockHasher.update(bufferPointer: bytes)
+                }
+            }
+
+            update(&blockHasher, byte: UInt8(blockIndex))
+            blockHasher.update(data: normalizedDomainSeparationTag)
+            update(
+                &blockHasher,
+                byte: UInt8(normalizedDomainSeparationTag.count)
+            )
+            let digest = blockHasher.finalize()
+            let remainingByteCount = outputByteCount - outputOffset
+            let writeByteCount = Swift.min(
+                remainingByteCount,
+                digestByteCount
+            )
+            digest.withUnsafeBytes { bytes in
+                let source = UnsafeRawBufferPointer(
+                    rebasing: bytes.prefix(writeByteCount)
+                )
+                let destination = UnsafeMutableRawBufferPointer(
+                    rebasing: output[outputOffset..<(outputOffset + writeByteCount)]
+                )
+                destination.copyMemory(from: source)
+            }
+            outputOffset += writeByteCount
+            previousDigest = digest
+        }
+    }
+
+    static func hashToField<Message: DataProtocol>(
+        _ data: Message,
+        outputElementCount: Int,
+        dst: Data,
+        outputSize: Int,
+        reductionModulus: ScalarReductionModulus
+    ) throws(CryptoKitMetaError) -> [PrimeOrderCurveGroup<C>.Scalar] {
+        guard outputElementCount > 0 else {
+            throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
+        }
+        let (byteCount, overflow) = outputElementCount.multipliedReportingOverflow(
+            by: outputSize
+        )
+        guard !overflow else {
+            throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
+        }
+        let uniformBytes = try expandMessageXMD(
+            data,
+            DST: dst,
+            outputByteCount: byteCount
+        )
+
+        var elements: [PrimeOrderCurveGroup<C>.Scalar] = []
+        elements.reserveCapacity(outputElementCount)
+        for index in 0..<outputElementCount {
+            let offset = index * outputSize
+            let uniformElementBytes = uniformBytes[offset..<(offset + outputSize)]
+            elements.append(
+                try PrimeOrderCurveGroup<C>.Scalar.reducing(
+                    uniformElementBytes,
+                    modulo: reductionModulus
+                )
+            )
+        }
+        return elements
+    }
+
+    static func hashToFieldElement(
+        dst: Data,
+        reductionModulus: ScalarReductionModulus,
+        updateInput: (inout C.H) throws(CryptoKitMetaError) -> Void
+    ) throws(CryptoKitMetaError) -> PrimeOrderCurveGroup<C>.Scalar {
+        try withUnsafeTemporaryAllocation(
+            byteCount: C.hashToFieldByteCount,
+            alignment: 1
+        ) {
+            (uniformBytes: UnsafeMutableRawBufferPointer) throws(CryptoKitMetaError) in
+            try expandMessageXMD(
+                DST: dst,
+                into: uniformBytes,
+                updateInput: updateInput
+            )
+            return try PrimeOrderCurveGroup<C>.Scalar.reducing(
+                UnsafeRawBufferPointer(uniformBytes),
+                modulo: reductionModulus
+            )
+        }
     }
 }

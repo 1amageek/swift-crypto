@@ -14,7 +14,7 @@
 
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
 extension Insecure {
     /// An implementation of SHA1 hashing.
@@ -33,7 +33,7 @@ extension Insecure {
     /// secure, but is provided for backward compatibility with older services
     /// that require it. For new services, prefer one of the secure hashes, like
     /// ``SHA512``.
-    public struct SHA1: HashFunctionImplementationDetails, Sendable {
+    public struct SHA1: DigestHashFunction, Sendable {
         /// The number of bytes that represents the hash function’s internal
         /// state.
         public static let blockByteCount: Int = 64
@@ -43,7 +43,7 @@ extension Insecure {
         
         /// The digest type for a SHA1 hash function.
         public typealias Digest = Insecure.SHA1Digest
-        var impl: DigestImpl<SHA1>
+        private var context: SHA1DigestContext
 
         /// Creates a SHA1 hash function.
         ///
@@ -58,7 +58,10 @@ extension Insecure {
         /// ``hash(data:)`` method instead, to compute the digest in a single
         /// call.
         public init() {
-            impl = DigestImpl()
+            guard let context = Self.makeContext() else {
+                preconditionFailure("Unable to initialize SHA-1 state")
+            }
+            self.context = context
         }
 
         /// Incrementally updates the hash function with the contents of the
@@ -80,7 +83,12 @@ extension Insecure {
         ///   - bufferPointer: A pointer to the next block of data for the ongoing
         /// digest calculation.
         public mutating func update(bufferPointer: UnsafeRawBufferPointer) {
-            impl.update(data: bufferPointer)
+            if !isKnownUniquelyReferenced(&context) {
+                context = Self.copyContext(context)
+            }
+            guard Self.update(context, data: bufferPointer) else {
+                preconditionFailure("Unable to update SHA-1 state")
+            }
         }
 
         /// Finalizes the hash function and returns the computed digest.
@@ -93,7 +101,19 @@ extension Insecure {
         ///
         /// - Returns: The computed digest of the data.
         public func finalize() -> Self.Digest {
-            return impl.finalize()
+            withUnsafeTemporaryAllocation(
+                byteCount: Self.digestSize,
+                alignment: 1
+            ) { digestPointer in
+                defer { digestPointer.zeroize() }
+                guard Self.finalize(context, digest: digestPointer) else {
+                    preconditionFailure("Unable to finalize SHA-1 state")
+                }
+                guard let digest = Insecure.SHA1Digest(copying: digestPointer.bytes) else {
+                    preconditionFailure("Invalid SHA-1 digest size")
+                }
+                return digest
+            }
         }
     }
 
@@ -113,7 +133,7 @@ extension Insecure {
     /// secure, but is provided for backward compatibility with older services
     /// that require it. For new services, prefer one of the secure hashes, like
     /// ``SHA512``.
-    public struct MD5: HashFunctionImplementationDetails, Sendable {
+    public struct MD5: DigestHashFunction, Sendable {
         /// The number of bytes that represents the hash function’s internal
         /// state.
         public static let blockByteCount: Int = 64
@@ -122,7 +142,7 @@ extension Insecure {
         
         /// The digest type for a MD5 hash function.
         public typealias Digest = Insecure.MD5Digest
-        var impl: DigestImpl<MD5>
+        private var context: MD5DigestContext
 
         /// Creates a MD5 hash function.
         ///
@@ -137,7 +157,10 @@ extension Insecure {
         /// ``hash(data:)`` method instead, to compute the digest in a single
         /// call.
         public init() {
-            impl = DigestImpl()
+            guard let context = Self.makeContext() else {
+                preconditionFailure("Unable to initialize MD5 state")
+            }
+            self.context = context
         }
 
         /// Incrementally updates the hash function with the contents of the
@@ -159,7 +182,12 @@ extension Insecure {
         ///   - bufferPointer: A pointer to the next block of data for the ongoing
         /// digest calculation.
         public mutating func update(bufferPointer: UnsafeRawBufferPointer) {
-            impl.update(data: bufferPointer)
+            if !isKnownUniquelyReferenced(&context) {
+                context = Self.copyContext(context)
+            }
+            guard Self.update(context, data: bufferPointer) else {
+                preconditionFailure("Unable to update MD5 state")
+            }
         }
 
         /// Finalizes the hash function and returns the computed digest.
@@ -172,7 +200,19 @@ extension Insecure {
         ///
         /// - Returns: The computed digest of the data.
         public func finalize() -> Self.Digest {
-            return impl.finalize()
+            withUnsafeTemporaryAllocation(
+                byteCount: Self.digestSize,
+                alignment: 1
+            ) { digestPointer in
+                defer { digestPointer.zeroize() }
+                guard Self.finalize(context, digest: digestPointer) else {
+                    preconditionFailure("Unable to finalize MD5 state")
+                }
+                guard let digest = Insecure.MD5Digest(copying: digestPointer.bytes) else {
+                    preconditionFailure("Invalid MD5 digest size")
+                }
+                return digest
+            }
         }
     }
 }

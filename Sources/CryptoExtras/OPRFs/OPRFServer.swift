@@ -18,98 +18,177 @@ import Foundation
 #endif
 import Crypto
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 extension OPRF {
     struct Server<H2G: HashToGroup> {
         typealias G = H2G.G
         let mode: Mode
         let ciphersuite: Ciphersuite<H2G>
         let privateKey: G.Scalar
-        let v8CompatibilityMode: Bool
+        let publicKey: G.Element
+        let context: Data
+        let hashToGroupDomainSeparationTag: Data
+        let hashToScalarDomainSeparationTag: Data
         
-        init(ciphersuite: Ciphersuite<H2G>, privateKey: G.Scalar = G.Scalar.random) {
-            self.init(mode: .base, ciphersuite: ciphersuite, privateKey: privateKey)
+        init(
+            ciphersuite: Ciphersuite<H2G>,
+            privateKey: G.Scalar = G.Scalar.random
+        ) throws(CryptoKitMetaError) {
+            try self.init(mode: .base, ciphersuite: ciphersuite, privateKey: privateKey)
         }
         
-        internal init(mode: Mode, ciphersuite: Ciphersuite<H2G>, privateKey: G.Scalar = G.Scalar.random, v8CompatibilityMode: Bool = false) {
+        internal init(
+            mode: Mode,
+            ciphersuite: Ciphersuite<H2G>,
+            privateKey: G.Scalar = G.Scalar.random
+        ) throws(CryptoKitMetaError) {
+            guard privateKey != .zero else {
+                throw cryptoExtrasError(OPRF.Errors.invalidScalar)
+            }
             self.mode = mode
             self.ciphersuite = ciphersuite
             self.privateKey = privateKey
-            self.v8CompatibilityMode = v8CompatibilityMode
-        }
-        
-        var publicKey: G.Element {
-            privateKey * G.Element.generator
+            self.publicKey = privateKey * G.Element.generator
+            let context = protocolContext(mode: mode, ciphersuite: ciphersuite)
+            self.context = context
+            self.hashToGroupDomainSeparationTag = H2G.hashToGroupDomainSeparationTag(
+                context: context
+            )
+            self.hashToScalarDomainSeparationTag = H2G.hashToScalarDomainSeparationTag(
+                context: context
+            )
         }
         
         func evaluate(blindedElement: G.Element, info: Data? = nil, proofScalar: G.Scalar = G.Scalar.random) throws(CryptoKitMetaError) ->
         (G.Element, DLEQProof<H2G.G.Element.Scalar>?) {
-            let dst = setupContext(mode: mode, suite: ciphersuite, v8CompatibilityMode: self.v8CompatibilityMode)
-            
-            if v8CompatibilityMode { return try v8Evaluate(blindedElement: blindedElement, info: info, proofScalar: proofScalar) }
-            
+            if mode != .partiallyOblivious, info != nil {
+                throw cryptoExtrasError(OPRF.Errors.invalidModeForInfo)
+            }
             if mode == .base || mode == .verifiable {
                 let evaluatedElement = self.privateKey * blindedElement
                 if mode == .base { return (evaluatedElement, nil) }
-                
-                let proof = try DLEQ<H2G>.proveEquivalenceBetween(k: self.privateKey,
-                                                                  A: G.Element.generator,
-                                                                  B: (self.privateKey * G.Element.generator),
-                                                                  CDs: [(C: blindedElement, D: evaluatedElement)],
-                                                                  dst: dst,
-                                                                  proofScalar: proofScalar, v8CompatibilityMode: self.v8CompatibilityMode)
+
+                let proof = try DLEQ<H2G>.prove(
+                    secretScalar: self.privateKey,
+                    generator: G.Element.generator,
+                    publicKey: self.publicKey,
+                    inputs: CollectionOfOne(blindedElement),
+                    outputs: CollectionOfOne(evaluatedElement),
+                    context: context,
+                    hashToScalarDomainSeparationTag: hashToScalarDomainSeparationTag,
+                    proofScalar: proofScalar
+                )
                 return (evaluatedElement, proof)
             }
-            
-            precondition(mode == .partiallyOblivious)
-            let framedInfo = Data("Info".utf8) + I2OSP(value: info!.count, outputByteCount: 2) + info!
-            
-            let m = try H2G.hashToScalar(framedInfo, domainSeparationString: dst)
-            let t = privateKey + m
-            
-            let evaluatedElement = (t ^ (-1)) * blindedElement
-            let proof = try DLEQ<H2G>.proveEquivalenceBetween(k: t,
-                                                              A: G.Element.generator,
-                                                              B: (t * G.Element.generator),
-                                                              CDs: [(C: evaluatedElement, D: blindedElement)],
-                                                              dst: dst,
-                                                              proofScalar: proofScalar, v8CompatibilityMode: self.v8CompatibilityMode)
-            return (evaluatedElement, proof)
-        }
-        
-        internal func v8Evaluate(blindedElement: G.Element, info: Data? = nil, proofScalar: G.Scalar = G.Scalar.random) throws(CryptoKitMetaError) ->
-        (G.Element, DLEQProof<H2G.G.Element.Scalar>?) {
-            precondition(self.mode == .verifiable || self.mode == .base)
-            let setupCtx = setupContext(mode: mode, suite: ciphersuite, v8CompatibilityMode: self.v8CompatibilityMode)
-            let contextDST = Data("Context-".utf8) + setupCtx
-            
-            let ctx = contextDST + I2OSP(value: (info?.count ?? 0), outputByteCount: 2) + (info ?? Data())
-            
-            let m = try H2G.hashToScalar(ctx, domainSeparationString: setupCtx)
-            let t = privateKey + m
-            let evaluatedElement = (t ^ (-1)) * blindedElement
-            
-            guard self.mode != .base else {
-                return (evaluatedElement, nil)
+
+            guard let info else {
+                throw cryptoExtrasError(OPRF.Errors.missingInfo)
             }
-            
-            let proof = try DLEQ<H2G>.proveEquivalenceBetween(k: t,
-                                                              A: G.Element.generator,
-                                                              B: (t * G.Element.generator),
-                                                              CDs: [(C: evaluatedElement, D: blindedElement)],
-                                                              dst: setupCtx,
-                                                              proofScalar: proofScalar, v8CompatibilityMode: self.v8CompatibilityMode)
+            let infoScalar = try OPRF.hashInfoToScalar(
+                info,
+                domainSeparationTag: hashToScalarDomainSeparationTag,
+                using: H2G.self
+            )
+            let tweakedKey = privateKey + infoScalar
+            guard tweakedKey != .zero else {
+                throw cryptoExtrasError(OPRF.Errors.invalidScalar)
+            }
+            let evaluatedElement = try tweakedKey.inverted() * blindedElement
+            let proof = try DLEQ<H2G>.prove(
+                secretScalar: tweakedKey,
+                generator: G.Element.generator,
+                publicKey: tweakedKey * G.Element.generator,
+                inputs: CollectionOfOne(evaluatedElement),
+                outputs: CollectionOfOne(blindedElement),
+                context: context,
+                hashToScalarDomainSeparationTag: hashToScalarDomainSeparationTag,
+                proofScalar: proofScalar
+            )
             return (evaluatedElement, proof)
         }
+
+        func evaluate(
+            blindedElements: [G.Element],
+            info: Data? = nil,
+            proofScalar: G.Scalar = G.Scalar.random
+        ) throws(CryptoKitMetaError) -> ([G.Element], DLEQProof<G.Scalar>?) {
+            guard !blindedElements.isEmpty else {
+                throw cryptoExtrasError(OPRF.Errors.emptyBatch)
+            }
+            if mode != .partiallyOblivious, info != nil {
+                throw cryptoExtrasError(OPRF.Errors.invalidModeForInfo)
+            }
+            if mode == .base || mode == .verifiable {
+                var evaluatedElements: [G.Element] = []
+                evaluatedElements.reserveCapacity(blindedElements.count)
+                for blindedElement in blindedElements {
+                    evaluatedElements.append(privateKey * blindedElement)
+                }
+                if mode == .base {
+                    return (evaluatedElements, nil)
+                }
+
+                let proof = try DLEQ<H2G>.prove(
+                    secretScalar: privateKey,
+                    generator: G.Element.generator,
+                    publicKey: publicKey,
+                    inputs: blindedElements,
+                    outputs: evaluatedElements,
+                    context: context,
+                    hashToScalarDomainSeparationTag: hashToScalarDomainSeparationTag,
+                    proofScalar: proofScalar
+                )
+                return (evaluatedElements, proof)
+            }
+
+            guard let info else {
+                throw cryptoExtrasError(OPRF.Errors.missingInfo)
+            }
+            let infoScalar = try OPRF.hashInfoToScalar(
+                info,
+                domainSeparationTag: hashToScalarDomainSeparationTag,
+                using: H2G.self
+            )
+            let tweakedKey = privateKey + infoScalar
+            guard tweakedKey != .zero else {
+                throw cryptoExtrasError(OPRF.Errors.invalidScalar)
+            }
+            let inverseTweakedKey = try tweakedKey.inverted()
+            var evaluatedElements: [G.Element] = []
+            evaluatedElements.reserveCapacity(blindedElements.count)
+            for blindedElement in blindedElements {
+                evaluatedElements.append(inverseTweakedKey * blindedElement)
+            }
+            let proof = try DLEQ<H2G>.prove(
+                secretScalar: tweakedKey,
+                generator: G.Element.generator,
+                publicKey: tweakedKey * G.Element.generator,
+                inputs: evaluatedElements,
+                outputs: blindedElements,
+                context: context,
+                hashToScalarDomainSeparationTag: hashToScalarDomainSeparationTag,
+                proofScalar: proofScalar
+            )
+            return (evaluatedElements, proof)
+        }
         
-        internal func verifyFinalize(msg: Data,
-                                     output: Data,
-                                     info: Data?) throws(CryptoKitMetaError) -> Bool {
-            let dst = Data("HashToGroup-".utf8) + setupContext(mode: mode, suite: ciphersuite, v8CompatibilityMode: self.v8CompatibilityMode)
-            let t: H2G.G.Element = H2G.hashToGroup(msg, domainSeparationString: dst)
-            let (issuedElement, _): (H2G.G.Element, DLEQProof<H2G.G.Element.Scalar>?) = try evaluate(blindedElement: t, info: info)
-            
-            return output == Data(H2G.H.hash(data: composeFinalizeContext(message: msg, info: info, unblindedElement: issuedElement, ciphersuite: ciphersuite, mode: mode, v8CompatibilityMode: v8CompatibilityMode)))
+        internal func outputMatchesDirectEvaluation(
+            message: Data,
+            output: Data,
+            info: Data?
+        ) throws(CryptoKitMetaError) -> Bool {
+            let inputElement: H2G.G.Element = H2G.hashToGroup(
+                message,
+                domainSeparationString: hashToGroupDomainSeparationTag
+            )
+            let (issuedElement, _) = try evaluate(blindedElement: inputElement, info: info)
+            let digest = try hashFinalizeTranscript(
+                message: message,
+                info: info,
+                unblindedElement: issuedElement,
+                mode: mode,
+                using: H2G.H.self
+            )
+            return output == Data(digest)
         }
     }
 }

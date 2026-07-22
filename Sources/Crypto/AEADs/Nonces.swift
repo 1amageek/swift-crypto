@@ -20,7 +20,7 @@ import Foundation
 
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
 // MARK: - Generated file, do NOT edit
 // any edits of this file WILL be overwritten and thus discarded

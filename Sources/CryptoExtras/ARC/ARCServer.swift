@@ -19,7 +19,6 @@ import FoundationEssentials
 import Foundation
 #endif
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 extension ARC {
     struct ServerPrivateKey<Scalar: GroupScalar> {
         let x0: Scalar
@@ -89,7 +88,7 @@ extension ARC {
         }
 
         func verify(presentation: Presentation<H2G>, requestContext: Data, presentationContext: Data, presentationLimit: Int, nonce: Int) throws -> Bool {
-            let m2 = try H2G.hashToScalar(requestContext, domainSeparationString: Data((self.ciphersuite.domain + "requestContext").utf8))
+            let m2 = try H2G.hashToScalar(requestContext, domainSeparationContext: Data((self.ciphersuite.domain + "requestContext").utf8))
             return try presentation.verify(
                 serverPrivateKey: self.serverPrivateKey,
                 X1: self.serverPublicKey.X1,

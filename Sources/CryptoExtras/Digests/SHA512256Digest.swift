@@ -12,9 +12,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Crypto
+
 /// The output of a Secure Hashing Algorithm 2 (SHA-2) hash with a 256-bit digest
 /// using the SHA-512/256 variant.
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 public struct SHA512256Digest: Digest {
     let bytes: (UInt64, UInt64, UInt64, UInt64)
 

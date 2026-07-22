@@ -15,7 +15,6 @@
 import Crypto
 import SwiftASN1
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension ASN1 {
     // A PKCS#8 private key is one of two formats, depending on the version:
     //
@@ -36,7 +35,6 @@ extension ASN1 {
     // Attributes ::= SET OF Attribute
     //
     // We disregard the attributes because we don't support them anyway.
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     struct PKCS8PrivateKey: DERImplicitlyTaggable {
         static var defaultIdentifier: ASN1Identifier {
             .sequence

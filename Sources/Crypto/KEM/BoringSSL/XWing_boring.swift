@@ -20,15 +20,10 @@ import Foundation
 
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
+internal import CCryptoBoringSSL
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 struct OpenSSLXWingPublicKeyImpl: Sendable {
     private var publicKeyBytes: Data
 
@@ -85,7 +80,6 @@ struct OpenSSLXWingPublicKeyImpl: Sendable {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 struct OpenSSLXWingPrivateKeyImpl: Sendable {
     private var backing: Backing
 
@@ -126,9 +120,7 @@ struct OpenSSLXWingPrivateKeyImpl: Sendable {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension OpenSSLXWingPrivateKeyImpl {
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     final class Backing: @unchecked Sendable {
         private var privateKey: XWING_private_key
 

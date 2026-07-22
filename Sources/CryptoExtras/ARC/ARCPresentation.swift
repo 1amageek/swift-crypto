@@ -19,7 +19,6 @@ import FoundationEssentials
 import Foundation
 #endif
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 extension ARC {
     /// Presentation consists of a commitment to a MACGGC evaluation over two attributes,
     /// a commitment to one of the attributes, a tag and its public inputs (presentationContext, nonce),
@@ -50,8 +49,13 @@ extension ARC {
             let V = z * credential.X1 - r * generatorG
 
             // Create tag: (m1 + nonce)^(-1) * H2G(presentationContext)
-            let nonceScalar = try Group.Scalar(bytes: I2OSP(value: nonce, outputByteCount: credential.ciphersuite.scalarByteCount), reductionIsModOrder: true)
-            let inverse = (nonceScalar + credential.m1) ^ (-1)
+            let nonceScalar = try Group.Scalar(
+                canonicalRepresentation: I2OSP(
+                    value: nonce,
+                    outputByteCount: credential.ciphersuite.scalarByteCount
+                )
+            )
+            let inverse = try (nonceScalar + credential.m1).inverted()
             let T = H2G.hashToGroup(presentationContext, domainSeparationString: Data(("HashToGroup-" + credential.ciphersuite.domain + "Tag").utf8))
             let tag = inverse * T
 

@@ -19,7 +19,6 @@ import FoundationEssentials
 import Foundation
 #endif
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 extension ARC {
     struct ClientSecrets<Scalar: GroupScalar> {
         let m1: Scalar // secret at request and verification
@@ -45,7 +44,7 @@ extension ARC {
         let credentialRequest: CredentialRequest<H2G>
 
         init(ciphersuite: Ciphersuite<H2G>, m1: Group.Scalar = Group.Scalar.random, requestContext: Data, r1: Group.Scalar = Group.Scalar.random, r2: Group.Scalar = Group.Scalar.random, serverPublicKey: ServerPublicKey<H2G>) throws {
-            let m2 = try H2G.hashToScalar(requestContext, domainSeparationString: Data((ciphersuite.domain + "requestContext").utf8))
+            let m2 = try H2G.hashToScalar(requestContext, domainSeparationContext: Data((ciphersuite.domain + "requestContext").utf8))
             self.clientSecrets = ClientSecrets(m1: m1, m2: m2, r1: r1, r2: r2)
             self.serverPublicKey = serverPublicKey
             self.ciphersuite = ciphersuite

@@ -45,7 +45,7 @@ extension NISTECDHTests {
 
                 let privateKey = try PrivKey(rawRepresentation: privateBytes)
 
-                let agreement = try unwrap(publicKey as? PrivKey.PublicKey, file: file, line: line)
+                let agreement = try XCTUnwrap(publicKey as? PrivKey.PublicKey, file: file, line: line)
                 let result = try privateKey.sharedSecretFromKeyAgreement(with: agreement)
 
                 let expectedResult = try Array(hexString: testVector.shared)
@@ -103,7 +103,7 @@ extension NISTECDHTests {
 
                 let privateKey = try PrivKey(rawRepresentation: privateBytes)
 
-                let agreement = try unwrap(publicKey as? PrivKey.PublicKey, file: file, line: line)
+                let agreement = try XCTUnwrap(publicKey as? PrivKey.PublicKey, file: file, line: line)
                 let result = try privateKey.sharedSecretFromKeyAgreement(with: agreement)
 
                 let expectedResult = try Array(hexString: testVector.shared)

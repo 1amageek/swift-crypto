@@ -64,9 +64,16 @@ if(CMAKE_SYSTEM_NAME STREQUAL Windows)
   endif()
 endif()
 
+set(SWIFT_CRYPTO_PLATFORM_LIBRARIES)
 if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
-  find_package(dispatch CONFIG)
-  find_package(Foundation CONFIG)
+  find_package(dispatch CONFIG QUIET)
+  find_package(Foundation CONFIG QUIET)
+  if(TARGET dispatch)
+    list(APPEND SWIFT_CRYPTO_PLATFORM_LIBRARIES dispatch)
+  endif()
+  if(TARGET Foundation)
+    list(APPEND SWIFT_CRYPTO_PLATFORM_LIBRARIES Foundation)
+  endif()
 endif()
 
 include(FetchContent)
@@ -74,8 +81,8 @@ find_package(SwiftASN1 CONFIG)
 if(NOT SwiftASN1_FOUND)
   message("-- Vending swift-asn1")
   FetchContent_Declare(ASN1
-    GIT_REPOSITORY https://github.com/apple/swift-asn1
-    GIT_TAG 1.3.1)
+    GIT_REPOSITORY https://github.com/1amageek/swift-asn1.git
+    GIT_TAG b6ceb273cb9c35b7a44f853ddd9e6e5044938102)
   FetchContent_MakeAvailable(ASN1)
 endif()
 

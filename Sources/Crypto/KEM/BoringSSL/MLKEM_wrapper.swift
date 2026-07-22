@@ -20,15 +20,10 @@ import Foundation
 
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
+internal import CCryptoBoringSSL
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 protocol BoringSSLBackedMLKEMPrivateKey: Sendable {
     associatedtype InteriorPublicKey: BoringSSLBackedMLKEMPublicKey
 
@@ -49,14 +44,12 @@ protocol BoringSSLBackedMLKEMPrivateKey: Sendable {
     var integrityCheckedRepresentation: Data { get }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension BoringSSLBackedMLKEMPrivateKey {
     func decapsulate<Bytes: DataProtocol>(encapsulated: Bytes) throws(CryptoKitMetaError) -> SymmetricKey {
         try self.decapsulate(encapsulated)
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 protocol BoringSSLBackedMLKEMPublicKey: Sendable {
     init<Bytes: DataProtocol>(rawRepresentation: Bytes) throws(CryptoKitMetaError)
 
@@ -67,12 +60,10 @@ protocol BoringSSLBackedMLKEMPublicKey: Sendable {
     func encapsulateWithSeed(_ encapSeed: Data) -> KEM.EncapsulationResult
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 protocol BoringSSLBackedMLKEMOuterPublicKey: Sendable {
     init(rawRepresentation: Data) throws(CryptoKitMetaError)
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 protocol BoringSSLBackedMLKEMParameters {
     associatedtype BackingPrivateKey: BoringSSLBackedMLKEMPrivateKey
     where BackingPrivateKey.InteriorPublicKey == BackingPublicKey
@@ -80,16 +71,13 @@ protocol BoringSSLBackedMLKEMParameters {
     associatedtype PublicKey: BoringSSLBackedMLKEMOuterPublicKey
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLKEM768: BoringSSLBackedMLKEMParameters {
     typealias BackingPrivateKey = MLKEM768.InternalPrivateKey
     typealias BackingPublicKey = MLKEM768.InternalPublicKey
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLKEM768.PublicKey: BoringSSLBackedMLKEMOuterPublicKey {}
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLKEM768.InternalPrivateKey: BoringSSLBackedMLKEMPrivateKey {
     static func generatePrivateKey() throws(CryptoKitMetaError) -> Self {
         .generate()
@@ -135,23 +123,19 @@ extension MLKEM768.InternalPrivateKey: BoringSSLBackedMLKEMPrivateKey {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLKEM768.InternalPublicKey: BoringSSLBackedMLKEMPublicKey {
     func encapsulateWithSeed(_ encapSeed: Data) -> KEM.EncapsulationResult {
         fatalError()
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLKEM1024: BoringSSLBackedMLKEMParameters {
     typealias BackingPrivateKey = MLKEM1024.InternalPrivateKey
     typealias BackingPublicKey = MLKEM1024.InternalPublicKey
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLKEM1024.PublicKey: BoringSSLBackedMLKEMOuterPublicKey {}
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLKEM1024.InternalPrivateKey: BoringSSLBackedMLKEMPrivateKey {
     static func generatePrivateKey() throws(CryptoKitMetaError) -> Self {
         .generate()
@@ -197,14 +181,12 @@ extension MLKEM1024.InternalPrivateKey: BoringSSLBackedMLKEMPrivateKey {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MLKEM1024.InternalPublicKey: BoringSSLBackedMLKEMPublicKey {
     func encapsulateWithSeed(_ encapSeed: Data) -> KEM.EncapsulationResult {
         fatalError()
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 struct OpenSSLMLKEMPublicKeyImpl<Parameters: BoringSSLBackedMLKEMParameters>: BoringSSLBackedMLKEMPublicKey, Sendable {
     private var backing: Parameters.BackingPublicKey
 
@@ -229,7 +211,6 @@ struct OpenSSLMLKEMPublicKeyImpl<Parameters: BoringSSLBackedMLKEMParameters>: Bo
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 struct OpenSSLMLKEMPrivateKeyImpl<Parameters: BoringSSLBackedMLKEMParameters>: BoringSSLBackedMLKEMPrivateKey, Sendable
 {
     typealias InteriorPublicKey = OpenSSLMLKEMPublicKeyImpl<Parameters>

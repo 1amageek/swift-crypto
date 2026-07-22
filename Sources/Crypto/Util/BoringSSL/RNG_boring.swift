@@ -13,10 +13,10 @@
 //===----------------------------------------------------------------------===//
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
+internal import CCryptoBoringSSL
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension UnsafeMutableRawBufferPointer {
     func initializeWithRandomBytes(count: Int) {
         guard count > 0 else {
@@ -24,41 +24,27 @@ extension UnsafeMutableRawBufferPointer {
         }
 
         precondition(count <= self.count)
-        var rng = SystemRandomNumberGenerator()
-
-        // We store bytes 64-bits at a time until we can't anymore.
-        var targetPtr = self
-        while targetPtr.count > 8 {
-            targetPtr.storeBytes(of: rng.next(), as: UInt64.self)
-            targetPtr = UnsafeMutableRawBufferPointer(rebasing: targetPtr[8...])
+        let target = UnsafeMutableRawBufferPointer(rebasing: self.prefix(count))
+        guard let baseAddress = target.baseAddress else {
+            preconditionFailure("A non-empty random output requires valid storage")
         }
-
-        // Now we're down to having to store things an integer at a time. We do this by shifting and
-        // masking.
-        var remainingWord: UInt64 = rng.next()
-        while targetPtr.count > 0 {
-            targetPtr.storeBytes(of: UInt8(remainingWord & 0xFF), as: UInt8.self)
-            remainingWord >>= 8
-            targetPtr = UnsafeMutableRawBufferPointer(rebasing: targetPtr[1...])
-        }
+        precondition(
+            CCryptoBoringSSL_RAND_bytes(
+                baseAddress.assumingMemoryBound(to: UInt8.self),
+                target.count
+            ) == 1,
+            "The secure random number generator failed"
+        )
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension MutableRawSpan {
-    #if swift(<6.3)
-    @_lifetime(self: copy self)
-    #endif
     mutating func initializeWithRandomBytes(count: Int) {
         self.withUnsafeMutableBytes { $0.initializeWithRandomBytes(count: count) }
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension OutputRawSpan {
-    #if swift(<6.3)
-    @_lifetime(self: copy self)
-    #endif
     mutating func appendingRandomBytes(count: Int) {
         self.withUnsafeMutableBytes { buffer, initializedCount in
             UnsafeMutableRawBufferPointer(rebasing: buffer[initializedCount..<initializedCount + count])

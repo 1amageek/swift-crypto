@@ -14,9 +14,7 @@
 
 import SwiftASN1
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension ASN1 {
-    @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
     struct RFC8410AlgorithmIdentifier: DERImplicitlyTaggable, Hashable {
         static var defaultIdentifier: ASN1Identifier {
             .sequence
@@ -62,7 +60,6 @@ extension ASN1 {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension ASN1.RFC8410AlgorithmIdentifier {
     static let x25519 = ASN1.RFC8410AlgorithmIdentifier(algorithm: .AlgorithmIdentifier.idX25519, parameters: nil)
 

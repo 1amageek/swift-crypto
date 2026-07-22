@@ -18,18 +18,21 @@ import Foundation
 #endif
 import Crypto
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
 extension OPRF {
     struct VerifiableServer<H2G: HashToGroup> {
         typealias G = H2G.G
         let server: OPRF.Server<H2G>
         
-        init(ciphersuite: Ciphersuite<H2G>, privateKey: G.Scalar = G.Scalar.random, v8CompatibilityMode: Bool = false, mode: OPRF.Mode) throws(CryptoKitMetaError) {
+        init(
+            ciphersuite: Ciphersuite<H2G>,
+            privateKey: G.Scalar = G.Scalar.random,
+            mode: OPRF.Mode
+        ) throws(CryptoKitMetaError) {
             if mode != .partiallyOblivious && mode != .verifiable {
                 throw cryptoExtrasError(OPRF.Errors.incompatibleMode)
             }
             
-            self.server = .init(mode: mode, ciphersuite: ciphersuite, privateKey: privateKey, v8CompatibilityMode: v8CompatibilityMode)
+            self.server = try .init(mode: mode, ciphersuite: ciphersuite, privateKey: privateKey)
         }
         
         var publicKey: G.Element {
@@ -38,8 +41,7 @@ extension OPRF {
         
         func evaluate(blindedElement: G.Element, info: Data? = nil, proofScalar: G.Scalar = G.Scalar.random) throws(CryptoKitMetaError) ->
         (G.Element, DLEQProof<H2G.G.Element.Scalar>) {
-            let hasInfo = (info != nil)
-            if hasInfo && self.server.mode == .verifiable && !server.v8CompatibilityMode {
+            if info != nil && self.server.mode == .verifiable {
                 throw cryptoExtrasError(OPRF.Errors.invalidModeForInfo)
             }
             
@@ -47,13 +49,42 @@ extension OPRF {
                                                                      info: info,
                                                                      proofScalar: proofScalar)
             
-            return (evaluatedElement, proof!)
+            guard let proof else {
+                throw cryptoExtrasError(OPRF.Errors.invalidProof)
+            }
+            return (evaluatedElement, proof)
+        }
+
+        func evaluate(
+            blindedElements: [G.Element],
+            info: Data? = nil,
+            proofScalar: G.Scalar = G.Scalar.random
+        ) throws(CryptoKitMetaError) -> ([G.Element], DLEQProof<G.Scalar>) {
+            if info != nil && self.server.mode == .verifiable {
+                throw cryptoExtrasError(OPRF.Errors.invalidModeForInfo)
+            }
+
+            let (evaluatedElements, proof) = try self.server.evaluate(
+                blindedElements: blindedElements,
+                info: info,
+                proofScalar: proofScalar
+            )
+            guard let proof else {
+                throw cryptoExtrasError(OPRF.Errors.invalidProof)
+            }
+            return (evaluatedElements, proof)
         }
         
-        internal func verifyFinalize(msg: Data,
-                                     output: Data,
-                                     info: Data?) throws(CryptoKitMetaError) -> Bool {
-            return try server.verifyFinalize(msg: msg, output: output, info: info)
+        internal func outputMatchesDirectEvaluation(
+            message: Data,
+            output: Data,
+            info: Data?
+        ) throws(CryptoKitMetaError) -> Bool {
+            try server.outputMatchesDirectEvaluation(
+                message: message,
+                output: output,
+                info: info
+            )
         }
     }
 }

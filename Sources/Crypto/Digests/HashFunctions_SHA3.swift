@@ -14,9 +14,8 @@
 
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
-#if !CRYPTOKIT_IN_SEP
 /// An implementation of Secure Hashing Algorithm 3 (SHA-3) hashing with a 256-bit digest.
 ///
 /// The ``SHA3_256`` hash implements the ``HashFunction`` protocol for the
@@ -28,7 +27,7 @@
 /// applications can compute the digest iteratively by creating a new hash
 /// instance, calling the ``update(data:)`` method repeatedly with blocks of
 /// data, and then calling the ``finalize()`` method to get the result.
-public struct SHA3_256: HashFunctionImplementationDetails, Sendable {
+public struct SHA3_256: DigestHashFunction, Sendable {
     /// The number of bytes that represents the hash function’s internal state.
     public static let blockByteCount: Int = 136
     /// The number of bytes in a SHA3-256 digest.
@@ -36,7 +35,7 @@ public struct SHA3_256: HashFunctionImplementationDetails, Sendable {
     /// The digest type for a SHA3-256 hash function.
     public typealias Digest = SHA3_256Digest
 
-    var impl: DigestImplSHA3<SHA3_256>
+    private var context: KeccakDigestContext
 
     /// Creates a SHA3-256 hash function.
     ///
@@ -49,7 +48,10 @@ public struct SHA3_256: HashFunctionImplementationDetails, Sendable {
     /// If your data fits into a single buffer, you can use the ``hash(data:)``
     /// method instead, to compute the digest in a single call.
     public init() {
-        impl = DigestImplSHA3()
+        guard let context = Self.makeContext() else {
+            preconditionFailure("Unable to initialize SHA3-256 state")
+        }
+        self.context = context
     }
 
     /// Incrementally updates the hash function with the contents of the buffer.
@@ -70,7 +72,12 @@ public struct SHA3_256: HashFunctionImplementationDetails, Sendable {
     ///   - bufferPointer: A pointer to the next block of data for the ongoing
     /// digest calculation.
     public mutating func update(bufferPointer: UnsafeRawBufferPointer) {
-        impl.update(data: bufferPointer)
+        if !isKnownUniquelyReferenced(&context) {
+            context = Self.copyContext(context)
+        }
+        guard Self.update(context, data: bufferPointer) else {
+            preconditionFailure("Unable to update SHA3-256 state")
+        }
     }
 
     /// Finalizes the hash function and returns the computed digest.
@@ -83,7 +90,19 @@ public struct SHA3_256: HashFunctionImplementationDetails, Sendable {
     ///
     /// - Returns: The computed digest of the data.
     public func finalize() -> Self.Digest {
-        return impl.finalize()
+        withUnsafeTemporaryAllocation(
+            byteCount: Self.digestSize,
+            alignment: 1
+        ) { digestPointer in
+            defer { digestPointer.zeroize() }
+            guard Self.finalize(context, digest: digestPointer) else {
+                preconditionFailure("Unable to finalize SHA3-256 state")
+            }
+            guard let digest = SHA3_256Digest(copying: digestPointer.bytes) else {
+                preconditionFailure("Invalid SHA3-256 digest size")
+            }
+            return digest
+        }
     }
 }
 
@@ -98,7 +117,7 @@ public struct SHA3_256: HashFunctionImplementationDetails, Sendable {
 /// applications can compute the digest iteratively by creating a new hash
 /// instance, calling the ``update(data:)`` method repeatedly with blocks of
 /// data, and then calling the ``finalize()`` method to get the result.
-public struct SHA3_384: HashFunctionImplementationDetails, Sendable {
+public struct SHA3_384: DigestHashFunction, Sendable {
     /// The number of bytes that represents the hash function’s internal state.
     public static let blockByteCount: Int = 104
     /// The number of bytes in a SHA3-384 digest.
@@ -106,7 +125,7 @@ public struct SHA3_384: HashFunctionImplementationDetails, Sendable {
     /// The digest type for a SHA3-384 hash function.
     public typealias Digest = SHA3_384Digest
 
-    var impl: DigestImplSHA3<SHA3_384>
+    private var context: KeccakDigestContext
 
     /// Creates a SHA3-384 hash function.
     ///
@@ -119,7 +138,10 @@ public struct SHA3_384: HashFunctionImplementationDetails, Sendable {
     /// If your data fits into a single buffer, you can use the ``hash(data:)``
     /// method instead, to compute the digest in a single call.
     public init() {
-        impl = DigestImplSHA3()
+        guard let context = Self.makeContext() else {
+            preconditionFailure("Unable to initialize SHA3-384 state")
+        }
+        self.context = context
     }
 
     /// Incrementally updates the hash function with the contents of the buffer.
@@ -140,7 +162,12 @@ public struct SHA3_384: HashFunctionImplementationDetails, Sendable {
     ///   - bufferPointer: A pointer to the next block of data for the ongoing
     /// digest calculation.
     public mutating func update(bufferPointer: UnsafeRawBufferPointer) {
-        impl.update(data: bufferPointer)
+        if !isKnownUniquelyReferenced(&context) {
+            context = Self.copyContext(context)
+        }
+        guard Self.update(context, data: bufferPointer) else {
+            preconditionFailure("Unable to update SHA3-384 state")
+        }
     }
 
     /// Finalizes the hash function and returns the computed digest.
@@ -153,7 +180,19 @@ public struct SHA3_384: HashFunctionImplementationDetails, Sendable {
     ///
     /// - Returns: The computed digest of the data.
     public func finalize() -> Self.Digest {
-        return impl.finalize()
+        withUnsafeTemporaryAllocation(
+            byteCount: Self.digestSize,
+            alignment: 1
+        ) { digestPointer in
+            defer { digestPointer.zeroize() }
+            guard Self.finalize(context, digest: digestPointer) else {
+                preconditionFailure("Unable to finalize SHA3-384 state")
+            }
+            guard let digest = SHA3_384Digest(copying: digestPointer.bytes) else {
+                preconditionFailure("Invalid SHA3-384 digest size")
+            }
+            return digest
+        }
     }
 }
 
@@ -168,7 +207,7 @@ public struct SHA3_384: HashFunctionImplementationDetails, Sendable {
 /// applications can compute the digest iteratively by creating a new hash
 /// instance, calling the ``update(data:)`` method repeatedly with blocks of
 /// data, and then calling the ``finalize()`` method to get the result.
-public struct SHA3_512: HashFunctionImplementationDetails, Sendable {
+public struct SHA3_512: DigestHashFunction, Sendable {
     /// The number of bytes that represents the hash function’s internal state.
     public static let blockByteCount: Int = 72
     /// The number of bytes in a SHA3-512 digest.
@@ -176,7 +215,7 @@ public struct SHA3_512: HashFunctionImplementationDetails, Sendable {
     /// The digest type for a SHA3-512 hash function.
     public typealias Digest = SHA3_512Digest
 
-    var impl: DigestImplSHA3<SHA3_512>
+    private var context: KeccakDigestContext
 
     /// Creates a SHA3-512 hash function.
     ///
@@ -189,7 +228,10 @@ public struct SHA3_512: HashFunctionImplementationDetails, Sendable {
     /// If your data fits into a single buffer, you can use the ``hash(data:)``
     /// method instead, to compute the digest in a single call.
     public init() {
-        impl = DigestImplSHA3()
+        guard let context = Self.makeContext() else {
+            preconditionFailure("Unable to initialize SHA3-512 state")
+        }
+        self.context = context
     }
 
     /// Incrementally updates the hash function with the contents of the buffer.
@@ -210,7 +252,12 @@ public struct SHA3_512: HashFunctionImplementationDetails, Sendable {
     ///   - bufferPointer: A pointer to the next block of data for the ongoing
     /// digest calculation.
     public mutating func update(bufferPointer: UnsafeRawBufferPointer) {
-        impl.update(data: bufferPointer)
+        if !isKnownUniquelyReferenced(&context) {
+            context = Self.copyContext(context)
+        }
+        guard Self.update(context, data: bufferPointer) else {
+            preconditionFailure("Unable to update SHA3-512 state")
+        }
     }
 
     /// Finalizes the hash function and returns the computed digest.
@@ -223,8 +270,19 @@ public struct SHA3_512: HashFunctionImplementationDetails, Sendable {
     ///
     /// - Returns: The computed digest of the data.
     public func finalize() -> Self.Digest {
-        return impl.finalize()
+        withUnsafeTemporaryAllocation(
+            byteCount: Self.digestSize,
+            alignment: 1
+        ) { digestPointer in
+            defer { digestPointer.zeroize() }
+            guard Self.finalize(context, digest: digestPointer) else {
+                preconditionFailure("Unable to finalize SHA3-512 state")
+            }
+            guard let digest = SHA3_512Digest(copying: digestPointer.bytes) else {
+                preconditionFailure("Invalid SHA3-512 digest size")
+            }
+            return digest
+        }
     }
 }
-#endif // !CRYPTOKIT_IN_SEP
 #endif // canImport(CryptoKit)

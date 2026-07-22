@@ -19,16 +19,11 @@ import Foundation
 #endif
 
 #if canImport(CryptoKit)
-@_exported import CryptoKit
+import CryptoKit
 #else
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
+internal import CCryptoBoringSSL
 import CryptoBoringWrapper
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension Data {
     init<D: DataProtocol, Curve: OpenSSLSupportedNISTCurve>(
         derSignature derBytes: D,
@@ -69,7 +64,6 @@ extension Data {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P256.Signing.ECDSASignature {
     init<D: DataProtocol>(openSSLDERSignature derRepresentation: D) throws(CryptoKitMetaError) {
         self.rawRepresentation = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in
@@ -82,7 +76,6 @@ extension P256.Signing.ECDSASignature {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P256.Signing.PrivateKey {
     func openSSLSignature<D: Digest>(for digest: D) throws(CryptoKitMetaError) -> P256.Signing.ECDSASignature {
         let baseSignature = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in
@@ -95,7 +88,6 @@ extension P256.Signing.PrivateKey {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P256.Signing.PublicKey {
     func openSSLIsValidSignature<D: Digest>(
         _ signature: P256.Signing.ECDSASignature,
@@ -115,7 +107,6 @@ extension P256.Signing.PublicKey {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P384.Signing.ECDSASignature {
     init<D: DataProtocol>(openSSLDERSignature derRepresentation: D) throws(CryptoKitMetaError) {
         self.rawRepresentation = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in
@@ -128,7 +119,6 @@ extension P384.Signing.ECDSASignature {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P384.Signing.PrivateKey {
     func openSSLSignature<D: Digest>(for digest: D) throws(CryptoKitMetaError) -> P384.Signing.ECDSASignature {
         let baseSignature = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in
@@ -141,7 +131,6 @@ extension P384.Signing.PrivateKey {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P384.Signing.PublicKey {
     func openSSLIsValidSignature<D: Digest>(
         _ signature: P384.Signing.ECDSASignature,
@@ -161,7 +150,6 @@ extension P384.Signing.PublicKey {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P521.Signing.ECDSASignature {
     init<D: DataProtocol>(openSSLDERSignature derRepresentation: D) throws(CryptoKitMetaError) {
         self.rawRepresentation = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in
@@ -174,7 +162,6 @@ extension P521.Signing.ECDSASignature {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P521.Signing.PrivateKey {
     func openSSLSignature<D: Digest>(for digest: D) throws(CryptoKitMetaError) -> P521.Signing.ECDSASignature {
         let baseSignature = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in
@@ -187,7 +174,6 @@ extension P521.Signing.PrivateKey {
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension P521.Signing.PublicKey {
     func openSSLIsValidSignature<D: Digest>(
         _ signature: P521.Signing.ECDSASignature,

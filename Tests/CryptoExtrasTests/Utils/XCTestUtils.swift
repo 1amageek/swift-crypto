@@ -13,24 +13,8 @@
 //===----------------------------------------------------------------------===//
 import XCTest
 
-// Xcode 11.4 catches errors thrown during tests and reports them on the
-// correct line. But Linux and older Xcodes do not, so we need to use this
-// wrapper as long as those platforms are supported.
 func orFail<T>(file: StaticString = #filePath, line: UInt = #line, _ closure: () throws -> T) throws -> T {
-    func wrapper<U>(_ closure: () throws -> U, file: StaticString, line: UInt) throws -> U {
-        do {
-            return try closure()
-        } catch {
-            XCTFail("Function threw error: \(error)", file: file, line: line)
-            throw error
-        }
-    }
-    
-    if #available(macOS 10.15.4, macCatalyst 13.4, iOS 13.4, tvOS 13.4, watchOS 6.0, *) {
-        return try closure()
-    } else {
-        return try wrapper(closure, file: file, line: line)
-    }
+    try closure()
 }
 
 func XCTAssertThrowsError<T, E: Error & Equatable>(

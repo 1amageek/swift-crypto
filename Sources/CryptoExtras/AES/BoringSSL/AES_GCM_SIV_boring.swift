@@ -14,16 +14,8 @@
 
 // This is a copy ChaChaPoly_boring just with a different set aes algos
 
-#if hasFeature(Embedded)
-import CCryptoBoringSSL
-#else
-@_implementationOnly import CCryptoBoringSSL
-#endif
-#if hasFeature(Embedded)
-import CCryptoBoringSSLShims
-#else
-@_implementationOnly import CCryptoBoringSSLShims
-#endif
+internal import CCryptoBoringSSL
+internal import CCryptoBoringSSLShims
 import Crypto
 import CryptoBoringWrapper
 
@@ -33,7 +25,6 @@ import FoundationEssentials
 import Foundation
 #endif
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension BoringSSLAEAD {
     /// Seal a given message.
     func seal<Plaintext: DataProtocol, Nonce: Crypto.ContiguousBytes, AuthenticatedData: DataProtocol>(
@@ -43,30 +34,32 @@ extension BoringSSLAEAD {
         authenticatedData: AuthenticatedData
     ) throws(CryptoKitMetaError) -> Data {
         #if hasFeature(Embedded)
-        var nonceData = Data()
-        nonce.withUnsafeBytes { nonceData.append(contentsOf: $0) }
-        let authenticatedData = Data(authenticatedData)
-        var combined = nonceData
-        combined.append(contentsOf: message)
-        let plaintextOffset = nonceData.count
-        let tagOffset = plaintextOffset + message.count
-        combined.append(contentsOf: repeatElement(UInt8(0), count: 16))
-
         do {
             let context = try AEADContext(cipher: self, key: key.bytes)
-            try combined.withUnsafeMutableBytes { (buffer) throws(CryptoBoringWrapperError) in
-                let messageBuffer = UnsafeMutableRawBufferPointer(rebasing: buffer[plaintextOffset..<tagOffset])
-                let tagBuffer = UnsafeMutableRawBufferPointer(rebasing: buffer[tagOffset..<buffer.count])
-                var messageSpan = messageBuffer.mutableBytes
-                var tagSpan = OutputRawSpan(buffer: tagBuffer, initializedCount: 0)
-                try context.seal(
-                    message: &messageSpan,
-                    nonce: nonceData.bytes,
-                    authenticatedData: authenticatedData.bytes,
-                    tag: &tagSpan
-                )
+            return try nonce.withUnsafeBytes { nonceBuffer throws(CryptoBoringWrapperError) in
+                var combined = Data(capacity: nonceBuffer.count + message.count + 16)
+                combined.append(contentsOf: nonceBuffer)
+                combined.append(contentsOf: message)
+                let plaintextOffset = nonceBuffer.count
+                let tagOffset = plaintextOffset + message.count
+                combined.append(contentsOf: repeatElement(UInt8(0), count: 16))
+
+                try authenticatedData.withUnsafeBytes { authenticatedDataBuffer throws(CryptoBoringWrapperError) in
+                    try combined.withUnsafeMutableBytes { (buffer) throws(CryptoBoringWrapperError) in
+                        let messageBuffer = UnsafeMutableRawBufferPointer(rebasing: buffer[plaintextOffset..<tagOffset])
+                        let tagBuffer = UnsafeMutableRawBufferPointer(rebasing: buffer[tagOffset..<buffer.count])
+                        var messageSpan = messageBuffer.mutableBytes
+                        var tagSpan = OutputRawSpan(buffer: tagBuffer, initializedCount: 0)
+                        try context.seal(
+                            message: &messageSpan,
+                            nonce: nonceBuffer.bytes,
+                            authenticatedData: authenticatedDataBuffer.bytes,
+                            tag: &tagSpan
+                        )
+                    }
+                }
+                return combined
             }
-            return combined
         } catch {
             throw cryptoExtrasError(error)
         }
@@ -74,8 +67,8 @@ extension BoringSSLAEAD {
         do {
             let context = try AEADContext(cipher: self, key: key)
             return try context.seal(message: message, nonce: nonce, authenticatedData: authenticatedData)
-        } catch CryptoBoringWrapperError.underlyingCoreCryptoError(let errorCode) {
-            throw cryptoExtrasError(CryptoKitError.underlyingCoreCryptoError(error: errorCode))
+        } catch {
+            throw cryptoExtrasError(error)
         }
         #endif
     }
@@ -90,21 +83,22 @@ extension BoringSSLAEAD {
         #if hasFeature(Embedded)
         let ciphertext = combinedCiphertextAndTag.dropLast(16)
         let tag = combinedCiphertextAndTag.suffix(16)
-        var output = Data(ciphertext)
-        var nonceData = Data()
-        nonce.withUnsafeBytes { nonceData.append(contentsOf: $0) }
-        let authenticatedData = Data(authenticatedData)
+        var output = Data(copying: ciphertext)
 
         do {
             let context = try AEADContext(cipher: self, key: key.bytes)
-            try output.withUnsafeMutableBytes { (buffer) throws(CryptoBoringWrapperError) in
-                var messageSpan = buffer.mutableBytes
-                try context.open(
-                    message: &messageSpan,
-                    nonce: nonceData.bytes,
-                    tag: tag.bytes,
-                    authenticatedData: authenticatedData.bytes
-                )
+            try nonce.withUnsafeBytes { nonceBuffer throws(CryptoBoringWrapperError) in
+                try authenticatedData.withUnsafeBytes { authenticatedDataBuffer throws(CryptoBoringWrapperError) in
+                    try output.withUnsafeMutableBytes { (buffer) throws(CryptoBoringWrapperError) in
+                        var messageSpan = buffer.mutableBytes
+                        try context.open(
+                            message: &messageSpan,
+                            nonce: nonceBuffer.bytes,
+                            tag: tag.bytes,
+                            authenticatedData: authenticatedDataBuffer.bytes
+                        )
+                    }
+                }
             }
             return output
         } catch {
@@ -118,15 +112,14 @@ extension BoringSSLAEAD {
                 nonce: nonce,
                 authenticatedData: authenticatedData
             )
-        } catch CryptoBoringWrapperError.underlyingCoreCryptoError(let errorCode) {
-            throw cryptoExtrasError(CryptoKitError.underlyingCoreCryptoError(error: errorCode))
+        } catch {
+            throw cryptoExtrasError(error)
         }
         #endif
     }
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
-enum OpenSSLAESGCMSIVImpl {
+enum AESGCMSIVCipher {
     @inlinable
     static func seal<Plaintext: DataProtocol, AuthenticatedData: DataProtocol>(
         key: SymmetricKey,

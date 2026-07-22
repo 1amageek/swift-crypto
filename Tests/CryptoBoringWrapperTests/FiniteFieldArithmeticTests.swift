@@ -18,7 +18,7 @@ import XCTest
 
 final class FiniteFieldArithmeticTests: XCTestCase {
     func testResidue() throws {
-        let ff = try FiniteFieldArithmeticContext(fieldSize: 3)
+        let ff = try FiniteFieldArithmeticContext(modulus: 3)
         XCTAssertEqual(try ff.residue(-4), 2)
         XCTAssertEqual(try ff.residue(-3), 0)
         XCTAssertEqual(try ff.residue(-2), 1)
@@ -33,7 +33,7 @@ final class FiniteFieldArithmeticTests: XCTestCase {
     }
 
     func testSquare() throws {
-        let ff = try FiniteFieldArithmeticContext(fieldSize: 3)
+        let ff = try FiniteFieldArithmeticContext(modulus: 3)
         XCTAssertEqual(try ff.square(1), 1)
         XCTAssertEqual(try ff.square(2), 1)
         XCTAssertEqual(try ff.square(3), 0)
@@ -43,7 +43,7 @@ final class FiniteFieldArithmeticTests: XCTestCase {
     }
 
     func testMultiply() throws {
-        let ff = try FiniteFieldArithmeticContext(fieldSize: 3)
+        let ff = try FiniteFieldArithmeticContext(modulus: 3)
         XCTAssertEqual(try ff.multiply(1, 1), 1)
         XCTAssertEqual(try ff.multiply(2, 3), 0)
         XCTAssertEqual(try ff.multiply(4, 2), 2)
@@ -53,7 +53,7 @@ final class FiniteFieldArithmeticTests: XCTestCase {
     }
 
     func testAdd() throws {
-        let ff = try FiniteFieldArithmeticContext(fieldSize: 3)
+        let ff = try FiniteFieldArithmeticContext(modulus: 3)
         XCTAssertEqual(try ff.add(1, 0), 1)
         XCTAssertEqual(try ff.add(1, 1), 2)
         XCTAssertEqual(try ff.add(1, 2), 0)
@@ -62,7 +62,7 @@ final class FiniteFieldArithmeticTests: XCTestCase {
     }
 
     func testSubtract() throws {
-        let ff = try FiniteFieldArithmeticContext(fieldSize: 3)
+        let ff = try FiniteFieldArithmeticContext(modulus: 3)
         XCTAssertEqual(try ff.subtract(0, from: 1), 1)
         XCTAssertEqual(try ff.subtract(1, from: 1), 0)
         XCTAssertEqual(try ff.subtract(2, from: 1), 2)
@@ -70,7 +70,7 @@ final class FiniteFieldArithmeticTests: XCTestCase {
     }
 
     func testPositiveSquareRoot() throws {
-        let ff = try FiniteFieldArithmeticContext(fieldSize: 3)
+        let ff = try FiniteFieldArithmeticContext(modulus: 3)
         XCTAssertEqual(try ff.positiveSquareRoot(1), 1)
         XCTAssertEqual(try ff.positiveSquareRoot(4), 1)
         XCTAssertEqual(try ff.positiveSquareRoot(9), 0)
@@ -79,7 +79,7 @@ final class FiniteFieldArithmeticTests: XCTestCase {
     }
 
     func testInverse() throws {
-        let ff = try FiniteFieldArithmeticContext(fieldSize: 3)
+        let ff = try FiniteFieldArithmeticContext(modulus: 3)
         XCTAssertEqual(try ff.inverse(1), 1)
         XCTAssertEqual(try ff.inverse(2), 2)
         XCTAssertEqual(try ff.inverse(3), nil)
@@ -99,7 +99,7 @@ final class FiniteFieldArithmeticTests: XCTestCase {
 
     func testPow() throws {
         let m: ArbitraryPrecisionInteger = 7
-        let ff = try FiniteFieldArithmeticContext(fieldSize: m)
+        let ff = try FiniteFieldArithmeticContext(modulus: m)
         for (x, p, expectedResult): (ArbitraryPrecisionInteger, ArbitraryPrecisionInteger, ArbitraryPrecisionInteger)
             in [
                 (1, 0, 1), (1, 1, 1), (1, 2, 1), (1, 3, 1),

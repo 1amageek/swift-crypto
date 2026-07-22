@@ -15,273 +15,610 @@ import Crypto
 @testable import CryptoExtras
 import XCTest
 
-struct OPRFSuite: Codable {
-    let groupDST: String
-    let suiteName: String?
-    let identifier: String?
-    let suiteID: Int?
+struct OPRFSuite: Decodable {
+    let groupDomainSeparationTag: String
+    let identifier: String
+    let keyInfo: String
     let mode: Int
-    let skSm: String
-    let pkSm: String?
+    let privateKey: String
+    let publicKey: String?
+    let seed: String
     let vectors: [OPRFTestVector]
+
+    private enum CodingKeys: String, CodingKey {
+        case groupDomainSeparationTag = "groupDST"
+        case identifier
+        case keyInfo
+        case mode
+        case privateKey = "skSm"
+        case publicKey = "pkSm"
+        case seed
+        case vectors
+    }
+
+    static func loadRFC9497Vectors() throws -> [Self] {
+        let fileURL = try XCTUnwrap(
+            Bundle.module.url(forResource: "OPRFVectors-RFC9497", withExtension: "json")
+        )
+        return try JSONDecoder().decode([Self].self, from: Data(contentsOf: fileURL))
+    }
+
+    static func p384SHA384VOPRF() throws -> Self {
+        let suites = try loadRFC9497Vectors()
+        return try XCTUnwrap(
+            suites.first { $0.identifier == "P384-SHA384" && $0.mode == OPRF.Mode.verifiable.rawValue }
+        )
+    }
 }
 
-struct DLEQProofVector: Codable {
+struct DLEQProofVector: Decodable {
     let proof: String
-    let r: String
+    let proofScalar: String
+
+    private enum CodingKeys: String, CodingKey {
+        case proof
+        case proofScalar = "r"
+    }
 }
 
-struct OPRFTestVector: Codable {
-    let Batch: Int
-    let Blind: String
-    let BlindedElement: String
-    let EvaluationElement: String
-    let Info: String?
-    let Input: String
-    let Output: String
-    let Proof: DLEQProofVector?
-    let result: String?
-    let comment: String?
+struct OPRFTestVector: Decodable {
+    let batchSize: Int
+    let blinds: String
+    let blindedElements: String
+    let evaluatedElements: String
+    let info: String?
+    let inputs: String
+    let outputs: String
+    let proof: DLEQProofVector?
+
+    private enum CodingKeys: String, CodingKey {
+        case batchSize = "Batch"
+        case blinds = "Blind"
+        case blindedElements = "BlindedElement"
+        case evaluatedElements = "EvaluatedElement"
+        case info = "Info"
+        case inputs = "Input"
+        case outputs = "Output"
+        case proof = "Proof"
+    }
 }
 
-enum Result: String {
-    case success = "success"
-    case invalidProof = "invalidProof"
-    case invalidOPRFOutput = "invalidOPRFOutput"
+private enum OPRFVectorError: Error {
+    case invalidBatchField(field: String, expected: Int, actual: Int)
+    case invalidMode(Int)
+    case malformedProof
+    case unexpectedInfo
 }
 
-@available(macOS 10.15, iOS 13.2, tvOS 13.2, watchOS 6.1, macCatalyst 13.2, visionOS 1.2, *)
-class ECVOPRFTests: XCTestCase {
-    func testSuite<G: SupportedCurveDetailsImpl>(suite: OPRFSuite, C: G.Type, modeValue: Int, v8DraftCompatible: Bool) throws {
-        switch modeValue {
-        case OPRF.Mode.base.rawValue:
-            try testBaseSuite(suite: suite, C: C, v8DraftCompatible: v8DraftCompatible)
-        case OPRF.Mode.verifiable.rawValue:
-            try testVerifiableSuite(suite: suite, C: C, v8DraftCompatible: v8DraftCompatible, mode: .verifiable)
-        case OPRF.Mode.partiallyOblivious.rawValue:
-            try testVerifiableSuite(suite: suite, C: C, v8DraftCompatible: v8DraftCompatible, mode: .partiallyOblivious)
-        default:
-            fatalError("Unknown mode")
+final class ECVOPRFTests: XCTestCase {
+    private func decodeBatch(
+        _ encodedValues: String,
+        field: String,
+        expectedCount: Int
+    ) throws -> [Data] {
+        guard expectedCount > 0 else {
+            throw OPRFVectorError.invalidBatchField(
+                field: field,
+                expected: 1,
+                actual: expectedCount
+            )
+        }
+        let components = encodedValues.split(separator: ",", omittingEmptySubsequences: false)
+        guard components.count == expectedCount else {
+            throw OPRFVectorError.invalidBatchField(
+                field: field,
+                expected: expectedCount,
+                actual: components.count
+            )
+        }
+
+        var values: [Data] = []
+        values.reserveCapacity(components.count)
+        for component in components {
+            values.append(try Data(hexString: String(component)))
+        }
+        return values
+    }
+
+    private func proof<G: HashToGroupCurve>(
+        from vector: DLEQProofVector,
+        curve: G.Type
+    ) throws -> DLEQProof<PrimeOrderCurveGroup<G>.Scalar> {
+        guard vector.proof.count == 4 * G.orderByteCount else {
+            throw OPRFVectorError.malformedProof
+        }
+        let midpoint = vector.proof.index(vector.proof.startIndex, offsetBy: vector.proof.count / 2)
+        let challenge = try PrimeOrderCurveGroup<G>.Scalar(
+            canonicalRepresentation: Data(hexString: String(vector.proof[..<midpoint]))
+        )
+        let response = try PrimeOrderCurveGroup<G>.Scalar(
+            canonicalRepresentation: Data(hexString: String(vector.proof[midpoint...]))
+        )
+        return DLEQProof(challenge: challenge, response: response)
+    }
+
+    private func testSuite<G: HashToGroupCurve>(
+        _ suite: OPRFSuite,
+        curve: G.Type
+    ) throws {
+        guard let mode = OPRF.Mode(rawValue: suite.mode) else {
+            throw OPRFVectorError.invalidMode(suite.mode)
+        }
+        typealias HashToGroup = CurveHashToGroup<G>
+        let ciphersuite = OPRF.Ciphersuite<HashToGroup>()
+        let derivedKeyPair = try OPRF.deriveKeyPair(
+            seed: Data(hexString: suite.seed),
+            info: Data(hexString: suite.keyInfo),
+            mode: mode,
+            ciphersuite: ciphersuite
+        )
+        XCTAssertEqual(derivedKeyPair.privateKey.rawRepresentation.hexString, suite.privateKey)
+        if let publicKey = suite.publicKey {
+            XCTAssertEqual(derivedKeyPair.publicKey.oprfRepresentation.hexString, publicKey)
+        }
+        switch mode {
+        case .base:
+            try testBaseSuite(suite, curve: curve)
+        case .verifiable, .partiallyOblivious:
+            try testVerifiableSuite(suite, curve: curve, mode: mode)
         }
     }
 
-    func testBaseSuite<G: SupportedCurveDetailsImpl>(suite: OPRFSuite, C: G.Type, v8DraftCompatible: Bool) throws {
-        print("Testing \(suite.suiteName ?? suite.identifier!) in base mode.")
+    private func testBaseSuite<G: HashToGroupCurve>(
+        _ suite: OPRFSuite,
+        curve: G.Type
+    ) throws {
+        typealias Group = PrimeOrderCurveGroup<G>
+        typealias HashToGroup = CurveHashToGroup<G>
 
-        let privateKey = try GroupImpl<G>.Scalar(bytes: Data(hexString: suite.skSm))
-        let ciphersuite = OPRF.Ciphersuite(HashToCurveImpl<G>.self)
+        let privateKey = try Group.Scalar(canonicalRepresentation: Data(hexString: suite.privateKey))
+        let ciphersuite = OPRF.Ciphersuite<HashToGroup>()
+        let client = OPRF.Client(ciphersuite: ciphersuite)
+        let server = try OPRF.Server(ciphersuite: ciphersuite, privateKey: privateKey)
+
+        XCTAssertNil(suite.publicKey)
+        XCTAssertEqual(ciphersuite.identifier, suite.identifier)
+        XCTAssertEqual(
+            try Data(hexString: suite.groupDomainSeparationTag),
+            Self.hashToGroupDomainSeparationTag(mode: .base, ciphersuite: ciphersuite)
+        )
 
         for vector in suite.vectors {
-            if vector.Batch != 1 {
-                continue
+            guard vector.info == nil else {
+                throw OPRFVectorError.unexpectedInfo
+            }
+            let blinds = try decodeBatch(vector.blinds, field: "Blind", expectedCount: vector.batchSize)
+            let inputs = try decodeBatch(vector.inputs, field: "Input", expectedCount: vector.batchSize)
+            let expectedBlindedElements = try decodeBatch(
+                vector.blindedElements,
+                field: "BlindedElement",
+                expectedCount: vector.batchSize
+            )
+            let expectedEvaluatedElements = try decodeBatch(
+                vector.evaluatedElements,
+                field: "EvaluatedElement",
+                expectedCount: vector.batchSize
+            )
+            let expectedOutputs = try decodeBatch(vector.outputs, field: "Output", expectedCount: vector.batchSize)
+
+            var blindScalars: [Group.Scalar] = []
+            var blindedElements: [Group.Element] = []
+            blindScalars.reserveCapacity(vector.batchSize)
+            blindedElements.reserveCapacity(vector.batchSize)
+            for index in inputs.indices {
+                let expectedBlind = try Group.Scalar(canonicalRepresentation: blinds[index])
+                let result = try client.blindMessage(inputs[index], blind: expectedBlind)
+                XCTAssertEqual(result.blind, expectedBlind)
+                XCTAssertEqual(result.blindedElement.oprfRepresentation, expectedBlindedElements[index])
+                blindScalars.append(result.blind)
+                blindedElements.append(result.blindedElement)
             }
 
-            let client = OPRF.Client(mode: .base, ciphersuite: ciphersuite, v8CompatibilityMode: v8DraftCompatible)
-            let blindTestVector = try GroupImpl<G>.Scalar(bytes: Data(hexString: vector.Blind))
-            let input = try Data(hexString: vector.Input)
-
-            let (blind, blindedElement) = client.blindMessage(input, blind: blindTestVector)
-
-            XCTAssert(blindTestVector == blind)
-            XCTAssert(blindedElement.oprfRepresentation.hexString == vector.BlindedElement)
-
-            let server = OPRF.Server(mode: .base, ciphersuite: ciphersuite, privateKey: privateKey, v8CompatibilityMode: v8DraftCompatible)
-
-            var info = Data()
-            if vector.Info != nil { info = try Data(hexString: vector.Info!) }
-
-            let evaluate = try server.evaluate(blindedElement: blindedElement, info: info)
-
-            let evaluatedElementTv = try GroupImpl<G>.Element(oprfRepresentation: Data(hexString: vector.EvaluationElement))
-            XCTAssert(evaluate.0 == evaluatedElementTv)
-
-            let finalized = try client.finalize(message: input,
-                                                info: info,
-                                                blind: blind,
-                                                evaluatedElement: evaluate.0)
-
-            XCTAssert(finalized.hexString == vector.Output)
-            XCTAssert(try server.verifyFinalize(msg: input, output: finalized, info: info))
+            let evaluation = try server.evaluate(blindedElements: blindedElements)
+            XCTAssertNil(evaluation.1)
+            XCTAssertEqual(evaluation.0.count, vector.batchSize)
+            for index in inputs.indices {
+                XCTAssertEqual(evaluation.0[index].oprfRepresentation, expectedEvaluatedElements[index])
+                let output = try client.finalize(
+                    message: inputs[index],
+                    info: nil,
+                    blind: blindScalars[index],
+                    evaluatedElement: evaluation.0[index]
+                )
+                XCTAssertEqual(output, expectedOutputs[index])
+                XCTAssertTrue(
+                    try server.outputMatchesDirectEvaluation(
+                        message: inputs[index],
+                        output: output,
+                        info: nil
+                    )
+                )
+            }
         }
     }
 
-    func testVerifiableSuite<G: SupportedCurveDetailsImpl>(suite: OPRFSuite, C: G.Type, v8DraftCompatible: Bool, mode: OPRF.Mode) throws {
-        print("Testing \(suite.suiteName ?? suite.identifier!) in \(mode) mode.")
+    private func testVerifiableSuite<G: HashToGroupCurve>(
+        _ suite: OPRFSuite,
+        curve: G.Type,
+        mode: OPRF.Mode
+    ) throws {
+        typealias Group = PrimeOrderCurveGroup<G>
+        typealias HashToGroup = CurveHashToGroup<G>
 
-        let privateKey = try GroupImpl<G>.Scalar(bytes: Data(hexString: suite.skSm))
-        let ciphersuite = OPRF.Ciphersuite(HashToCurveImpl<G>.self)
+        let privateKey = try Group.Scalar(canonicalRepresentation: Data(hexString: suite.privateKey))
+        let ciphersuite = OPRF.Ciphersuite<HashToGroup>()
+        let client = try OPRF.VerifiableClient(ciphersuite: ciphersuite, mode: mode)
+        let server = try OPRF.VerifiableServer(
+            ciphersuite: ciphersuite,
+            privateKey: privateKey,
+            mode: mode
+        )
+
+        XCTAssertEqual(ciphersuite.identifier, suite.identifier)
+        XCTAssertEqual(
+            try Data(hexString: suite.groupDomainSeparationTag),
+            Self.hashToGroupDomainSeparationTag(mode: mode, ciphersuite: ciphersuite)
+        )
+        XCTAssertEqual(server.publicKey.oprfRepresentation, try Data(hexString: XCTUnwrap(suite.publicKey)))
 
         for vector in suite.vectors {
-            if vector.Batch != 1 {
-                continue
+            let proofVector = try XCTUnwrap(vector.proof)
+            let blinds = try decodeBatch(vector.blinds, field: "Blind", expectedCount: vector.batchSize)
+            let inputs = try decodeBatch(vector.inputs, field: "Input", expectedCount: vector.batchSize)
+            let expectedBlindedElements = try decodeBatch(
+                vector.blindedElements,
+                field: "BlindedElement",
+                expectedCount: vector.batchSize
+            )
+            let expectedEvaluatedElements = try decodeBatch(
+                vector.evaluatedElements,
+                field: "EvaluatedElement",
+                expectedCount: vector.batchSize
+            )
+            let expectedOutputs = try decodeBatch(vector.outputs, field: "Output", expectedCount: vector.batchSize)
+            let info = try vector.info.map(Data.init(hexString:))
+
+            if mode == .verifiable {
+                XCTAssertNil(info)
+            } else {
+                XCTAssertNotNil(info)
             }
 
-            let client = try! OPRF.VerifiableClient(ciphersuite: ciphersuite, v8CompatibilityMode: v8DraftCompatible, mode: mode)
-            let blindTestVector = try GroupImpl<G>.Scalar(bytes: Data(hexString: vector.Blind))
-            let input = try Data(hexString: vector.Input)
-
-            let (blind, blindedElement) = client.blindMessage(input, blind: blindTestVector)
-
-            XCTAssert(blindTestVector == blind)
-            XCTAssert(blindedElement.oprfRepresentation.hexString == vector.BlindedElement)
-
-            let server = try! OPRF.VerifiableServer(ciphersuite: ciphersuite, privateKey: privateKey, v8CompatibilityMode: v8DraftCompatible, mode: mode)
-            let proofBlind = try GroupImpl<G>.Scalar(bytes: Data(hexString: vector.Proof!.r))
-
-            var info: Data?
-            if (vector.Info?.count ?? 0) > 0 { info = try Data(hexString: vector.Info!) }
-
-            let evaluate = try server.evaluate(blindedElement: blindedElement, info: info, proofScalar: proofBlind)
-
-            let evaluatedElementTv = try GroupImpl<G>.Element(oprfRepresentation: Data(hexString: vector.EvaluationElement))
-            XCTAssert(evaluate.0 == evaluatedElementTv)
-
-            let proof_tv = vector.Proof!.proof
-            let c_tv = try GroupImpl<G>.Scalar(bytes: Data(hexString: String(proof_tv.prefix(proof_tv.count / 2))))
-            let s_tv = try GroupImpl<G>.Scalar(bytes: Data(hexString: String(proof_tv.suffix(proof_tv.count / 2))))
-            let proof = DLEQProof(c: c_tv, s: s_tv)
-
-            switch (vector.result) {
-            case .some(Result.invalidProof.rawValue): do {
-                XCTAssertThrowsError(try client.finalize(message: input,
-                                                         info: info,
-                                                         blind: blind,
-                                                         evaluatedElement: evaluate.0,
-                                                         proof: proof,
-                                                         publicKey: server.publicKey),
-                                     error: OPRF.Errors.invalidProof)
+            var blindScalars: [Group.Scalar] = []
+            var blindedElements: [Group.Element] = []
+            blindScalars.reserveCapacity(vector.batchSize)
+            blindedElements.reserveCapacity(vector.batchSize)
+            for index in inputs.indices {
+                let expectedBlind = try Group.Scalar(canonicalRepresentation: blinds[index])
+                let result = try client.blindMessage(inputs[index], blind: expectedBlind)
+                XCTAssertEqual(result.blind, expectedBlind)
+                XCTAssertEqual(result.blindedElement.oprfRepresentation, expectedBlindedElements[index])
+                blindScalars.append(result.blind)
+                blindedElements.append(result.blindedElement)
             }
-            case .some(Result.invalidOPRFOutput.rawValue): do {
-                XCTAssertFalse(try server.verifyFinalize(msg: input, output: Data(hexString: vector.Output), info: info))
+
+            let proofScalar = try Group.Scalar(canonicalRepresentation: Data(hexString: proofVector.proofScalar))
+            let evaluation = try server.evaluate(
+                blindedElements: blindedElements,
+                info: info,
+                proofScalar: proofScalar
+            )
+            XCTAssertEqual(evaluation.0.count, vector.batchSize)
+            for index in inputs.indices {
+                XCTAssertEqual(evaluation.0[index].oprfRepresentation, expectedEvaluatedElements[index])
             }
+
+            let expectedProof = try proof(from: proofVector, curve: curve)
+            XCTAssertEqual(evaluation.1.challenge, expectedProof.challenge)
+            XCTAssertEqual(evaluation.1.response, expectedProof.response)
+
+            let outputs = try client.finalize(
+                messages: inputs,
+                info: info,
+                blinds: blindScalars,
+                blindedElements: blindedElements,
+                evaluatedElements: evaluation.0,
+                proof: expectedProof,
+                publicKey: server.publicKey
+            )
+            XCTAssertEqual(outputs, expectedOutputs)
+            for index in inputs.indices {
+                XCTAssertTrue(
+                    try server.outputMatchesDirectEvaluation(
+                        message: inputs[index],
+                        output: outputs[index],
+                        info: info
+                    )
+                )
+            }
+        }
+    }
+
+    private static func hashToGroupDomainSeparationTag<H2G: HashToGroup>(
+        mode: OPRF.Mode,
+        ciphersuite: OPRF.Ciphersuite<H2G>
+    ) -> Data {
+        let prefix = Data("HashToGroup-".utf8)
+        let context = OPRF.protocolContext(mode: mode, ciphersuite: ciphersuite)
+        var domainSeparationTag = Data(capacity: prefix.count + context.count)
+        domainSeparationTag.append(prefix)
+        domainSeparationTag.append(context)
+        return domainSeparationTag
+    }
+
+    func testRFC9497Vectors() throws {
+        let suites = try OPRFSuite.loadRFC9497Vectors()
+        var testedSuiteCount = 0
+        var supportedVectorCount = 0
+        var supportedBatchVectorCount = 0
+        var unsupportedSuiteCount = 0
+        var unsupportedVectorCount = 0
+        var unsupportedIdentifiers = Set<String>()
+        var modesByIdentifier: [String: Set<Int>] = [:]
+
+        for suite in suites {
+            modesByIdentifier[suite.identifier, default: []].insert(suite.mode)
+            switch suite.identifier {
+            case CurveHashToGroup<P256>.oprfCiphersuiteIdentifier:
+                try testSuite(suite, curve: P256.self)
+                testedSuiteCount += 1
+                supportedVectorCount += suite.vectors.count
+                supportedBatchVectorCount += suite.vectors.filter { $0.batchSize == 2 }.count
+            case CurveHashToGroup<P384>.oprfCiphersuiteIdentifier:
+                try testSuite(suite, curve: P384.self)
+                testedSuiteCount += 1
+                supportedVectorCount += suite.vectors.count
+                supportedBatchVectorCount += suite.vectors.filter { $0.batchSize == 2 }.count
             default:
-                XCTAssert(c_tv == evaluate.1.c)
-                XCTAssert(s_tv == evaluate.1.s)
-                let finalized = try client.finalize(message: input,
-                                                    info: info,
-                                                    blind: blind,
-                                                    evaluatedElement: evaluate.0,
-                                                    proof: proof,
-                                                    publicKey: server.publicKey)
+                unsupportedIdentifiers.insert(suite.identifier)
+                unsupportedSuiteCount += 1
+                unsupportedVectorCount += suite.vectors.count
+            }
+        }
 
-                XCTAssert(finalized.hexString == vector.Output)
-                XCTAssert(try server.verifyFinalize(msg: input, output: finalized, info: info))
+        let expectedIdentifiers: Set<String> = [
+            "ristretto255-SHA512",
+            "decaf448-SHAKE256",
+            "P256-SHA256",
+            "P384-SHA384",
+            "P521-SHA512",
+        ]
+        XCTAssertEqual(suites.count, 15)
+        XCTAssertEqual(suites.reduce(0) { $0 + $1.vectors.count }, 40)
+        XCTAssertEqual(Set(modesByIdentifier.keys), expectedIdentifiers)
+        for identifier in expectedIdentifiers {
+            XCTAssertEqual(modesByIdentifier[identifier], [0, 1, 2])
+        }
+        XCTAssertEqual(testedSuiteCount, 6)
+        XCTAssertEqual(supportedVectorCount, 16)
+        XCTAssertEqual(supportedBatchVectorCount, 4)
+        XCTAssertEqual(unsupportedSuiteCount, 9)
+        XCTAssertEqual(unsupportedVectorCount, 24)
+        XCTAssertEqual(
+            unsupportedIdentifiers,
+            ["ristretto255-SHA512", "decaf448-SHAKE256", "P521-SHA512"]
+        )
+    }
+
+    func testProtocolFailuresAreExplicit() throws {
+        typealias HashToGroup = CurveHashToGroup<P256>
+        typealias Group = HashToGroup.G
+
+        let ciphersuite = OPRF.Ciphersuite<HashToGroup>()
+        XCTAssertThrowsError(
+            try OPRF.Server(ciphersuite: ciphersuite, privateKey: .zero),
+            error: OPRF.Errors.invalidScalar
+        )
+
+        let privateKey = Group.Scalar.random
+        let client = try OPRF.VerifiableClient(ciphersuite: ciphersuite, mode: .verifiable)
+        let server = try OPRF.VerifiableServer(
+            ciphersuite: ciphersuite,
+            privateKey: privateKey,
+            mode: .verifiable
+        )
+        let messages = [Data("first".utf8), Data("second".utf8)]
+        let blinds = [Group.Scalar.random, Group.Scalar.random]
+        var blindedElements: [Group.Element] = []
+        blindedElements.reserveCapacity(messages.count)
+        for index in messages.indices {
+            blindedElements.append(
+                try client.blindMessage(messages[index], blind: blinds[index]).blindedElement
+            )
+        }
+
+        XCTAssertThrowsError(
+            try server.evaluate(blindedElements: blindedElements, proofScalar: .zero),
+            error: OPRF.Errors.invalidScalar
+        )
+        XCTAssertThrowsError(
+            try server.evaluate(blindedElements: [Group.Element]()),
+            error: OPRF.Errors.emptyBatch
+        )
+        XCTAssertThrowsError(
+            try server.evaluate(blindedElements: blindedElements, info: Data()),
+            error: OPRF.Errors.invalidModeForInfo
+        )
+
+        let evaluation = try server.evaluate(blindedElements: blindedElements)
+        XCTAssertThrowsError(
+            try client.finalize(
+                messages: messages,
+                info: nil,
+                blinds: Array(blinds.dropLast()),
+                blindedElements: blindedElements,
+                evaluatedElements: evaluation.0,
+                proof: evaluation.1,
+                publicKey: server.publicKey
+            ),
+            error: OPRF.Errors.invalidBatchSize
+        )
+        XCTAssertThrowsError(
+            try client.finalize(
+                messages: messages,
+                info: nil,
+                blinds: blinds,
+                blindedElements: blindedElements,
+                evaluatedElements: Array(evaluation.0.reversed()),
+                proof: evaluation.1,
+                publicKey: server.publicKey
+            ),
+            error: OPRF.Errors.invalidProof
+        )
+
+        let baseClient = OPRF.Client(ciphersuite: ciphersuite)
+        XCTAssertThrowsError(
+            try baseClient.finalize(
+                message: messages[0],
+                info: nil,
+                blind: .zero,
+                evaluatedElement: evaluation.0[0]
+            ),
+            error: OPRF.Errors.invalidScalar
+        )
+        XCTAssertThrowsError(
+            try baseClient.finalize(
+                message: messages[0],
+                info: Data(),
+                blind: blinds[0],
+                evaluatedElement: evaluation.0[0]
+            ),
+            error: OPRF.Errors.invalidModeForInfo
+        )
+
+        let partiallyObliviousServer = try OPRF.VerifiableServer(
+            ciphersuite: ciphersuite,
+            privateKey: privateKey,
+            mode: .partiallyOblivious
+        )
+        XCTAssertThrowsError(
+            try partiallyObliviousServer.evaluate(blindedElements: blindedElements),
+            error: OPRF.Errors.missingInfo
+        )
+    }
+
+    func testProtocolLengthLimitsFailBeforeProcessing() throws {
+        typealias HashToGroup = CurveHashToGroup<P256>
+        let ciphersuite = OPRF.Ciphersuite<HashToGroup>()
+        let client = OPRF.Client(ciphersuite: ciphersuite)
+        let oversizedMessage = Data(repeating: 0, count: Int(UInt16.max) + 1)
+        XCTAssertThrowsError(
+            try client.blindMessage(oversizedMessage),
+            error: OPRF.Errors.messageTooLong
+        )
+
+        let oversizedInfo = Data(repeating: 0, count: Int(UInt16.max) + 1)
+        XCTAssertThrowsError(
+            try OPRF.hashInfoToScalar(
+                oversizedInfo,
+                domainSeparationTag: HashToGroup.hashToScalarDomainSeparationTag(
+                    context: Data()
+                ),
+                using: HashToGroup.self
+            ),
+            error: OPRF.Errors.infoTooLong
+        )
+
+        let secretScalar = HashToGroup.G.Scalar.random
+        let point = HashToGroup.G.Element.generator
+        let oversizedBatch = repeatElement(point, count: Int(UInt16.max) + 2)
+        XCTAssertThrowsError(
+            try DLEQ<HashToGroup>.prove(
+                secretScalar: secretScalar,
+                generator: point,
+                publicKey: secretScalar * point,
+                inputs: oversizedBatch,
+                outputs: oversizedBatch,
+                context: Data(),
+                hashToScalarDomainSeparationTag: HashToGroup.hashToScalarDomainSeparationTag(
+                    context: Data()
+                ),
+                proofScalar: .random
+            ),
+            error: OPRF.Errors.batchTooLarge
+        )
+    }
+
+    func testEmptyDLEQBatchFails() throws {
+        typealias HashToGroup = CurveHashToGroup<P256>
+        let secretScalar = HashToGroup.G.Scalar.random
+        XCTAssertThrowsError(
+            try DLEQ<HashToGroup>.prove(
+                secretScalar: secretScalar,
+                generator: HashToGroup.G.Element.generator,
+                publicKey: secretScalar * HashToGroup.G.Element.generator,
+                inputs: [HashToGroup.G.Element](),
+                outputs: [HashToGroup.G.Element](),
+                context: Data(),
+                hashToScalarDomainSeparationTag: HashToGroup.hashToScalarDomainSeparationTag(
+                    context: Data()
+                ),
+                proofScalar: .random
+            )
+        ) { error in
+            guard case OPRF.Errors.emptyBatch = error else {
+                return XCTFail("Expected emptyBatch, received \(error)")
             }
         }
     }
 
-    func testVectors() throws {
-        print("Testing VOPRF Draft8 vectors.")
-        try testVectors(filename: "OPRFVectors-VOPRFDraft8", v8DraftCompatible: true)
-        print("Testing VOPRF Draft19 vectors.")
-        try testVectors(filename: "OPRFVectors-VOPRFDraft19", v8DraftCompatible: false)
-        print("Testing VOPRF edge case vectors.")
-        try testVectors(filename: "OPRFVectors-edgecases", v8DraftCompatible: false)
-    }
-
-    func testVectors(filename: String, v8DraftCompatible: Bool) throws {
-        #if CRYPTO_IN_SWIFTPM
-        let bundle = Bundle.module
-        #else
-        let bundle = Bundle(for: type(of: self))
-        #endif
-
-        let fileURL = bundle.url(forResource: filename, withExtension: "json")
-
-        let data = try Data(contentsOf: fileURL!)
-        let decoder = JSONDecoder()
-        let suites = try decoder.decode([OPRFSuite].self, from: data)
-
-        if v8DraftCompatible {
-            for suite in suites {
-                switch (suite.suiteID, suite.mode) {
-                case (OPRF.Ciphersuite(HashToCurveImpl<P256>.self).suiteID, let modeValue): do {
-                    try testSuite(suite: suite, C: P256.self, modeValue: modeValue, v8DraftCompatible: v8DraftCompatible)
-                }
-                case (OPRF.Ciphersuite(HashToCurveImpl<P384>.self).suiteID, let modeValue): do {
-                    try testSuite(suite: suite, C: P384.self, modeValue: modeValue, v8DraftCompatible: v8DraftCompatible)
-                }
-//                case (OPRF.Ciphersuite(HashToCurveImpl<P521>.self).suiteID, let modeValue): do {
-//                    try testSuite(suite: suite, C: P521.self, modeValue: modeValue, v8DraftCompatible: v8DraftCompatible)
-//                }
-
-                default:
-                    print("Unsupported Ciphersuite: \(suite.suiteName ?? suite.identifier!)")
-                }
-            }
-        } else {
-            for suite in suites {
-                switch (suite.identifier, suite.mode) {
-                case (OPRF.Ciphersuite(HashToCurveImpl<P256>.self).stringIdentifier, let modeValue): do {
-                    try testSuite(suite: suite, C: P256.self, modeValue: modeValue, v8DraftCompatible: v8DraftCompatible)
-                }
-                case (OPRF.Ciphersuite(HashToCurveImpl<P384>.self).stringIdentifier, let modeValue): do {
-                    try testSuite(suite: suite, C: P384.self, modeValue: modeValue, v8DraftCompatible: v8DraftCompatible)
-                }
-//                case (OPRF.Ciphersuite(HashToCurveImpl<P521>.self).stringIdentifier, let modeValue): do {
-//                    try testSuite(suite: suite, C: P521.self, modeValue: modeValue, v8DraftCompatible: v8DraftCompatible)
-//                }
-
-                default:
-                    print("Unsupported Ciphersuite: \(suite.suiteName ?? suite.identifier!)")
-                }
+    func testZeroBlindFails() throws {
+        typealias HashToGroup = CurveHashToGroup<P256>
+        let client = OPRF.Client(ciphersuite: OPRF.Ciphersuite<HashToGroup>())
+        XCTAssertThrowsError(try client.blindMessage(Data("input".utf8), blind: .zero)) { error in
+            guard case OPRF.Errors.invalidScalar = error else {
+                return XCTFail("Expected invalidScalar, received \(error)")
             }
         }
     }
 
-    func testDistributivity() throws {
-        let r = GroupImpl<P256>.Scalar.random
+    func testDistributivity() {
+        let multiplier = PrimeOrderCurveGroup<P256>.Scalar.random
+        let first = PrimeOrderCurveGroup<P256>.Scalar.random
+        let second = PrimeOrderCurveGroup<P256>.Scalar.random
 
-        let a = GroupImpl<P256>.Scalar.random
-        let b = GroupImpl<P256>.Scalar.random
+        let sum = first + second
+        let firstProduct = first * multiplier
+        let secondProduct = second * multiplier
 
-        let ab = (a + b)
-        let ar = a * r
-        let br = b * r
-
-        XCTAssert(ab - b == a)
-        XCTAssert(ab - a == b)
-
-        let arbr = (ab) * r
-
-        XCTAssert(arbr - br == ar)
-        XCTAssert(arbr - ar == br)
+        XCTAssertEqual(sum - second, first)
+        XCTAssertEqual(sum - first, second)
+        XCTAssertEqual(sum * multiplier - secondProduct, firstProduct)
+        XCTAssertEqual(sum * multiplier - firstProduct, secondProduct)
     }
 
-    func testMath() throws {
-        let r = GroupImpl<P256>.Scalar.random
-        let k = GroupImpl<P256>.Scalar.random
-        let c = GroupImpl<P256>.Scalar.random
+    func testDLEQProof() throws {
+        typealias HashToGroup = CurveHashToGroup<P256>
+        let secretScalar = HashToGroup.G.Scalar.random
+        let generator = HashToGroup.G.Element.generator
+        let publicKey = secretScalar * generator
+        let input = HashToGroup.G.Element.random
+        let output = secretScalar * input
+        let hashToScalarDomainSeparationTag = HashToGroup.hashToScalarDomainSeparationTag(
+            context: Data()
+        )
 
-        let A = GroupImpl<P256>.Element.generator
-        let B = k * A
+        let proof = try DLEQ<HashToGroup>.prove(
+            secretScalar: secretScalar,
+            generator: generator,
+            publicKey: publicKey,
+            inputs: CollectionOfOne(input),
+            outputs: CollectionOfOne(output),
+            context: Data(),
+            hashToScalarDomainSeparationTag: hashToScalarDomainSeparationTag,
+            proofScalar: .random
+        )
 
-        let m = GroupImpl<P256>.Scalar.random
-        let z = k * m
-
-        let t2 = r * A
-        let t3 = r * m
-
-        let s = (r - c * k)
-        let t2_recontructed = (s * A) + (c * B)
-        let t3_reconstructed = ((s * m) + (c * z))
-
-        XCTAssert(t2 == t2_recontructed)
-        XCTAssert(t3.rawRepresentation == t3_reconstructed.rawRepresentation)
-    }
-
-    func testDLEQProver() throws {
-        let k = GroupImpl<P256>.Scalar.random
-        let A = GroupImpl<P256>.Element.generator
-        let B = k * A
-
-        let C = GroupImpl<P256>.Element.random
-        let D = k * C
-
-        let CDs = [(C: C, D: D)]
-
-        let proof = try DLEQ<HashToCurveImpl<P256>>.proveEquivalenceBetween(k: k, A: A, B: B, CDs: CDs, dst: Data(), proofScalar: .random, v8CompatibilityMode: false)
-
-        XCTAssert(try DLEQ<HashToCurveImpl<P256>>.verifyProof(A: A, B: B, CDs: CDs, proof: proof, dst: Data(), v8CompatibilityMode: false))
+        XCTAssertTrue(
+            try DLEQ<HashToGroup>.verify(
+                generator: generator,
+                publicKey: publicKey,
+                inputs: CollectionOfOne(input),
+                outputs: CollectionOfOne(output),
+                proof: proof,
+                context: Data(),
+                hashToScalarDomainSeparationTag: hashToScalarDomainSeparationTag
+            )
+        )
     }
 }

@@ -18,13 +18,12 @@ import FoundationEssentials
 import Foundation
 #endif
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 @usableFromInline
 func withCryptoUnsafeBytes<Bytes: ContiguousBytes, Result, E: Error>(
     _ bytes: Bytes,
     _ body: (UnsafeRawBufferPointer) throws(E) -> Result
 ) throws(E) -> Result {
-    #if hasFeature(Embedded) && !canImport(FoundationEssentials) && !canImport(Foundation)
+    #if !canImport(FoundationEssentials) && !canImport(Foundation)
     return try bytes.withUnsafeBytes(body)
     #else
     do {
@@ -39,13 +38,12 @@ func withCryptoUnsafeBytes<Bytes: ContiguousBytes, Result, E: Error>(
     #endif
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 @usableFromInline
 func withCryptoDataProtocolUnsafeBytes<Bytes: DataProtocol, Result, E: Error>(
     _ bytes: Bytes,
     _ body: (UnsafeRawBufferPointer) throws(E) -> Result
 ) throws(E) -> Result {
-    #if hasFeature(Embedded) && !canImport(FoundationEssentials) && !canImport(Foundation)
+    #if !canImport(FoundationEssentials) && !canImport(Foundation)
     if bytes.regions.count == 1 {
         return try bytes.regions.first!.withUnsafeBytes(body)
     }
@@ -68,7 +66,6 @@ func withCryptoDataProtocolUnsafeBytes<Bytes: DataProtocol, Result, E: Error>(
     #endif
 }
 
-@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 @usableFromInline
 func cryptoData<Bytes: ContiguousBytes>(_ bytes: Bytes) -> Data {
     bytes.withUnsafeBytes { buffer in

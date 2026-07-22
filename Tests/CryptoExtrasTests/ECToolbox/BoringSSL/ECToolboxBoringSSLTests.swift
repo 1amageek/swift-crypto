@@ -20,91 +20,55 @@ import FoundationEssentials
 import Foundation
 #endif
 
-#if !canImport(Darwin) || canImport(CryptoKit, _version: 241.100.42)
-// Corresponds to the CryptoKit in XCode 16.3, which has Sendable annotations
-import Crypto
 @testable import CryptoExtras
-#else
-@preconcurrency import Crypto
-@testable import CryptoExtras
-#endif
 
 final class ECToolboxBoringSSLTests: XCTestCase {
-    func testThreadLocalFFAC() async {
-        await testThreadLocalFFAC(P256.self)
-        await testThreadLocalFFAC(P384.self)
-        await testThreadLocalFFAC(P521.self)
+    func testSharedArithmeticContextSerializesConcurrentOperations() async {
+        await assertConcurrentArithmetic(P256.self)
+        await assertConcurrentArithmetic(P384.self)
     }
 
-    func testThreadLocalFFAC(_ Curve: (some OpenSSLSupportedNISTCurve & Sendable).Type) async {
-        let numThreads = 3
-        let numReadsPerThread = 2
-
-        var threads:
-            [(
-                thread: Thread,
-                thisThreadDidReads: XCTestExpectation,
-                allThreadsDidReads: XCTestExpectation,
-                thisThreadFinished: XCTestExpectation
-            )] = []
-
-        let objectIdentifiers: LockedBox<[(threadID: Int, ffacID: ObjectIdentifier)]> = .init(initialValue: [])
-
-        for i in 1...numThreads {
-            let thisThreadDidReads = expectation(description: "this thread did its reads")
-            let allThreadsDidReads = expectation(description: "all threads did their reads")
-            let thisThreadFinished = expectation(description: "this thread is finished")
-            let thread = Thread {
-                for _ in 1...numReadsPerThread {
-                    objectIdentifiers.withLockedValue {
-                        $0.append((i, ObjectIdentifier(Curve.__ffac)))
-                    }
+    private func assertConcurrentArithmetic<Curve: HashToGroupCurve & Sendable>(
+        _ curve: Curve.Type
+    ) async {
+        typealias Scalar = PrimeOrderCurveGroup<Curve>.Scalar
+        let expectedContextIdentifier = ObjectIdentifier(Curve.arithmeticContext)
+        let results = await withTaskGroup(of: ArithmeticResult.self, returning: [ArithmeticResult].self) { group in
+            for _ in 0..<64 {
+                group.addTask {
+                    let lhs = Scalar.random
+                    let rhs = Scalar.random
+                    let sum = lhs + rhs
+                    let restored = sum - rhs
+                    let generator = PrimeOrderCurveGroup<Curve>.Element.generator
+                    let point = lhs * generator
+                    return ArithmeticResult(
+                        contextIdentifier: ObjectIdentifier(Curve.arithmeticContext),
+                        scalarRoundTripSucceeded: restored == lhs,
+                        pointMultiplicationSucceeded: point == lhs * generator
+                    )
                 }
-                thisThreadDidReads.fulfill()
-                XCTWaiter().wait(for: [allThreadsDidReads], timeout: .greatestFiniteMagnitude)
-                thisThreadFinished.fulfill()
             }
-            thread.name = "thread-\(i)"
-            threads.append((thread, thisThreadDidReads, allThreadsDidReads, thisThreadFinished))
-            thread.start()
-        }
-        await fulfillment(of: threads.map(\.thisThreadDidReads), timeout: 0.5)
-        for thread in threads { thread.allThreadsDidReads.fulfill() }
-        await fulfillment(of: threads.map(\.thisThreadFinished), timeout: 0.5)
 
-        objectIdentifiers.withLockedValue { objectIdentifiers in
-            XCTAssertEqual(objectIdentifiers.count, numThreads * numReadsPerThread)
-            for threadID in 1...numThreads {
-                let partitionBoundary = objectIdentifiers.partition(by: { $0.threadID == threadID })
-                let otherThreadsObjIDs = objectIdentifiers[..<partitionBoundary].map(\.ffacID)
-                let thisThreadObjIDs = objectIdentifiers[partitionBoundary...].map(\.ffacID)
-                let intersection = Set(thisThreadObjIDs).intersection(Set(otherThreadsObjIDs))
-                XCTAssertEqual(
-                    thisThreadObjIDs.count,
-                    numReadsPerThread,
-                    "Thread should read \(numReadsPerThread) times."
-                )
-                XCTAssertEqual(Set(thisThreadObjIDs).count, 1, "Thread should see same object on every read.")
-                XCTAssert(intersection.isEmpty, "Thread should see different objects from other threads.")
+            var results: [ArithmeticResult] = []
+            results.reserveCapacity(64)
+            for await result in group {
+                results.append(result)
             }
+            return results
+        }
+
+        XCTAssertEqual(results.count, 64)
+        for result in results {
+            XCTAssertEqual(result.contextIdentifier, expectedContextIdentifier)
+            XCTAssertTrue(result.scalarRoundTripSucceeded)
+            XCTAssertTrue(result.pointMultiplicationSucceeded)
         }
     }
 }
 
-final class LockedBox<Value: Sendable>: @unchecked Sendable {
-    private let lock: NSLock
-    private var value: Value
-
-    init(initialValue: Value) {
-        self.value = initialValue
-        self.lock = NSLock()
-    }
-
-    func withLockedValue<ReturnType>(_ body: (inout Value) throws -> ReturnType) rethrows -> ReturnType {
-        self.lock.lock()
-        defer {
-            self.lock.unlock()
-        }
-        return try body(&self.value)
-    }
+private struct ArithmeticResult: Sendable {
+    let contextIdentifier: ObjectIdentifier
+    let scalarRoundTripSucceeded: Bool
+    let pointMultiplicationSucceeded: Bool
 }
