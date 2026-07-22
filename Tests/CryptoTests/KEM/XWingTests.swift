@@ -90,6 +90,19 @@ final class XWingTests: XCTestCase {
         let exportedFormat = privateKey.integrityCheckedRepresentation
         let importedKey = try XWingMLKEM768X25519.PrivateKey.init(integrityCheckedRepresentation: exportedFormat)
         XCTAssertEqual(importedKey.seedRepresentation, privateKey.seedRepresentation)
+
+        XCTAssertThrowsError(
+            try XWingMLKEM768X25519.PrivateKey(
+                integrityCheckedRepresentation: Data(repeating: 0, count: 63)
+            ),
+            error: CryptoKitError.incorrectKeySize
+        )
+        XCTAssertThrowsError(
+            try XWingMLKEM768X25519.PrivateKey(
+                integrityCheckedRepresentation: Data(repeating: 0, count: 65)
+            ),
+            error: CryptoKitError.incorrectKeySize
+        )
     }
 }
 

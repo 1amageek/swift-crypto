@@ -54,10 +54,12 @@ extension P521: OpenSSLSupportedNISTCurve {
 }
 
 @usableFromInline
-struct OpenSSLNISTCurvePrivateKeyImpl<Curve: OpenSSLSupportedNISTCurve>: Sendable {
+struct OpenSSLNISTCurvePrivateKeyImpl<Curve>: Sendable {
     @usableFromInline
     var key: BoringSSLECPrivateKeyWrapper<Curve>
+}
 
+extension OpenSSLNISTCurvePrivateKeyImpl where Curve: OpenSSLSupportedNISTCurve {
     init(compactRepresentable: Bool = true) {
         self.key = try! BoringSSLECPrivateKeyWrapper(compactRepresentable: compactRepresentable)
     }
@@ -84,10 +86,12 @@ struct OpenSSLNISTCurvePrivateKeyImpl<Curve: OpenSSLSupportedNISTCurve>: Sendabl
 }
 
 @usableFromInline
-struct OpenSSLNISTCurvePublicKeyImpl<Curve: OpenSSLSupportedNISTCurve>: Sendable {
+struct OpenSSLNISTCurvePublicKeyImpl<Curve>: Sendable {
     @usableFromInline
     var key: BoringSSLECPublicKeyWrapper<Curve>
+}
 
+extension OpenSSLNISTCurvePublicKeyImpl where Curve: OpenSSLSupportedNISTCurve {
     init<Bytes: ContiguousBytes>(compactRepresentation: Bytes) throws(CryptoBoringWrapperError) {
         self.key = try BoringSSLECPublicKeyWrapper(compactRepresentation: cryptoData(compactRepresentation))
     }
@@ -133,14 +137,25 @@ struct OpenSSLNISTCurvePublicKeyImpl<Curve: OpenSSLSupportedNISTCurve>: Sendable
 /// A simple wrapper for an EC_KEY pointer for a private key. This manages the lifetime of that pointer and
 /// allows some helper operations.
 @usableFromInline
-final class BoringSSLECPrivateKeyWrapper<Curve: OpenSSLSupportedNISTCurve>: @unchecked Sendable {
+final class BoringSSLECPrivateKeyWrapper<Curve>: @unchecked Sendable {
     @usableFromInline
     let key: OpaquePointer
 
-    init(compactRepresentable: Bool) throws(CryptoBoringWrapperError) {
+    @usableFromInline
+    init(takingOwnershipOf key: OpaquePointer) {
+        self.key = key
+    }
+
+    deinit {
+        CCryptoBoringSSL_EC_KEY_free(self.key)
+    }
+}
+
+extension BoringSSLECPrivateKeyWrapper where Curve: OpenSSLSupportedNISTCurve {
+    convenience init(compactRepresentable: Bool) throws(CryptoBoringWrapperError) {
         // We cannot handle allocation failure.
         let group = Curve.group
-        self.key = try! group.makeUnsafeOwnedECKey()
+        self.init(takingOwnershipOf: try! group.makeUnsafeOwnedECKey())
 
         // If we've been asked to generate a compact representable key, we need to try a few times. This loop shouldn't
         // execute more than 100 times: if it does, we'll crash because something bad is happening.
@@ -165,7 +180,7 @@ final class BoringSSLECPrivateKeyWrapper<Curve: OpenSSLSupportedNISTCurve>: @unc
         fatalError("Looped more than 100 times trying to generate a key")
     }
 
-    init(x963Representation bytes: Data) throws(CryptoBoringWrapperError) {
+    convenience init(x963Representation bytes: Data) throws(CryptoBoringWrapperError) {
         // Before we do anything, we validate that the x963 representation has the right number of bytes.
         // This is because BoringSSL will quietly accept shorter byte counts, though it will reject longer ones.
         // This brings our behaviour into line with CryptoKit
@@ -175,7 +190,7 @@ final class BoringSSLECPrivateKeyWrapper<Curve: OpenSSLSupportedNISTCurve>: @unc
             throw CryptoBoringWrapperError.incorrectParameterSize
         }
 
-        self.key = try group.makeUnsafeOwnedECKey()
+        self.init(takingOwnershipOf: try group.makeUnsafeOwnedECKey())
 
         // First, try to grab the numbers.
         var (x, y, k) = try bytes.readx963PrivateNumbers()
@@ -186,7 +201,7 @@ final class BoringSSLECPrivateKeyWrapper<Curve: OpenSSLSupportedNISTCurve>: @unc
         try self.setPublicKey(x: &x, y: &y)
     }
 
-    init(rawRepresentation bytes: Data) throws(CryptoBoringWrapperError) {
+    convenience init(rawRepresentation bytes: Data) throws(CryptoBoringWrapperError) {
         let group = Curve.group
 
         // Before we do anything, we validate that the raw representation has the right number of bytes.
@@ -197,7 +212,7 @@ final class BoringSSLECPrivateKeyWrapper<Curve: OpenSSLSupportedNISTCurve>: @unc
             throw CryptoBoringWrapperError.incorrectParameterSize
         }
 
-        self.key = try group.makeUnsafeOwnedECKey()
+        self.init(takingOwnershipOf: try group.makeUnsafeOwnedECKey())
 
         // The raw representation is just the bytes that make up k.
         let k = try Crypto.withUnsafeBytes(of: bytes) { (bytesPointer) throws(CryptoBoringWrapperError) in
@@ -244,9 +259,10 @@ final class BoringSSLECPrivateKeyWrapper<Curve: OpenSSLSupportedNISTCurve>: @unc
     }
 
     var publicKey: BoringSSLECPublicKeyWrapper<Curve> {
-        // This is a weird little trick we can do here: because EC_KEY is both private and public depending on
-        // its internal state, we can just vend a pointer to ourself and this will work.
-        try! BoringSSLECPublicKeyWrapper(unsafeTakingOwnership: CCryptoBoringSSL_EC_KEY_dup(self.key))
+        // The public key owns an independent EC_KEY containing only the public
+        // point. Duplicating the private EC_KEY would also duplicate and retain
+        // the private scalar across a public-key ownership boundary.
+        try! BoringSSLECPublicKeyWrapper(publicKeyOf: self)
     }
 
     @usableFromInline
@@ -331,19 +347,44 @@ final class BoringSSLECPrivateKeyWrapper<Curve: OpenSSLSupportedNISTCurve>: @unc
         return ECDSASignature(takingOwnershipOf: rawSignature)
     }
 
-    deinit {
-        CCryptoBoringSSL_EC_KEY_free(self.key)
-    }
 }
 
 /// A simple wrapper for an EC_KEY pointer for a public key. This manages the lifetime of that pointer and
 /// allows some helper operations.
 @usableFromInline
-final class BoringSSLECPublicKeyWrapper<Curve: OpenSSLSupportedNISTCurve>: @unchecked Sendable {
+final class BoringSSLECPublicKeyWrapper<Curve>: @unchecked Sendable {
     @usableFromInline
     let key: OpaquePointer
 
-    init(compactRepresentation bytes: Data) throws(CryptoBoringWrapperError) {
+    @usableFromInline
+    init(takingOwnershipOf key: OpaquePointer) {
+        self.key = key
+    }
+
+    deinit {
+        CCryptoBoringSSL_EC_KEY_free(self.key)
+    }
+}
+
+extension BoringSSLECPublicKeyWrapper where Curve: OpenSSLSupportedNISTCurve {
+    convenience init(
+        publicKeyOf privateKey: BoringSSLECPrivateKeyWrapper<Curve>
+    ) throws(CryptoBoringWrapperError) {
+        let ownedKey = try Curve.group.makeUnsafeOwnedECKey()
+        guard let publicPoint = CCryptoBoringSSL_EC_KEY_get0_public_key(
+            privateKey.key
+        ) else {
+            CCryptoBoringSSL_EC_KEY_free(ownedKey)
+            throw CryptoBoringWrapperError.internalBoringSSLError()
+        }
+        guard CCryptoBoringSSL_EC_KEY_set_public_key(ownedKey, publicPoint) == 1 else {
+            CCryptoBoringSSL_EC_KEY_free(ownedKey)
+            throw CryptoBoringWrapperError.internalBoringSSLError()
+        }
+        self.init(takingOwnershipOf: ownedKey)
+    }
+
+    convenience init(compactRepresentation bytes: Data) throws(CryptoBoringWrapperError) {
         let group = Curve.group
 
         // Before we do anything, we validate that the compact representation has the right number of bytes.
@@ -354,7 +395,7 @@ final class BoringSSLECPublicKeyWrapper<Curve: OpenSSLSupportedNISTCurve>: @unch
             throw CryptoBoringWrapperError.incorrectParameterSize
         }
 
-        self.key = try group.makeUnsafeOwnedECKey()
+        self.init(takingOwnershipOf: try group.makeUnsafeOwnedECKey())
 
         // The compact representation is simply the X coordinate: deserializing then requires us to do a little math,
         // as discussed in https://datatracker.ietf.org/doc/html/draft-jivsov-ecc-compact-05#section-4.1
@@ -380,7 +421,7 @@ final class BoringSSLECPublicKeyWrapper<Curve: OpenSSLSupportedNISTCurve>: @unch
         try self.setPublicKey(x: &x, y: &y)
     }
 
-    init(x963Representation bytes: Data) throws(CryptoBoringWrapperError) {
+    convenience init(x963Representation bytes: Data) throws(CryptoBoringWrapperError) {
         // Before we do anything, we validate that the x963 representation has the right number of bytes.
         // This is because BoringSSL will quietly accept shorter byte counts, though it will reject longer ones.
         // This brings our behaviour into line with CryptoKit
@@ -390,7 +431,7 @@ final class BoringSSLECPublicKeyWrapper<Curve: OpenSSLSupportedNISTCurve>: @unch
         switch length {
         case (group.coordinateByteCount * 2) + 1:
             var (x, y) = try bytes.readx963PublicNumbers()
-            self.key = try group.makeUnsafeOwnedECKey()
+            self.init(takingOwnershipOf: try group.makeUnsafeOwnedECKey())
             try self.setPublicKey(x: &x, y: &y)
 
         default:
@@ -398,14 +439,14 @@ final class BoringSSLECPublicKeyWrapper<Curve: OpenSSLSupportedNISTCurve>: @unch
         }
     }
 
-    init(compressedRepresentation bytes: Data) throws(CryptoBoringWrapperError) {
+    convenience init(compressedRepresentation bytes: Data) throws(CryptoBoringWrapperError) {
         let group = Curve.group
         let length = bytes.withUnsafeBytes { $0.count }
 
         switch length {
         case group.coordinateByteCount + 1:
             var (x, yBit) = try bytes.readx963CompressedPublicNumbers()
-            self.key = try group.makeUnsafeOwnedECKey()
+            self.init(takingOwnershipOf: try group.makeUnsafeOwnedECKey())
             try self.setPublicKey(x: &x, yBit: yBit)
 
         default:
@@ -413,7 +454,7 @@ final class BoringSSLECPublicKeyWrapper<Curve: OpenSSLSupportedNISTCurve>: @unch
         }
     }
 
-    init(rawRepresentation bytes: Data) throws(CryptoBoringWrapperError) {
+    convenience init(rawRepresentation bytes: Data) throws(CryptoBoringWrapperError) {
         let group = Curve.group
 
         // Before we do anything, we validate that the raw representation has the right number of bytes.
@@ -424,7 +465,7 @@ final class BoringSSLECPublicKeyWrapper<Curve: OpenSSLSupportedNISTCurve>: @unch
             throw CryptoBoringWrapperError.incorrectParameterSize
         }
 
-        self.key = try group.makeUnsafeOwnedECKey()
+        self.init(takingOwnershipOf: try group.makeUnsafeOwnedECKey())
 
         // The raw representation is identical to the x963 representation, without the leading 0x4.
         var (x, y): (ArbitraryPrecisionInteger, ArbitraryPrecisionInteger) = try Crypto.withUnsafeBytes(of: bytes) { (bytesPtr) throws(CryptoBoringWrapperError) in
@@ -437,7 +478,7 @@ final class BoringSSLECPublicKeyWrapper<Curve: OpenSSLSupportedNISTCurve>: @unch
 
     /// Takes ownership of the pointer. If this throws, ownership of the pointer has not been taken.
     @usableFromInline
-    init(unsafeTakingOwnership ownedPointer: OpaquePointer) throws(CryptoBoringWrapperError) {
+    convenience init(unsafeTakingOwnership ownedPointer: OpaquePointer) throws(CryptoBoringWrapperError) {
         guard let newKeyGroup = CCryptoBoringSSL_EC_KEY_get0_group(ownedPointer) else {
             throw CryptoBoringWrapperError.internalBoringSSLError()
         }
@@ -448,7 +489,7 @@ final class BoringSSLECPublicKeyWrapper<Curve: OpenSSLSupportedNISTCurve>: @unch
             throw CryptoBoringWrapperError.incorrectParameterSize
         }
 
-        self.key = ownedPointer
+        self.init(takingOwnershipOf: ownedPointer)
     }
 
     @inlinable
@@ -502,10 +543,6 @@ final class BoringSSLECPublicKeyWrapper<Curve: OpenSSLSupportedNISTCurve>: @unch
         let yMask = bytes.last! & 0x1
         bytes[0] = 0x2 | yMask
         return bytes.dropLast(Curve.group.coordinateByteCount)
-    }
-
-    deinit {
-        CCryptoBoringSSL_EC_KEY_free(self.key)
     }
 
     @usableFromInline

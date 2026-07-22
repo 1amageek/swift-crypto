@@ -26,38 +26,42 @@ import CryptoKit
 
 internal struct ANSIKDFx963<H: HashFunction>: Sendable {
     public static func deriveKey<Info: DataProtocol>(inputKeyMaterial: SymmetricKey, info: Info, outputByteCount: Int) -> SymmetricKey {
-        
-        guard UInt64(outputByteCount) < (UInt64(H.Digest.byteCount) * UInt64(UInt32.max)) else {
-            fatalError("Invalid parameter size")
-        }
-        
+        precondition(H.Digest.byteCount > 0)
+        precondition(outputByteCount >= 0)
+        let maximumOutputByteCount = UInt64(H.Digest.byteCount) * UInt64(UInt32.max)
+        precondition(UInt64(outputByteCount) <= maximumOutputByteCount)
+
+        // Build into owned secure storage so the result outlives every borrowed
+        // digest. SymmetricKey reuses the copy-on-write backing without copying.
         var key = SecureBytes()
         key.reserveCapacity(outputByteCount)
-        
-        var remainingBytes = outputByteCount
         var counter = UInt32(1)
-        
-        while remainingBytes > 0 {
+
+        while key.count < outputByteCount {
             // 1. Compute: Ki = Hash(Z || Counter || [SharedInfo]).
             var hasher = H()
-            inputKeyMaterial.withUnsafeBytes { ikmBytes in
-                hasher.update(bytes: ikmBytes.bytes)
+            inputKeyMaterial.withUnsafeBytes { inputKeyMaterialBytes in
+                hasher.update(bytes: inputKeyMaterialBytes.bytes)
             }
             hasher.update(counter.bigEndian)
             hasher.update(data: info)
             let digest = hasher.finalize()
-            
-            // 2. Increment Counter.
-            counter += 1
-            
-            // Append the bytes of the digest. We don't want to append more than the remaining number of bytes.
-            let bytesToAppend = min(remainingBytes, H.Digest.byteCount)
-            digest.withUnsafeBytes { digestPtr in
-                key.append(digestPtr.bytes.extracting(first: bytesToAppend))
+
+            // Append only the requested prefix of the final digest.
+            let remainingByteCount = outputByteCount - key.count
+            let digestByteCount = min(remainingByteCount, H.Digest.byteCount)
+            digest.withUnsafeBytes { digestBytes in
+                key.append(
+                    digestBytes.bytes.extracting(first: digestByteCount)
+                )
             }
-            remainingBytes -= bytesToAppend
+
+            // 2. Increment Counter when another digest block is needed.
+            if key.count < outputByteCount {
+                counter += 1
+            }
         }
-        
+
         precondition(key.count == outputByteCount)
         return SymmetricKey(data: key)
     }

@@ -138,23 +138,37 @@ extension XWingMLKEM768X25519.PrivateKey: HPKEKEMPrivateKeyGeneration {
     }
 
     public init<D: DataProtocol>(seedRepresentation: D, publicKey: XWingMLKEM768X25519.PublicKey?) throws(CryptoKitMetaError) {
-        var publicKeyHash: SHA3_256Digest? = nil
-        if publicKey != nil {
-            publicKeyHash = SHA3_256.hash(data: publicKey!.rawRepresentation)
-        }
+        let publicKeyHash = publicKey.map { SHA3_256.hash(data: $0.rawRepresentation) }
 
         self = try XWingMLKEM768X25519.PrivateKey.init(seedRepresentation: seedRepresentation, publicKeyHash: publicKeyHash)
     }
 
     public init<D: DataProtocol>(integrityCheckedRepresentation: D) throws(CryptoKitMetaError) {
-        let seed = Data(integrityCheckedRepresentation.dropLast(32)) // sizeof(SHA3-256 digest)
-        let publicKeyHashBytes = Data(integrityCheckedRepresentation.dropFirst(32))
-        let publicKeyHash = SHA3_256Digest { output in
-            for region in publicKeyHashBytes.regions {
-                region.withUnsafeBytes {
-                    output.append(contentsOf: $0.bytes)
-                }
+        let digestByteCount = SHA3_256Digest.byteCount
+        guard integrityCheckedRepresentation.count == digestByteCount * 2 else {
+            throw error(CryptoKitError.incorrectKeySize)
+        }
+
+        // This fixed-size public representation is the ownership boundary for
+        // the backend. Materialize it once instead of extending borrowed region
+        // lifetimes across the key implementation boundary.
+        var representation = Data()
+        representation.reserveCapacity(integrityCheckedRepresentation.count)
+        for region in integrityCheckedRepresentation.regions {
+            region.withUnsafeBytes { bytes in
+                representation.append(contentsOf: bytes)
             }
+        }
+        let splitIndex = representation.index(
+            representation.startIndex,
+            offsetBy: digestByteCount
+        )
+        let seed = representation[..<splitIndex]
+        let publicKeyHash = representation[splitIndex...].withUnsafeBytes { bytes in
+            SHA3_256Digest(copying: bytes.bytes)
+        }
+        guard let publicKeyHash else {
+            throw error(CryptoKitError.incorrectKeySize)
         }
 
         self = try XWingMLKEM768X25519.PrivateKey.init(seedRepresentation: seed, publicKeyHash: publicKeyHash)

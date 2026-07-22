@@ -41,7 +41,90 @@ class HPKETests: XCTestCase {
 
     func testMismatchedKEM() {
         let skR = P256.KeyAgreement.PrivateKey()
-        XCTAssertThrowsError(try HPKE.Sender(recipientKey: skR.publicKey, ciphersuite: .P384_SHA384_AES_GCM_256, info: Data()))
+        XCTAssertThrowsError(
+            try HPKE.Sender(
+                recipientKey: skR.publicKey,
+                ciphersuite: .P384_SHA384_AES_GCM_256,
+                info: Data()
+            ),
+            error: HPKE.Errors.inconsistentCiphersuiteAndKey
+        )
+    }
+
+    func testExportOnlyCiphersuite() throws {
+        let recipientKey = Curve25519.KeyAgreement.PrivateKey()
+        let ciphersuite = HPKE.Ciphersuite(
+            kem: .Curve25519_HKDF_SHA256,
+            kdf: .HKDF_SHA256,
+            aead: .exportOnly
+        )
+        var sender = try HPKE.Sender(
+            recipientKey: recipientKey.publicKey,
+            ciphersuite: ciphersuite,
+            info: Data()
+        )
+        var recipient = try HPKE.Recipient(
+            privateKey: recipientKey,
+            ciphersuite: ciphersuite,
+            info: Data(),
+            encapsulatedKey: sender.encapsulatedKey
+        )
+
+        XCTAssertEqual(
+            try sender.exportSecret(context: Data(), outputByteCount: 32),
+            try recipient.exportSecret(context: Data(), outputByteCount: 32)
+        )
+        XCTAssertThrowsError(
+            try sender.seal(Data()),
+            error: HPKE.Errors.exportOnlyMode
+        )
+        XCTAssertThrowsError(
+            try recipient.open(Data()),
+            error: HPKE.Errors.exportOnlyMode
+        )
+    }
+
+    func testExportSecretMaximumLength() throws {
+        let recipientKey = Curve25519.KeyAgreement.PrivateKey()
+        let ciphersuite = HPKE.Ciphersuite.Curve25519_SHA256_ChachaPoly
+        let sender = try HPKE.Sender(
+            recipientKey: recipientKey.publicKey,
+            ciphersuite: ciphersuite,
+            info: Data()
+        )
+        let recipient = try HPKE.Recipient(
+            privateKey: recipientKey,
+            ciphersuite: ciphersuite,
+            info: Data(),
+            encapsulatedKey: sender.encapsulatedKey
+        )
+        let maximumOutputByteCount = ciphersuite.kdf.Nh * 255
+
+        XCTAssertEqual(
+            try sender.exportSecret(context: Data(), outputByteCount: maximumOutputByteCount),
+            try recipient.exportSecret(context: Data(), outputByteCount: maximumOutputByteCount)
+        )
+    }
+
+    func testShortCiphertextError() throws {
+        let recipientKey = Curve25519.KeyAgreement.PrivateKey()
+        let ciphersuite = HPKE.Ciphersuite.Curve25519_SHA256_ChachaPoly
+        let sender = try HPKE.Sender(
+            recipientKey: recipientKey.publicKey,
+            ciphersuite: ciphersuite,
+            info: Data()
+        )
+        var recipient = try HPKE.Recipient(
+            privateKey: recipientKey,
+            ciphersuite: ciphersuite,
+            info: Data(),
+            encapsulatedKey: sender.encapsulatedKey
+        )
+
+        XCTAssertThrowsError(
+            try recipient.open(Data()),
+            error: HPKE.Errors.ciphertextTooShort
+        )
     }
 
     func testCiphersuite(_ ciphersuite: HPKE.Ciphersuite) throws {
@@ -57,7 +140,7 @@ class HPKETests: XCTestCase {
         case .XWingMLKEM768X25519:
             try testHPKECiphersuite(ciphersuite, withKeys: XWingMLKEM768X25519.PrivateKey.self)
         @unknown default:
-            fatalError()
+            XCTFail("Unsupported KEM: \(ciphersuite.kem)")
         }
     }
 

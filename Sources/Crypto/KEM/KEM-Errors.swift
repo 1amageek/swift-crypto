@@ -30,4 +30,6 @@ extension KEM {
     }
 }
 
+extension KEM.Errors: Equatable, Hashable {}
+
 #endif // canImport(CryptoKit)

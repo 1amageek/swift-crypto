@@ -102,7 +102,7 @@ extension HPKE {
         
         internal func open<C: DataProtocol, AD: DataProtocol>(_ ct: C, nonce: Data, authenticating aad: AD, using key: SymmetricKey) throws(CryptoKitMetaError) -> Data {
             guard ct.count >= self.tagByteCount else {
-                throw error(HPKE.Errors.expectedPSK)
+                throw error(HPKE.Errors.ciphertextTooShort)
             }
             
             switch self {

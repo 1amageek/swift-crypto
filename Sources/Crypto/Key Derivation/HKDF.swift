@@ -54,12 +54,21 @@ public struct HKDF<H: HashFunction>: Sendable {
                                  salt: RawSpan? = nil,
                                  info: RawSpan? = nil,
                                  output outputKey: inout OutputRawSpan) {
-        let code = extract(inputKeyMaterial: inputKeyMaterial, salt: salt)
-        code.withUnsafeBytes { codeBytes in
-            expand(
+        preconditionValidOutputByteCount(outputKey.freeCapacity)
+        withExtractedKeyBytes(
+            salt: salt,
+            updateInputKeyMaterial: { authenticator in
+                authenticator.update(bytes: inputKeyMaterial.bytes)
+            }
+        ) { codeBytes in
+            expandValidated(
                 pseudoRandomKey: codeBytes.bytes,
-                info: info,
-                into: &outputKey
+                into: &outputKey,
+                updateInfo: { authenticator in
+                    if let info {
+                        authenticator.update(bytes: info)
+                    }
+                }
             )
         }
     }
@@ -81,32 +90,23 @@ public struct HKDF<H: HashFunction>: Sendable {
         info: Info,
         outputByteCount: Int
     ) -> SymmetricKey {
-        // Fast path: Both salt and info have a single contiguous region, so
-        // go directly to the span.
-        if salt.regions.count == 1 && info.regions.count == 1 {
-            return salt.regions.first!.withUnsafeBytes { saltBytes in
-                info.regions.first!.withUnsafeBytes { infoBytes in
-                    SymmetricKey(size: SymmetricKeySize(bitCount: outputByteCount * 8)) { output in
-                        deriveKey(
-                            inputKeyMaterial: inputKeyMaterial,
-                            salt: saltBytes.bytes,
-                            info: infoBytes.bytes,
-                            output: &output
-                        )
-                    }
+        preconditionValidOutputByteCount(outputByteCount)
+        return SymmetricKey(capacity: outputByteCount) { output in
+            withExtractedKeyBytes(
+                salt: Optional(salt),
+                updateInputKeyMaterial: { authenticator in
+                    authenticator.update(bytes: inputKeyMaterial.bytes)
                 }
+            ) { codeBytes in
+                expandValidated(
+                    pseudoRandomKey: codeBytes.bytes,
+                    into: &output,
+                    updateInfo: { authenticator in
+                        authenticator.update(data: info)
+                    }
+                )
             }
         }
-
-        // Turn salt and info into contiguous regions, then recurse.
-        let contiguousSalt = Array(salt)
-        let contiguousInfo = Array(info)
-        return deriveKey(
-            inputKeyMaterial: inputKeyMaterial,
-            salt: contiguousSalt,
-            info: contiguousInfo,
-            outputByteCount: outputByteCount
-        )
     }
 
     /// Derives a symmetric encryption key from a main key or passcode using
@@ -169,20 +169,13 @@ public struct HKDF<H: HashFunction>: Sendable {
     ///
     /// - Returns: A pseudorandom, cryptographically strong key in the form of a
     /// hashed authentication code.
-    public static func extract<Salt: DataProtocol>(inputKeyMaterial: SymmetricKey, salt: Salt?) -> HashedAuthenticationCode<H> {
-        let key: SymmetricKey
-        if let salt {
-            if salt.regions.count != 1 {
-                let contiguousBytes = Array(salt)
-                key = SymmetricKey(data: contiguousBytes)
-            } else {
-                key = SymmetricKey(data: salt.regions.first!)
-            }
-        } else {
-            key = SymmetricKey(data: [UInt8]())
+    public static func extract<Salt: DataProtocol>(
+        inputKeyMaterial: SymmetricKey,
+        salt: Salt?
+    ) -> HashedAuthenticationCode<H> {
+        extract(salt: salt) { authenticator in
+            authenticator.update(bytes: inputKeyMaterial.bytes)
         }
-
-        return HMAC<H>.authenticationCode(for: inputKeyMaterial.bytes, using: key)
     }
 
     /// Creates cryptographically strong key material from a main key or
@@ -199,14 +192,13 @@ public struct HKDF<H: HashFunction>: Sendable {
     ///
     /// - Returns: A pseudorandom, cryptographically strong key in the form of a
     /// hashed authentication code.
-    public static func extract(inputKeyMaterial: SymmetricKey, salt: RawSpan?) -> HashedAuthenticationCode<H> {
-        let key = if let salt {
-            SymmetricKey(copying: salt)
-        } else {
-            SymmetricKey(data: SecureBytes())
+    public static func extract(
+        inputKeyMaterial: SymmetricKey,
+        salt: RawSpan?
+    ) -> HashedAuthenticationCode<H> {
+        extract(salt: salt) { authenticator in
+            authenticator.update(bytes: inputKeyMaterial.bytes)
         }
-
-        return HMAC<H>.authenticationCode(for: inputKeyMaterial.bytes, using: key)
     }
 
     /// Expands cryptographically strong key material into a derived symmetric
@@ -222,26 +214,25 @@ public struct HKDF<H: HashFunction>: Sendable {
     ///   - outputByteCount: The length in bytes of the resulting symmetric key.
     ///
     /// - Returns: The derived symmetric key.
-    public static func expand<PRK: ContiguousBytes, Info: DataProtocol>(pseudoRandomKey prk: PRK, info: Info?, outputByteCount: Int) -> SymmetricKey {
-        SymmetricKey(capacity: outputByteCount) { output in
+    public static func expand<PRK: ContiguousBytes, Info: DataProtocol>(
+        pseudoRandomKey prk: PRK,
+        info: Info?,
+        outputByteCount: Int
+    ) -> SymmetricKey {
+        preconditionValidOutputByteCount(outputByteCount)
+        return SymmetricKey(capacity: outputByteCount) { output in
             prk.withUnsafeBytes { prkBuffer in
-                guard let info else {
-                    self.expand(pseudoRandomKey: prkBuffer.bytes, info: nil, into: &output)
-                    return
-                }
-
-                if info.regions.count == 1 {
-                    info.regions.first!.withUnsafeBytes { infoBuffer in
-                        self.expand(pseudoRandomKey: prkBuffer.bytes, info: infoBuffer.bytes, into: &output)
+                expandValidated(
+                    pseudoRandomKey: prkBuffer.bytes,
+                    into: &output,
+                    updateInfo: { authenticator in
+                        if let info {
+                            authenticator.update(data: info)
+                        }
                     }
-                } else {
-                    let contiguous = ContiguousArray(info)
-                    self.expand(pseudoRandomKey: prkBuffer.bytes, info: contiguous.span.bytes, into: &output)
-                }
+                )
             }
-
         }
-
     }
 
     /// Expands cryptographically strong key material into a derived symmetric
@@ -258,28 +249,125 @@ public struct HKDF<H: HashFunction>: Sendable {
     ///
     /// - Returns: The derived symmetric key.
     public static func expand(pseudoRandomKey prk: RawSpan, info: RawSpan?, into output: inout OutputRawSpan) {
-        let iterations: UInt8 = UInt8((Double(output.freeCapacity) / Double(H.Digest.byteCount)).rounded(.up))
+        preconditionValidOutputByteCount(output.freeCapacity)
+        expandValidated(
+            pseudoRandomKey: prk,
+            into: &output,
+            updateInfo: { authenticator in
+                if let info {
+                    authenticator.update(bytes: info)
+                }
+            }
+        )
+    }
 
-        let key = SymmetricKey(copying: prk)
+    static func extract<Salt: DataProtocol>(
+        salt: Salt?,
+        updateInputKeyMaterial: (inout HMAC<H>) -> Void
+    ) -> HashedAuthenticationCode<H> {
+        var authenticator = if let salt {
+            HMAC<H>(keyMaterial: salt)
+        } else {
+            HMAC<H>(keyMaterial: SecureBytes())
+        }
+        updateInputKeyMaterial(&authenticator)
+        return authenticator.finalizeAuthenticationCode()
+    }
+
+    static func extract(
+        salt: RawSpan?,
+        updateInputKeyMaterial: (inout HMAC<H>) -> Void
+    ) -> HashedAuthenticationCode<H> {
+        var authenticator = if let salt {
+            HMAC<H>(keyMaterial: salt)
+        } else {
+            HMAC<H>(keyMaterial: SecureBytes())
+        }
+        updateInputKeyMaterial(&authenticator)
+        return authenticator.finalizeAuthenticationCode()
+    }
+
+    static func withExtractedKeyBytes<Salt: DataProtocol, Result>(
+        salt: Salt?,
+        updateInputKeyMaterial: (inout HMAC<H>) -> Void,
+        _ body: (UnsafeRawBufferPointer) -> Result
+    ) -> Result {
+        var authenticator = if let salt {
+            HMAC<H>(keyMaterial: salt)
+        } else {
+            HMAC<H>(keyMaterial: SecureBytes())
+        }
+        updateInputKeyMaterial(&authenticator)
+        return authenticator.withFinalizedDigestBytes(body)
+    }
+
+    static func withExtractedKeyBytes<Result>(
+        salt: RawSpan?,
+        updateInputKeyMaterial: (inout HMAC<H>) -> Void,
+        _ body: (UnsafeRawBufferPointer) -> Result
+    ) -> Result {
+        var authenticator = if let salt {
+            HMAC<H>(keyMaterial: salt)
+        } else {
+            HMAC<H>(keyMaterial: SecureBytes())
+        }
+        updateInputKeyMaterial(&authenticator)
+        return authenticator.withFinalizedDigestBytes(body)
+    }
+
+    static func expandValidated(
+        pseudoRandomKey prk: RawSpan,
+        into output: inout OutputRawSpan,
+        updateInfo: (inout HMAC<H>) -> Void
+    ) {
+        let outputByteCount = output.freeCapacity
+        precondition(outputByteCount <= maximumOutputByteCount)
+        guard outputByteCount > 0 else {
+            return
+        }
+
+        let digestByteCount = H.Digest.byteCount
+        let iterationCount = outputByteCount / digestByteCount
+            + (outputByteCount.isMultiple(of: digestByteCount) ? 0 : 1)
+        let keyedAuthenticator = HMAC<H>(keyMaterial: prk)
         var lastIterationBytes = 0
-        for i in 1...iterations {
-            var hmac = HMAC<H>(key: key)
-            hmac.update(bytes: output.bytes.extracting(last: lastIterationBytes))
-            if let info {
-                hmac.update(bytes: info)
-            }
+        for iteration in 1...iterationCount {
+            var authenticator = keyedAuthenticator
+            authenticator.update(bytes: output.bytes.extracting(last: lastIterationBytes))
+            updateInfo(&authenticator)
 
-            var buf = i
-            withUnsafeBytes(of: &buf) { rawBuffer in
+            var counter = UInt8(iteration)
+            withUnsafeBytes(of: &counter) { rawBuffer in
                 let span = RawSpan(_unsafeBytes: rawBuffer)
-                hmac.update(bytes: span)
+                authenticator.update(bytes: span)
             }
-            hmac.finalize().withUnsafeBytes {
-                let bytesToAppend = $0.bytes.extracting(first: output.freeCapacity)
+            authenticator.withFinalizedDigestBytes { digestBytes in
+                let bytesToAppend = digestBytes.bytes.extracting(first: output.freeCapacity)
                 output.append(contentsOf: bytesToAppend)
                 lastIterationBytes = bytesToAppend.byteCount
             }
         }
+    }
+
+    private static var maximumOutputByteCount: Int {
+        let digestByteCount = H.Digest.byteCount
+        precondition(digestByteCount > 0)
+        let (maximumOutputByteCount, overflow) = digestByteCount.multipliedReportingOverflow(by: 255)
+        return overflow ? Int.max : maximumOutputByteCount
+    }
+
+    private static func preconditionValidOutputByteCount(
+        _ outputByteCount: Int
+    ) {
+        let maximumOutputByteCount = Self.maximumOutputByteCount
+        precondition(
+            outputByteCount > 0,
+            "HKDF output byte count must be positive"
+        )
+        precondition(
+            outputByteCount <= maximumOutputByteCount,
+            "HKDF output byte count exceeds 255 times the digest byte count"
+        )
     }
 }
 #endif // canImport(CryptoKit)

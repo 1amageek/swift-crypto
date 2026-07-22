@@ -59,8 +59,8 @@ class HKDFTests: XCTestCase {
         let OKM4 = HKDF<H>.expand(pseudoRandomKey: PRK2, info: discontiguousSharedInfo,
                                   outputByteCount: vector.outputLength)
         
-        XCTAssertEqual(Data(PRK1.digest), Data(vector.pseudoRandomKey))
-        XCTAssertEqual(Data(PRK2.digest), Data(vector.pseudoRandomKey))
+        XCTAssertEqual(Data(PRK1), Data(vector.pseudoRandomKey))
+        XCTAssertEqual(Data(PRK2), Data(vector.pseudoRandomKey))
         
         let expectedOKM = SymmetricKey(data: vector.outputKeyMaterial)
         XCTAssertEqual(OKM1, expectedOKM)
@@ -114,10 +114,33 @@ class HKDFTests: XCTestCase {
         XCTAssertEqual(fourthKey, expectedKey)
     }
     
-    func testRFCVector<H: HashFunction>(_ vector: RFCTestVector, hash: H.Type) throws {
+    func testRFCVector<H: HashFunction>(_ vector: RFCTestVector, hash: H.Type) {
         sharedSecretTesting(vector, hash: hash)
         oneshotTesting(vector, hash: hash)
         expandExtractTesting(vector, hash: hash)
+    }
+
+    func testOutputByteCountBounds() {
+        let inputKeyMaterial = SymmetricKey(data: [UInt8](repeating: 0x0b, count: 22))
+        let salt = Array(UInt8(0x00)...UInt8(0x0c))
+        let info = Array(UInt8(0xf0)...UInt8(0xf9))
+        let maximumOutputByteCount = SHA256.Digest.byteCount * 255
+        let maximumLengthKey = HKDF<SHA256>.deriveKey(
+            inputKeyMaterial: inputKeyMaterial,
+            salt: salt,
+            info: info,
+            outputByteCount: maximumOutputByteCount
+        )
+        let expectedFinalBlock: [UInt8] = [
+            0x76, 0xa3, 0xf7, 0x8b, 0xcf, 0xfe, 0x95, 0xfe,
+            0xcf, 0x91, 0x92, 0x3c, 0x22, 0xad, 0x6e, 0xe6,
+            0x4d, 0x48, 0xa6, 0xd1, 0xb9, 0x81, 0xd7, 0xe5,
+            0x23, 0xd5, 0xc0, 0xf2, 0x21, 0x54, 0xee, 0x88,
+        ]
+        maximumLengthKey.withUnsafeBytes { bytes in
+            XCTAssertEqual(bytes.count, maximumOutputByteCount)
+            XCTAssertTrue(bytes.suffix(expectedFinalBlock.count).elementsEqual(expectedFinalBlock))
+        }
     }
     
     func testRfcTestVectorsSHA1() throws {
@@ -126,7 +149,7 @@ class HKDFTests: XCTestCase {
         
         for vector in vectors {
             precondition(vector.hash == "SHA-1")
-            try orFail { try self.testRFCVector(vector, hash: Insecure.SHA1.self) }
+            self.testRFCVector(vector, hash: Insecure.SHA1.self)
         }
     }
     
@@ -136,7 +159,7 @@ class HKDFTests: XCTestCase {
         
         for vector in vectors {
             precondition(vector.hash == "SHA-256")
-            try orFail { try self.testRFCVector(vector, hash: SHA256.self) }
+            self.testRFCVector(vector, hash: SHA256.self)
         }
     }
 }

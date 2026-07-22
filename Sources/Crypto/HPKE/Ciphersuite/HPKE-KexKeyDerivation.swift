@@ -25,24 +25,64 @@ import CryptoKit
 
 
 
-private let suiteIDLabel = Data("KEM".utf8)
+private let kemSuiteLabel = Data("KEM".utf8)
 
 extension HPKE {
-    struct KexUtils {
-        static func ExtractAndExpand<DH: ContiguousBytes>(dh: DH, enc: Data,
-                                     pkRm: Data, pkSm: Data? = nil, kem: HPKE.KEM, kdf: HPKE.KDF) -> SymmetricKey {
-            var suiteID = suiteIDLabel
+    struct KeyExchangeDerivation {
+        static func extractAndExpand<SharedSecret: ContiguousBytes>(
+            sharedSecret: SharedSecret,
+            encapsulatedKey: Data,
+            recipientPublicKey: Data,
+            kem: HPKE.KEM,
+            kdf: HPKE.KDF
+        ) -> SymmetricKey {
+            let secretTranscript = HPKEInputKeyMaterialTranscript(bytes: sharedSecret)
+            let contextTranscript = HPKEKEMContextTranscript(
+                encapsulatedKey: encapsulatedKey,
+                recipientPublicKey: recipientPublicKey,
+                senderPublicKey: nil
+            )
+            var suiteID = kemSuiteLabel
             suiteID.append(kem.identifier)
-            return Crypto.ExtractAndExpand(zz: dh, kemContext: kemContext(enc: enc, pkRm: pkRm, pkSm: pkSm),
-                                                     suiteID: suiteID, kem: kem, kdf: kdf)
+            return Crypto.extractAndExpand(
+                sharedSecret: secretTranscript,
+                kemContext: contextTranscript,
+                suiteID: suiteID,
+                kem: kem,
+                kdf: kdf
+            )
         }
-        
-        static func kemContext(enc: Data, pkRm: Data, pkSm: Data? = nil) -> Data {
-            var context = Data()
-            context.append(enc)
-            context.append(pkRm)
-            if let pkSm { context.append(pkSm) }
-            return context
+
+        static func extractAndExpand<
+            EphemeralSharedSecret: ContiguousBytes,
+            AuthenticationSharedSecret: ContiguousBytes
+        >(
+            ephemeralSharedSecret: EphemeralSharedSecret,
+            authenticationSharedSecret: AuthenticationSharedSecret,
+            encapsulatedKey: Data,
+            recipientPublicKey: Data,
+            senderPublicKey: Data,
+            kem: HPKE.KEM,
+            kdf: HPKE.KDF
+        ) -> SymmetricKey {
+            let secretTranscript = HPKEAuthenticatedSharedSecretTranscript(
+                ephemeralSharedSecret: ephemeralSharedSecret,
+                authenticationSharedSecret: authenticationSharedSecret
+            )
+            let contextTranscript = HPKEKEMContextTranscript(
+                encapsulatedKey: encapsulatedKey,
+                recipientPublicKey: recipientPublicKey,
+                senderPublicKey: senderPublicKey
+            )
+            var suiteID = kemSuiteLabel
+            suiteID.append(kem.identifier)
+            return Crypto.extractAndExpand(
+                sharedSecret: secretTranscript,
+                kemContext: contextTranscript,
+                suiteID: suiteID,
+                kem: kem,
+                kdf: kdf
+            )
         }
     }
 }

@@ -1,0 +1,32 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the SwiftCrypto open source project
+//
+// Copyright (c) 2026 Apple Inc. and the SwiftCrypto project authors
+// Licensed under Apache License v2.0
+//
+// SPDX-License-Identifier: Apache-2.0
+//
+//===----------------------------------------------------------------------===//
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
+
+#if canImport(CryptoKit)
+import CryptoKit
+#else
+
+struct HPKEInputKeyMaterialTranscript<Bytes: ContiguousBytes>: HPKETranscript {
+    let bytes: Bytes
+
+    func forEachByteRegion(_ body: (RawSpan) -> Void) {
+        bytes.withUnsafeBytes { buffer in
+            body(buffer.bytes)
+        }
+    }
+}
+
+#endif // canImport(CryptoKit)

@@ -27,10 +27,15 @@ Sources/Crypto/Digests/HashFunctions.swift
 Sources/Crypto/Digests/HashFunctions_SHA2.swift
 Sources/Crypto/Digests/HashFunctions_SHA3.swift
 Sources/Crypto/HPKE/Ciphersuite/HPKE-AEAD.swift
+Sources/Crypto/HPKE/Ciphersuite/HPKE-AuthenticatedSharedSecretTranscript.swift
 Sources/Crypto/HPKE/Ciphersuite/HPKE-Ciphersuite.swift
+Sources/Crypto/HPKE/Ciphersuite/HPKE-InformationTranscript.swift
+Sources/Crypto/HPKE/Ciphersuite/HPKE-InputKeyMaterialTranscript.swift
 Sources/Crypto/HPKE/Ciphersuite/HPKE-KDF.swift
+Sources/Crypto/HPKE/Ciphersuite/HPKE-KEMContextTranscript.swift
 Sources/Crypto/HPKE/Ciphersuite/HPKE-KexKeyDerivation.swift
 Sources/Crypto/HPKE/Ciphersuite/HPKE-LabeledExtract.swift
+Sources/Crypto/HPKE/Ciphersuite/HPKE-Transcript.swift
 Sources/Crypto/HPKE/Ciphersuite/HPKE-Utils.swift
 Sources/Crypto/HPKE/Ciphersuite/KEM/Conformances/DHKEM.swift
 Sources/Crypto/HPKE/Ciphersuite/KEM/Conformances/HPKE-KEM-Curve25519.swift
@@ -40,6 +45,7 @@ Sources/Crypto/HPKE/HPKE-Errors.swift
 Sources/Crypto/HPKE/HPKE.swift
 Sources/Crypto/HPKE/Key Schedule/HPKE-Context.swift
 Sources/Crypto/HPKE/Key Schedule/HPKE-KeySchedule.swift
+Sources/Crypto/HPKE/Key Schedule/HPKE-KeyScheduleTranscript.swift
 Sources/Crypto/HPKE/Modes/HPKE-Modes.swift
 Sources/Crypto/Insecure/Insecure.swift
 Sources/Crypto/Insecure/Insecure_HashFunctions.swift

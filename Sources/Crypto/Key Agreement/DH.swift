@@ -158,7 +158,7 @@ extension HashFunction {
         }
     }
     mutating func update(_ counter: UInt32) {
-        withUnsafeBytes(of: counter) {
+        Swift.withUnsafeBytes(of: counter) {
             self.update(bufferPointer: $0)
         }
     }

@@ -59,49 +59,6 @@ extension HPKE {
                 return SHA512.Digest.byteCount
             }
         }
-        
-		/// Creates cryptographically strong key material from initial key material that you specify.
-		///
-		/// Generate a derived symmetric key from the cryptographically strong key material this function
-		/// creates by calling ``expand(prk:info:outputByteCount:)``.
-		///
-		/// - Parameters:
-		///  - salt: The salt to use for key derivation.
-		///  - ikm: The initial key material the derivation function uses to derive a key.
-		///
-		/// - Returns: A pseudorandom, cryptographically strong key in the form of a hashed authentication code.
-        internal func extract<S: DataProtocol>(salt: S, ikm: SymmetricKey) -> SymmetricKey {
-            switch self {
-            case .HKDF_SHA256:
-                return SymmetricKey(data: HKDF<SHA256>.extract(inputKeyMaterial: ikm, salt: salt))
-            case .HKDF_SHA384:
-                return SymmetricKey(data: HKDF<SHA384>.extract(inputKeyMaterial: ikm, salt: salt))
-            case .HKDF_SHA512:
-                return SymmetricKey(data: HKDF<SHA512>.extract(inputKeyMaterial: ikm, salt: salt))
-            }
-        }
-        
-		/// Expands cryptographically strong key material into a derived symmetric key.
-		///
-		/// Generate cryptographically strong key material to use with this function by calling
-		/// ``extract(salt:ikm:)``.
-		///
-		/// - Parameters:
-		///  - prk: A pseudorandom, cryptographically strong key generated from the ``extract(salt:ikm:)`` function.
-		///  - info: The shared information to use for key derivation.
-		///  - outputByteCount: The length in bytes of the resulting symmetric key.
-		///
-		/// - Returns: The derived symmetric key.
-        internal func expand(prk: SymmetricKey, info: Data, outputByteCount: Int) -> SymmetricKey {
-            switch self {
-            case .HKDF_SHA256:
-                return SymmetricKey(data: HKDF<SHA256>.expand(pseudoRandomKey: prk, info: info, outputByteCount: outputByteCount))
-            case .HKDF_SHA384:
-                return SymmetricKey(data: HKDF<SHA384>.expand(pseudoRandomKey: prk, info: info, outputByteCount: outputByteCount))
-            case .HKDF_SHA512:
-                return SymmetricKey(data: HKDF<SHA512>.expand(pseudoRandomKey: prk, info: info, outputByteCount: outputByteCount))
-            }
-        }
     }
 }
 

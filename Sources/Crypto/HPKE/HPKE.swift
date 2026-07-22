@@ -60,6 +60,22 @@ extension HPKE {
     /// See: https://datatracker.ietf.org/doc/html/rfc9180#name-secret-export
     fileprivate static let exportLabel = Data("sec".utf8)
 
+    fileprivate static func encodedExportByteCount(
+        _ outputByteCount: Int,
+        using kdf: KDF
+    ) -> UInt16 {
+        let (maximumOutputByteCount, overflow) = kdf.Nh.multipliedReportingOverflow(by: 255)
+        precondition(
+            !overflow,
+            "HPKE export limit calculation overflowed"
+        )
+        precondition(
+            outputByteCount > 0 && outputByteCount <= maximumOutputByteCount,
+            "HPKE export byte count must be positive and within the KDF limit"
+        )
+        return UInt16(outputByteCount)
+    }
+
     /// A type that represents the sending side of an HPKE message exchange.
     ///
     /// To create encrypted messages, initialize a `Sender` specifying the appropriate cipher suite,
@@ -84,13 +100,19 @@ extension HPKE {
         ///   - outputByteCount: The desired length of the exported secret.
         /// - Returns: The exported secret.
         public func exportSecret<Context: DataProtocol>(context: Context, outputByteCount: Int) throws(CryptoKitMetaError) -> SymmetricKey {
-            precondition(outputByteCount > 0);
-            return LabeledExpand(prk: self.exporterSecret,
-                                 label: exportLabel,
-                                 info: context,
-                                 outputByteCount: UInt16(outputByteCount),
-                                 suiteID: self.context.keySchedule.ciphersuite.identifier,
-                                 kdf: self.context.keySchedule.ciphersuite.kdf)
+            let kdf = self.context.keySchedule.ciphersuite.kdf
+            let encodedOutputByteCount = HPKE.encodedExportByteCount(
+                outputByteCount,
+                using: kdf
+            )
+            return labeledExpand(
+                pseudoRandomKey: self.exporterSecret,
+                label: exportLabel,
+                info: context,
+                outputByteCount: encodedOutputByteCount,
+                suiteID: self.context.keySchedule.ciphersuite.identifier,
+                kdf: kdf
+            )
         }
         
         /// Creates a sender in base mode.
@@ -237,13 +259,19 @@ extension HPKE {
         ///   - outputByteCount: The desired length of the exported secret.
         /// - Returns: The exported secret.
         public func exportSecret<Context: DataProtocol>(context: Context, outputByteCount: Int) throws(CryptoKitMetaError) -> SymmetricKey {
-            precondition(outputByteCount > 0);
-            return LabeledExpand(prk: self.exporterSecret,
-                                 label: exportLabel,
-                                 info: context,
-                                 outputByteCount: UInt16(outputByteCount),
-                                 suiteID: self.context.keySchedule.ciphersuite.identifier,
-                                 kdf: self.context.keySchedule.ciphersuite.kdf)
+            let kdf = self.context.keySchedule.ciphersuite.kdf
+            let encodedOutputByteCount = HPKE.encodedExportByteCount(
+                outputByteCount,
+                using: kdf
+            )
+            return labeledExpand(
+                pseudoRandomKey: self.exporterSecret,
+                label: exportLabel,
+                info: context,
+                outputByteCount: encodedOutputByteCount,
+                suiteID: self.context.keySchedule.ciphersuite.identifier,
+                kdf: kdf
+            )
         }
         
         /// Creates a recipient in base mode.

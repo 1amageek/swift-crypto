@@ -34,67 +34,113 @@ struct HPKETestEncryption: Codable {
 
 struct HPKETestVector: Codable {
     let mode: UInt8
-    let kem_id: UInt16
-    let kdf_id: UInt16
-    let aead_id: UInt16
+    let kemIdentifier: UInt16
+    let kdfIdentifier: UInt16
+    let aeadIdentifier: UInt16
     
     let info: String
     let enc: String
     
-    let skEm: String
-    let skRm: String
+    let ephemeralPrivateKey: String
+    let recipientPrivateKey: String
     
-    let pkEm: String
-    let pkRm: String
+    let ephemeralPublicKey: String
+    let recipientPublicKey: String
     
-    let pkSm: String?
+    let senderPublicKey: String?
     
-    let psk: String?
-    let psk_id: String?
+    let presharedKey: String?
+    let presharedKeyIdentifier: String?
     
-    let shared_secret: String
+    let sharedSecret: String
     let secret: String
     
-    let exporter_secret: String
+    let exporterSecret: String
     
     let encryptions: [HPKETestEncryption]
+
+    enum CodingKeys: String, CodingKey {
+        case mode
+        case kemIdentifier = "kem_id"
+        case kdfIdentifier = "kdf_id"
+        case aeadIdentifier = "aead_id"
+        case info
+        case enc
+        case ephemeralPrivateKey = "skEm"
+        case recipientPrivateKey = "skRm"
+        case ephemeralPublicKey = "pkEm"
+        case recipientPublicKey = "pkRm"
+        case senderPublicKey = "pkSm"
+        case presharedKey = "psk"
+        case presharedKeyIdentifier = "psk_id"
+        case sharedSecret = "shared_secret"
+        case secret
+        case exporterSecret = "exporter_secret"
+        case encryptions
+    }
 }
 
 class HPKETestVectors: XCTestCase {
     
     func testVectors() throws {
         let bundle = Bundle.module
-        let fileURL = bundle.url(forResource: "hpke-test-vectors", withExtension: "json")!
+        let fileURL = try XCTUnwrap(
+            bundle.url(forResource: "hpke-test-vectors", withExtension: "json")
+        )
         let data = try orFail { try Data(contentsOf: fileURL) }
         let decoder = JSONDecoder()
         let testVectors = try orFail { try decoder.decode([HPKETestVector].self, from: data) }
-        testVectors.forEach { validateTestVector($0) }
+        for testVector in testVectors {
+            try validateTestVector(testVector)
+        }
     }
     
-    func validateTestVector(_ tv: HPKETestVector) {
-        guard let ciphersuite = ciphersuiteFromValues(kemValue: tv.kem_id, kdfValue: tv.kdf_id, aeadValue: tv.aead_id) else {
-            if unsupportedKEMs.contains(tv.kem_id) {
-                print("Skipping unsupported KEM: \(tv.kem_id)")
+    func validateTestVector(_ tv: HPKETestVector) throws {
+        guard let ciphersuite = ciphersuiteFromValues(
+            kemValue: tv.kemIdentifier,
+            kdfValue: tv.kdfIdentifier,
+            aeadValue: tv.aeadIdentifier
+        ) else {
+            if unsupportedKEMs.contains(tv.kemIdentifier) {
+                print("Skipping unsupported KEM: \(tv.kemIdentifier)")
             } else {
-                XCTFail("Ciphersuite coulnd't be configured from input values kem:\(tv.kem_id) kdf:\(tv.kdf_id) aead: \(tv.aead_id)")
+                XCTFail(
+                    "Ciphersuite could not be configured from input values "
+                        + "kem:\(tv.kemIdentifier) kdf:\(tv.kdfIdentifier) aead:\(tv.aeadIdentifier)"
+                )
             }
             return
         }
         
-        let skRBytes = try! Data(hexString: tv.skRm)
+        let recipientPrivateKeyBytes = try Data(hexString: tv.recipientPrivateKey)
         
         switch ciphersuite.kem {
         case .P256_HKDF_SHA256:
-            XCTAssertNoThrow(try testWithKEM(tv, ciphersuite: ciphersuite, skR: P256.KeyAgreement.PrivateKey(rawRepresentation: skRBytes)))
+            try testWithKEM(
+                tv,
+                ciphersuite: ciphersuite,
+                skR: P256.KeyAgreement.PrivateKey(rawRepresentation: recipientPrivateKeyBytes)
+            )
         case .P384_HKDF_SHA384:
-            XCTAssertNoThrow(try testWithKEM(tv, ciphersuite: ciphersuite, skR: P384.KeyAgreement.PrivateKey(rawRepresentation: skRBytes)))
+            try testWithKEM(
+                tv,
+                ciphersuite: ciphersuite,
+                skR: P384.KeyAgreement.PrivateKey(rawRepresentation: recipientPrivateKeyBytes)
+            )
         case .P521_HKDF_SHA512:
-            XCTAssertNoThrow(try testWithKEM(tv, ciphersuite: ciphersuite, skR: P521.KeyAgreement.PrivateKey(rawRepresentation: skRBytes)))
+            try testWithKEM(
+                tv,
+                ciphersuite: ciphersuite,
+                skR: P521.KeyAgreement.PrivateKey(rawRepresentation: recipientPrivateKeyBytes)
+            )
         case .Curve25519_HKDF_SHA256:
-            XCTAssertNoThrow(try testWithKEM(tv, ciphersuite: ciphersuite, skR: Curve25519.KeyAgreement.PrivateKey(rawRepresentation: skRBytes)))
+            try testWithKEM(
+                tv,
+                ciphersuite: ciphersuite,
+                skR: Curve25519.KeyAgreement.PrivateKey(rawRepresentation: recipientPrivateKeyBytes)
+            )
         case .XWingMLKEM768X25519:
-            // There are no test vectors for this implementation
-            break
+            XCTFail("Unexpected X-Wing test vector")
         }
     }
     
@@ -106,7 +152,8 @@ class HPKETestVectors: XCTestCase {
             try testUnauthenticatedModesWithKeys(tv, ciphersuite: ciphersuite, skR: skR, encapsulated: encapsulated)
         }
         case HPKE.Mode.auth.value, HPKE.Mode.auth_psk.value: do {
-            let pkSBytes = try Data(hexString: tv.pkSm!)
+            let senderPublicKey = try XCTUnwrap(tv.senderPublicKey)
+            let pkSBytes = try Data(hexString: senderPublicKey)
             let pkS = try SK.PublicKey(pkSBytes, kem: ciphersuite.kem)
             
             try testAuthenticatedModesWithKeys(tv, ciphersuite: ciphersuite, skR: skR, encapsulated: encapsulated, pkS: pkS)
@@ -122,14 +169,28 @@ class HPKETestVectors: XCTestCase {
         var recipient: HPKE.Recipient
         if tv.mode == HPKE.Mode.base.value {
             print(try skR.publicKey.hpkeRepresentation(kem: ciphersuite.kem).hexString)
-            recipient = try! HPKE.Recipient(privateKey: skR, ciphersuite: ciphersuite, info: infoBytes, encapsulatedKey: encapsulated)
+            recipient = try HPKE.Recipient(
+                privateKey: skR,
+                ciphersuite: ciphersuite,
+                info: infoBytes,
+                encapsulatedKey: encapsulated
+            )
         } else {
-            let psk = try SymmetricKey(data: Data(hexString: tv.psk!))
-            let psk_id = try Data(hexString: tv.psk_id!)
-            recipient = try! HPKE.Recipient(privateKey: skR, ciphersuite: ciphersuite, info: infoBytes, encapsulatedKey: encapsulated, presharedKey: psk, presharedKeyIdentifier: psk_id)
+            let presharedKey = try XCTUnwrap(tv.presharedKey)
+            let presharedKeyIdentifier = try XCTUnwrap(tv.presharedKeyIdentifier)
+            let psk = try SymmetricKey(data: Data(hexString: presharedKey))
+            let pskIdentifierBytes = try Data(hexString: presharedKeyIdentifier)
+            recipient = try HPKE.Recipient(
+                privateKey: skR,
+                ciphersuite: ciphersuite,
+                info: infoBytes,
+                encapsulatedKey: encapsulated,
+                presharedKey: psk,
+                presharedKeyIdentifier: pskIdentifierBytes
+            )
         }
         
-        XCTAssertEqual(recipient.exporterSecret.withUnsafeBytes { Data($0) }.hexString, tv.exporter_secret)
+        XCTAssertEqual(recipient.exporterSecret.withUnsafeBytes { Data($0) }.hexString, tv.exporterSecret)
         try testEncryptions(tv.encryptions, with: &recipient)
     }
     
@@ -138,14 +199,30 @@ class HPKETestVectors: XCTestCase {
         
         var recipient: HPKE.Recipient
         if tv.mode == HPKE.Mode.auth.value {
-            recipient = try! HPKE.Recipient(privateKey: skR, ciphersuite: ciphersuite, info: infoBytes, encapsulatedKey: encapsulated, authenticatedBy: pkS)
+            recipient = try HPKE.Recipient(
+                privateKey: skR,
+                ciphersuite: ciphersuite,
+                info: infoBytes,
+                encapsulatedKey: encapsulated,
+                authenticatedBy: pkS
+            )
         } else {
-            let psk = try SymmetricKey(data: Data(hexString: tv.psk!))
-            let psk_id = try Data(hexString: tv.psk_id!)
-            recipient = try! HPKE.Recipient(privateKey: skR, ciphersuite: ciphersuite, info: infoBytes, encapsulatedKey: encapsulated, authenticatedBy: pkS, presharedKey: psk, presharedKeyIdentifier: psk_id)
+            let presharedKey = try XCTUnwrap(tv.presharedKey)
+            let presharedKeyIdentifier = try XCTUnwrap(tv.presharedKeyIdentifier)
+            let psk = try SymmetricKey(data: Data(hexString: presharedKey))
+            let pskIdentifierBytes = try Data(hexString: presharedKeyIdentifier)
+            recipient = try HPKE.Recipient(
+                privateKey: skR,
+                ciphersuite: ciphersuite,
+                info: infoBytes,
+                encapsulatedKey: encapsulated,
+                authenticatedBy: pkS,
+                presharedKey: psk,
+                presharedKeyIdentifier: pskIdentifierBytes
+            )
         }
 
-        XCTAssertEqual(recipient.exporterSecret.withUnsafeBytes { Data($0) }.hexString, tv.exporter_secret)
+        XCTAssertEqual(recipient.exporterSecret.withUnsafeBytes { Data($0) }.hexString, tv.exporterSecret)
         try testEncryptions(tv.encryptions, with: &recipient)
     }
     
@@ -167,10 +244,10 @@ private func ciphersuiteFromValues(kemValue: UInt16,
     let kdf = kdfFromValue(value: kdfValue)
     let aead = aeadFromValue(value: aeadValue)
     
-    if kem != nil && kdf != nil && aead != nil {
-        return HPKE.Ciphersuite(kem: kem!, kdf: kdf!, aead: aead!)
+    guard let kem, let kdf, let aead else {
+        return nil
     }
-    return nil
+    return HPKE.Ciphersuite(kem: kem, kdf: kdf, aead: aead)
 }
 
 private func kemFromValue(value: UInt16) -> HPKE.KEM? {

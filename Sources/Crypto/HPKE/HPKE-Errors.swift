@@ -41,4 +41,6 @@ extension HPKE {
     }
 }
 
+extension HPKE.Errors: Equatable, Hashable {}
+
 #endif // canImport(CryptoKit)

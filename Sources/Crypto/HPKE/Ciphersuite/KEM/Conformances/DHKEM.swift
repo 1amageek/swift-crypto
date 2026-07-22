@@ -75,89 +75,132 @@ extension HPKE {
 	/// A container for Diffie-Hellman key encapsulation mechanisms (KEMs).
     @nonexhaustive
     public enum DHKEM: Sendable {
-        struct PublicKey<DHPK: HPKEDiffieHellmanPublicKey>: KEMPublicKey where DHPK == DHPK.EphemeralPrivateKey.PublicKey {
+        struct PublicKey<DHPK: HPKEDiffieHellmanPublicKey>: KEMPublicKey
+            where DHPK == DHPK.EphemeralPrivateKey.PublicKey {
             let kem: HPKE.KEM
             let key: DHPK
-
             typealias EncapsulationResult = Crypto.KEM.EncapsulationResult
 
             init(_ publicKey: DHPK, kem: HPKE.KEM) throws(CryptoKitMetaError) {
-                // TODO: Validate Ciphersuite Mismatches
                 _ = try publicKey.hpkeRepresentation(kem: kem)
+                self.init(validatedKey: publicKey, kem: kem)
+            }
+
+            init(validatedKey publicKey: DHPK, kem: HPKE.KEM) {
                 self.key = publicKey
                 self.kem = kem
             }
-            
+
             func encapsulate() throws(CryptoKitMetaError) -> EncapsulationResult {
                 let ephemeralKeys = DHPK.EphemeralPrivateKey()
-                let dh =
-                try ephemeralKeys.sharedSecretFromKeyAgreement(with: key)
-                
-                let enc = try! ephemeralKeys.publicKey.hpkeRepresentation(kem: kem)
-                let selfRepresentation = try self.key.hpkeRepresentation(kem: kem)
-                return EncapsulationResult(sharedSecret: HPKE.KexUtils.ExtractAndExpand(dh: dh,
-                                                                                            enc: enc,
-                                                                                            pkRm: selfRepresentation,
-                                                                                            kem: kem,
-                                                                                            kdf: kem.kdf), encapsulated: enc)
+                let sharedSecret = try ephemeralKeys.sharedSecretFromKeyAgreement(
+                    with: key
+                )
+
+                let encapsulatedKey = try ephemeralKeys.publicKey.hpkeRepresentation(
+                    kem: kem
+                )
+                let recipientPublicKey = try key.hpkeRepresentation(kem: kem)
+                return EncapsulationResult(
+                    sharedSecret: HPKE.KeyExchangeDerivation.extractAndExpand(
+                        sharedSecret: sharedSecret,
+                        encapsulatedKey: encapsulatedKey,
+                        recipientPublicKey: recipientPublicKey,
+                        kem: kem,
+                        kdf: kem.kdf
+                    ),
+                    encapsulated: encapsulatedKey
+                )
             }
         }
-        
-        struct PrivateKey<DHSK: HPKEDiffieHellmanPrivateKey>: KEMPrivateKey {
+
+        struct PrivateKey<DHSK: HPKEDiffieHellmanPrivateKey> {
+            typealias PublicKey = HPKE.DHKEM.PublicKey<DHSK.PublicKey>
+
             let kem: HPKE.KEM
             let key: DHSK
-            
+
             init(_ privateKey: DHSK, kem: HPKE.KEM) throws(CryptoKitMetaError) {
-                // TODO: Validate Ciphersuite Mismatches
                 _ = try privateKey.publicKey.hpkeRepresentation(kem: kem)
                 self.key = privateKey
                 self.kem = kem
             }
-            
-            static func generate() throws(CryptoKitMetaError) -> Self {
-                fatalError("generate() is not available on HPKE.DHKEM.PrivateKey, use generate(kem:) instead.")
+
+            func decapsulate(
+                _ encapsulated: Data
+            ) throws(CryptoKitMetaError) -> SymmetricKey {
+                let ephemeralPublicKey = try DHSK.PublicKey(encapsulated, kem: kem)
+                let sharedSecret = try key.sharedSecretFromKeyAgreement(
+                    with: ephemeralPublicKey
+                )
+
+                return HPKE.KeyExchangeDerivation.extractAndExpand(
+                    sharedSecret: sharedSecret,
+                    encapsulatedKey: encapsulated,
+                    recipientPublicKey: try key.publicKey.hpkeRepresentation(kem: kem),
+                    kem: kem,
+                    kdf: kem.kdf
+                )
             }
-            
-            public func decapsulate(_ encapsulated: Data) throws(CryptoKitMetaError) -> SymmetricKey {
-                let pkE = try DHSK.PublicKey(encapsulated, kem: kem)
-                let dh = try key.sharedSecretFromKeyAgreement(with: pkE)
-                
-                return HPKE.KexUtils.ExtractAndExpand(dh: dh,
-                                                      enc: encapsulated,
-                                                      pkRm: try key.publicKey.hpkeRepresentation(kem: kem),
-                                                      kem: kem, kdf: kem.kdf)
+
+            func decapsulate(
+                _ encapsulated: Data,
+                authenticating senderPublicKey: DHSK.PublicKey
+            ) throws(CryptoKitMetaError) -> SymmetricKey {
+                let ephemeralPublicKey = try DHSK.PublicKey(encapsulated, kem: kem)
+
+                let ephemeralSharedSecret = try key.sharedSecretFromKeyAgreement(
+                    with: ephemeralPublicKey
+                )
+                let authenticationSharedSecret = try key.sharedSecretFromKeyAgreement(
+                    with: senderPublicKey
+                )
+
+                return HPKE.KeyExchangeDerivation.extractAndExpand(
+                    ephemeralSharedSecret: ephemeralSharedSecret,
+                    authenticationSharedSecret: authenticationSharedSecret,
+                    encapsulatedKey: encapsulated,
+                    recipientPublicKey: try key.publicKey.hpkeRepresentation(kem: kem),
+                    senderPublicKey: try senderPublicKey.hpkeRepresentation(kem: kem),
+                    kem: kem,
+                    kdf: kem.kdf
+                )
             }
-            
-            func decapsulate(_ encapsulated: Data, authenticating pkS: DHSK.PublicKey) throws(CryptoKitMetaError) -> SymmetricKey {
-                let pkE = try DHSK.PublicKey(encapsulated, kem: kem)
-                
-                var dh = try Data(unsafeFromContiguousBytes: key.sharedSecretFromKeyAgreement(with: pkE))
-                try dh.append(Data(unsafeFromContiguousBytes: key.sharedSecretFromKeyAgreement(with: pkS)))
-                
-                return HPKE.KexUtils.ExtractAndExpand(dh: dh,
-                                                      enc: encapsulated,
-                                                      pkRm: try key.publicKey.hpkeRepresentation(kem: kem),
-                                                      pkSm: try pkS.hpkeRepresentation(kem: kem),
-                                                      kem: kem,
-                                                      kdf: kem.kdf)
-            }
-            
-            func authenticateAndEncapsulateTo(_ publicKey: Self.PublicKey) throws(CryptoKitMetaError) -> (sharedSecret: SymmetricKey, encapsulated: Data) {
+
+            func authenticateAndEncapsulateTo(
+                _ publicKey: PublicKey
+            ) throws(CryptoKitMetaError) -> (
+                sharedSecret: SymmetricKey,
+                encapsulated: Data
+            ) {
                 let ephemeralKeys = DHSK.PublicKey.EphemeralPrivateKey()
-                
-                var dh = try Data(unsafeFromContiguousBytes: ephemeralKeys.sharedSecretFromKeyAgreement(with: publicKey.key))
-                try dh.append(Data(unsafeFromContiguousBytes: key.sharedSecretFromKeyAgreement(with: publicKey.key)))
-                let enc = try ephemeralKeys.publicKey.hpkeRepresentation(kem: kem)
-                
-                return (HPKE.KexUtils.ExtractAndExpand(dh: dh,
-                                                       enc: enc,
-                                                       pkRm: try publicKey.key.hpkeRepresentation(kem: kem),
-                                                       pkSm: try key.publicKey.hpkeRepresentation(kem: kem),
-                                                       kem: kem, kdf: kem.kdf), enc)
+
+                let ephemeralSharedSecret = try ephemeralKeys.sharedSecretFromKeyAgreement(
+                    with: publicKey.key
+                )
+                let authenticationSharedSecret = try key.sharedSecretFromKeyAgreement(
+                    with: publicKey.key
+                )
+                let encapsulatedKey = try ephemeralKeys.publicKey.hpkeRepresentation(
+                    kem: kem
+                )
+
+                return (
+                    HPKE.KeyExchangeDerivation.extractAndExpand(
+                        ephemeralSharedSecret: ephemeralSharedSecret,
+                        authenticationSharedSecret: authenticationSharedSecret,
+                        encapsulatedKey: encapsulatedKey,
+                        recipientPublicKey: try publicKey.key.hpkeRepresentation(kem: kem),
+                        senderPublicKey: try key.publicKey.hpkeRepresentation(kem: kem),
+                        kem: kem,
+                        kdf: kem.kdf
+                    ),
+                    encapsulatedKey
+                )
             }
-            
-            var publicKey: HPKE.DHKEM.PublicKey<DHSK.PublicKey> {
-                return try! HPKE.DHKEM.PublicKey(key.publicKey, kem: kem)
+
+            var publicKey: PublicKey {
+                HPKE.DHKEM.PublicKey(validatedKey: key.publicKey, kem: kem)
             }
         }
     }

@@ -26,7 +26,7 @@ import CryptoKit
 
 extension HPKE {
     internal struct KeySchedule: Sendable {
-        fileprivate static let pksIDHashLabel = Data("psk_id_hash".utf8)
+        fileprivate static let presharedKeyIdentifierHashLabel = Data("psk_id_hash".utf8)
         fileprivate static let infoHashLabel = Data("info_hash".utf8)
         fileprivate static let secretLabel = Data("secret".utf8)
         fileprivate static let keyLabel = Data("key".utf8)
@@ -59,60 +59,86 @@ extension HPKE {
         init<SharedSecretBytes: ContiguousBytes>(mode: HPKE.Mode, sharedSecret: SharedSecretBytes, info: Data, psk: SymmetricKey?, pskID: Data?, ciphersuite: Ciphersuite) throws(CryptoKitMetaError) {
             try HPKE.KeySchedule.verifyPSKInputs(mode: mode, psk: psk, pskID: pskID)
             
-            let pskIDHash = NonSecretOutputLabeledExtract(salt: nil,
-                                                          label: HPKE.KeySchedule.pksIDHashLabel,
-                                                          ikm: pskID,
-                                                          suiteID: ciphersuite.identifier,
-                                                          kdf: ciphersuite.kdf)
+            let pskIDHash = nonSecretOutputLabeledExtract(
+                salt: nil,
+                label: HPKE.KeySchedule.presharedKeyIdentifierHashLabel,
+                inputKeyMaterial: pskID,
+                suiteID: ciphersuite.identifier,
+                kdf: ciphersuite.kdf
+            )
             
-            let infoHash = NonSecretOutputLabeledExtract(salt: nil,
-                                                         label: HPKE.KeySchedule.infoHashLabel,
-                                                         ikm: info,
-                                                         suiteID: ciphersuite.identifier,
-                                                         kdf: ciphersuite.kdf)
-            
-            var keyScheduleContext = Data()
-            keyScheduleContext.append(mode.value)
-            keyScheduleContext.append(pskIDHash)
-            keyScheduleContext.append(infoHash)
-            
-            let secret = LabeledExtract(salt: Data(unsafeFromContiguousBytes: sharedSecret),
-                                        label: HPKE.KeySchedule.secretLabel,
-                                        ikm: psk.map { Data(unsafeFromContiguousBytes: $0) },
-                                        suiteID: ciphersuite.identifier,
-                                        kdf: ciphersuite.kdf)
-            
-            if !ciphersuite.aead.isExportOnly {
-                self.key = LabeledExpand(prk: secret,
-                                         label: HPKE.KeySchedule.keyLabel,
-                                         info: keyScheduleContext,
-                                         outputByteCount: UInt16(ciphersuite.aead.keyByteCount),
-                                         suiteID: ciphersuite.identifier,
-                                         kdf: ciphersuite.kdf)
-                
-                self.nonce = NonSecretOutputLabeledExpand(prk: secret,
-                                                          label: HPKE.KeySchedule.baseLabel,
-                                                          info: keyScheduleContext,
-                                                          outputByteCount: UInt16(ciphersuite.aead.nonceByteCount),
-                                                          suiteID: ciphersuite.identifier,
-                                                          kdf: ciphersuite.kdf)
+            let infoHash = nonSecretOutputLabeledExtract(
+                salt: nil,
+                label: HPKE.KeySchedule.infoHashLabel,
+                inputKeyMaterial: info,
+                suiteID: ciphersuite.identifier,
+                kdf: ciphersuite.kdf
+            )
+
+            let keyScheduleTranscript = HPKEKeyScheduleTranscript(
+                mode: mode.value,
+                presharedKeyIdentifierHash: pskIDHash,
+                infoHash: infoHash
+            )
+
+            let derivedValues = withLabeledExtractedPseudoRandomKey(
+                salt: Optional(sharedSecret),
+                label: HPKE.KeySchedule.secretLabel,
+                inputKeyMaterial: psk,
+                suiteID: ciphersuite.identifier,
+                kdf: ciphersuite.kdf
+            ) { secret in
+                let key: SymmetricKey?
+                let nonce: Data?
+                if ciphersuite.aead.isExportOnly {
+                    key = nil
+                    nonce = nil
+                } else {
+                    key = labeledExpand(
+                        pseudoRandomKey: secret,
+                        label: HPKE.KeySchedule.keyLabel,
+                        transcript: keyScheduleTranscript,
+                        outputByteCount: UInt16(ciphersuite.aead.keyByteCount),
+                        suiteID: ciphersuite.identifier,
+                        kdf: ciphersuite.kdf
+                    )
+
+                    nonce = nonSecretOutputLabeledExpand(
+                        pseudoRandomKey: secret,
+                        label: HPKE.KeySchedule.baseLabel,
+                        transcript: keyScheduleTranscript,
+                        outputByteCount: UInt16(ciphersuite.aead.nonceByteCount),
+                        suiteID: ciphersuite.identifier,
+                        kdf: ciphersuite.kdf
+                    )
+                }
+
+                let exporterSecret = labeledExpand(
+                    pseudoRandomKey: secret,
+                    label: HPKE.KeySchedule.exporterLabel,
+                    transcript: keyScheduleTranscript,
+                    outputByteCount: UInt16(ciphersuite.kdf.Nh),
+                    suiteID: ciphersuite.identifier,
+                    kdf: ciphersuite.kdf
+                )
+
+                return (
+                    key: key,
+                    nonce: nonce,
+                    exporterSecret: exporterSecret
+                )
             }
-            
-            self.exporterSecret = LabeledExpand(prk: secret,
-                                                label: HPKE.KeySchedule.exporterLabel,
-                                                info: keyScheduleContext,
-                                                outputByteCount: UInt16(ciphersuite.kdf.Nh),
-                                                suiteID: ciphersuite.identifier,
-                                                kdf: ciphersuite.kdf)
-            
-            
+
+            self.key = derivedValues.key
+            self.nonce = derivedValues.nonce
+            self.exporterSecret = derivedValues.exporterSecret
             self.ciphersuite = ciphersuite
         }
         
         var maxSequenceNumber: UInt64 {
             get {
                 let nonceBitCount = UInt64(self.ciphersuite.aead.nonceByteCount * 8)
-                if (nonceBitCount >= 64) {
+                if nonceBitCount >= 64 {
                     return UInt64.max
                 }
                 
@@ -131,8 +157,11 @@ extension HPKE {
             guard !self.ciphersuite.aead.isExportOnly else {
                 throw error(HPKE.Errors.exportOnlyMode)
             }
-            
-            let ct = try ciphersuite.aead.seal(msg, authenticating: aad, nonce: currentNonce, using: self.key!)
+            guard let key else {
+                preconditionFailure("HPKE key schedule is missing its encryption key")
+            }
+
+            let ct = try ciphersuite.aead.seal(msg, authenticating: aad, nonce: currentNonce, using: key)
             try incrementSequenceNumber()
             return ct
         }
@@ -141,21 +170,35 @@ extension HPKE {
             guard !self.ciphersuite.aead.isExportOnly else {
                 throw error(HPKE.Errors.exportOnlyMode)
             }
-            
-            let pt = try ciphersuite.aead.open(ciphertext, nonce: currentNonce, authenticating: aad, using: self.key!)
+            guard let key else {
+                preconditionFailure("HPKE key schedule is missing its encryption key")
+            }
+
+            let pt = try ciphersuite.aead.open(ciphertext, nonce: currentNonce, authenticating: aad, using: key)
             try incrementSequenceNumber()
             return pt
         }
         
         var currentNonce: Data {
-            var nonceData = [UInt8](repeating: 0, count: ciphersuite.aead.nonceByteCount - MemoryLayout.size(ofValue: sequenceNumber))
-            var bigEndian = sequenceNumber.bigEndian
-            withUnsafeBytes(of: &(bigEndian)) { (bufferPointer) in
-                nonceData.append(contentsOf: bufferPointer)
+            guard let nonce else {
+                preconditionFailure("HPKE key schedule is missing its base nonce")
             }
-            let nonce = self.nonce!
-            precondition(nonce.count == nonceData.count)
-            return Data(zip(nonceData, nonce).lazy.map { $0.0 ^ $0.1 })
+            guard sequenceNumber != 0 else {
+                return nonce
+            }
+            precondition(nonce.count >= MemoryLayout<UInt64>.size)
+
+            var currentNonce = nonce
+            var encodedSequenceNumber = sequenceNumber.bigEndian
+            currentNonce.withUnsafeMutableBytes { nonceBytes in
+                withUnsafeBytes(of: &encodedSequenceNumber) { sequenceBytes in
+                    let sequenceOffset = nonceBytes.count - sequenceBytes.count
+                    for index in sequenceBytes.indices {
+                        nonceBytes[sequenceOffset + index] ^= sequenceBytes[index]
+                    }
+                }
+            }
+            return currentNonce
         }
     }
 }
