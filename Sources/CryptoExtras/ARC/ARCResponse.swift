@@ -52,18 +52,24 @@ extension ARC {
             serverPublicKey: ServerPublicKey<H2G>,
             generatorG: Group.Element,
             generatorH: Group.Element,
-            b: Group.Scalar = Group.Scalar.random,
+            b: Group.Scalar,
             ciphersuite: Ciphersuite<H2G>
         ) throws {
-            let U = b * generatorG
-            let X0Aux = b * serverPrivateKey.x0Blinding * generatorH
-            let X1Aux = b * serverPublicKey.X1
-            let X2Aux = b * serverPublicKey.X2
-            let HAux = b * generatorH
+            let U = try generatorG.multiplied(by: b)
+            let blindedX0 = try b.multiplied(by: serverPrivateKey.x0Blinding)
+            let X0Aux = try generatorH.multiplied(by: blindedX0)
+            let X1Aux = try serverPublicKey.X1.multiplied(by: b)
+            let X2Aux = try serverPublicKey.X2.multiplied(by: b)
+            let HAux = try generatorH.multiplied(by: b)
 
             // Enc(U') = b * (Enc(x0) + x1 * Enc(m1) + x2 * Enc(m2)), for a homomorphic encryption scheme
             //         = b * (X0 + x1 * request.m1Enc + x2 * request.m2Enc)
-            let encUPrime = b * (serverPublicKey.X0 + serverPrivateKey.x1 * request.m1Enc + serverPrivateKey.x2 * request.m2Enc)
+            let x1Commitment = try request.m1Enc.multiplied(by: serverPrivateKey.x1)
+            let x2Commitment = try request.m2Enc.multiplied(by: serverPrivateKey.x2)
+            let encryptedMessage = try serverPublicKey.X0
+                .adding(x1Commitment)
+                .adding(x2Commitment)
+            let encUPrime = try encryptedMessage.multiplied(by: b)
 
             // Create a prover, and allocate variables for the constrained scalars.
             var prover = Prover<H2G>(label: ciphersuite.domain + ciphersuite.domain + "CredentialResponse")
@@ -72,8 +78,10 @@ extension ARC {
             let x2Var = prover.appendScalar(label: "x2", assignment: serverPrivateKey.x2)
             let x0BlindingVar = prover.appendScalar(label: "x0Blinding", assignment: serverPrivateKey.x0Blinding)
             let bVar = prover.appendScalar(label: "b", assignment: b)
-            let t1Var = prover.appendScalar(label: "t1", assignment: b * serverPrivateKey.x1)
-            let t2Var = prover.appendScalar(label: "t2", assignment: b * serverPrivateKey.x2)
+            let t1 = try b.multiplied(by: serverPrivateKey.x1)
+            let t2 = try b.multiplied(by: serverPrivateKey.x2)
+            let t1Var = prover.appendScalar(label: "t1", assignment: t1)
+            let t2Var = prover.appendScalar(label: "t2", assignment: t2)
 
             // Allocate variables for the constrained points, and add the constraints.
             CredentialResponse.proofConstrain(participant: &prover, request: request, generatorG: generatorG, generatorH: generatorH, U: U, encUPrime: encUPrime, X0: serverPublicKey.X0, X1: serverPublicKey.X1, X2: serverPublicKey.X2, X0Aux: X0Aux, X1Aux: X1Aux, X2Aux: X2Aux, HAux: HAux, x0Var: x0Var, x0BlindingVar: x0BlindingVar, x1Var: x1Var, x2Var: x2Var, bVar: bVar, t1Var: t1Var, t2Var: t2Var)
@@ -102,7 +110,7 @@ extension ARC {
 
         func verify(request: CredentialRequest<H2G>, serverPublicKey: ServerPublicKey<H2G>, generatorG: Group.Element, generatorH: Group.Element, ciphersuite: Ciphersuite<H2G>) throws -> Bool {
             // Check that U, encUPrime are not 0
-            if (self.U == self.U + self.U) || (self.encUPrime == self.encUPrime + self.encUPrime) {
+            if try self.U.isIdentity() || self.encUPrime.isIdentity() {
                 return false
             }
 
@@ -122,7 +130,7 @@ extension ARC {
             return try verifier.verify(proof: self.proof)
         }
 
-        static internal func proofConstrain<P: ProofParticipant>(participant: inout P, request: CredentialRequest<H2G>, generatorG: Group.Element, generatorH: Group.Element, U: Group.Element, encUPrime: Group.Element, X0: Group.Element, X1: Group.Element, X2: Group.Element, X0Aux: Group.Element, X1Aux: Group.Element, X2Aux: Group.Element, HAux: Group.Element, x0Var: ScalarVar, x0BlindingVar: ScalarVar, x1Var: ScalarVar, x2Var: ScalarVar, bVar: ScalarVar, t1Var: ScalarVar, t2Var: ScalarVar) {
+        static internal func proofConstrain<P: ProofParticipant>(participant: inout P, request: CredentialRequest<H2G>, generatorG: Group.Element, generatorH: Group.Element, U: Group.Element, encUPrime: Group.Element, X0: Group.Element, X1: Group.Element, X2: Group.Element, X0Aux: Group.Element, X1Aux: Group.Element, X2Aux: Group.Element, HAux: Group.Element, x0Var: ScalarVar, x0BlindingVar: ScalarVar, x1Var: ScalarVar, x2Var: ScalarVar, bVar: ScalarVar, t1Var: ScalarVar, t2Var: ScalarVar) where P.Point == Group.Element {
             // Allocate point variables
             let genGVar = participant.appendPoint(label: "genG", assignment: generatorG)
             let genHVar = participant.appendPoint(label: "genH", assignment: generatorH)

@@ -16,6 +16,12 @@ import XCTest
 import Crypto
 
 class ARCEncodingTests: XCTestCase {
+    private typealias Point = P256._ARCV1.H2G.G.Element
+
+    private func assertEqual(_ left: Point, _ right: Point) throws {
+        XCTAssertTrue(try left.isEqual(to: right))
+    }
+
     func assertServerPublicKeyEncoding() throws {
         let ciphersuite = P256._ARCV1.ciphersuite
         let server = try ARC.Server(ciphersuite: ciphersuite)
@@ -23,9 +29,9 @@ class ARCEncodingTests: XCTestCase {
 
         let publicKeyData = publicKey.serialize(ciphersuite: ciphersuite)
         let publicKey2 = try ARC.ServerPublicKey.deserialize(serverPublicKeyData: publicKeyData, ciphersuite: ciphersuite)
-        XCTAssert(publicKey.X0 == publicKey2.X0)
-        XCTAssert(publicKey.X1 == publicKey2.X1)
-        XCTAssert(publicKey.X2 == publicKey2.X2)
+        try self.assertEqual(publicKey.X0, publicKey2.X0)
+        try self.assertEqual(publicKey.X1, publicKey2.X1)
+        try self.assertEqual(publicKey.X2, publicKey2.X2)
 
         let publicKeyData2 = publicKey2.serialize(ciphersuite: ciphersuite)
         XCTAssertEqual(publicKeyData, publicKeyData2)
@@ -44,8 +50,8 @@ class ARCEncodingTests: XCTestCase {
 
         let requestData = request.serialize(ciphersuite: ciphersuite)
         let request2 = try ARC.CredentialRequest.deserialize(requestData: requestData, ciphersuite: ciphersuite)
-        XCTAssert(request.m1Enc == request2.m1Enc)
-        XCTAssert(request.m2Enc == request2.m2Enc)
+        try self.assertEqual(request.m1Enc, request2.m1Enc)
+        try self.assertEqual(request.m2Enc, request2.m2Enc)
         XCTAssert(request.proof.challenge == request2.proof.challenge)
         for (index, response) in request.proof.responses.enumerated() {
             XCTAssert(response == request2.proof.responses[index])
@@ -69,12 +75,12 @@ class ARCEncodingTests: XCTestCase {
 
         let responseData = response.serialize(ciphersuite: ciphersuite)
         let response2 = try ARC.CredentialResponse.deserialize(responseData: responseData, ciphersuite: ciphersuite)
-        XCTAssert(response.U == response2.U)
-        XCTAssert(response.encUPrime == response2.encUPrime)
-        XCTAssert(response.X0Aux == response2.X0Aux)
-        XCTAssert(response.X1Aux == response2.X1Aux)
-        XCTAssert(response.X2Aux == response2.X2Aux)
-        XCTAssert(response.HAux == response2.HAux)
+        try self.assertEqual(response.U, response2.U)
+        try self.assertEqual(response.encUPrime, response2.encUPrime)
+        try self.assertEqual(response.X0Aux, response2.X0Aux)
+        try self.assertEqual(response.X1Aux, response2.X1Aux)
+        try self.assertEqual(response.X2Aux, response2.X2Aux)
+        try self.assertEqual(response.HAux, response2.HAux)
         XCTAssert(response.proof.challenge == response2.proof.challenge)
         for (index, response) in response.proof.responses.enumerated() {
             XCTAssert(response == response2.proof.responses[index])
@@ -100,11 +106,11 @@ class ARCEncodingTests: XCTestCase {
         let credentialData = try credential.serialize(ciphersuite: ciphersuite)
         let credential2 = try ARC.Credential.deserialize(credentialData: credentialData, ciphersuite: ciphersuite)
         XCTAssert(credential.m1 == credential2.m1)
-        XCTAssert(credential.U == credential2.U)
-        XCTAssert(credential.UPrime == credential2.UPrime)
-        XCTAssert(credential.X1 == credential2.X1)
-        XCTAssert(credential.generatorG == credential2.generatorG)
-        XCTAssert(credential.generatorH == credential2.generatorH)
+        try self.assertEqual(credential.U, credential2.U)
+        try self.assertEqual(credential.UPrime, credential2.UPrime)
+        try self.assertEqual(credential.X1, credential2.X1)
+        try self.assertEqual(credential.generatorG, credential2.generatorG)
+        try self.assertEqual(credential.generatorH, credential2.generatorH)
         for (key, value) in credential.presentationState.state {
             XCTAssertEqual(value.0, credential2.presentationState.state[key]?.0)
             XCTAssertEqual(value.1, credential2.presentationState.state[key]?.1)
@@ -130,10 +136,10 @@ class ARCEncodingTests: XCTestCase {
 
         let presentationData = presentation.serialize(ciphersuite: ciphersuite)
         let presentation2 = try ARC.Presentation.deserialize(presentationData: presentationData, ciphersuite: ciphersuite)
-        XCTAssert(presentation.U == presentation2.U)
-        XCTAssert(presentation.UPrimeCommit == presentation2.UPrimeCommit)
-        XCTAssert(presentation.m1Commit == presentation2.m1Commit)
-        XCTAssert(presentation.tag == presentation2.tag)
+        try self.assertEqual(presentation.U, presentation2.U)
+        try self.assertEqual(presentation.UPrimeCommit, presentation2.UPrimeCommit)
+        try self.assertEqual(presentation.m1Commit, presentation2.m1Commit)
+        try self.assertEqual(presentation.tag, presentation2.tag)
         XCTAssert(presentation.proof.challenge == presentation2.proof.challenge)
         for (index, response) in presentation.proof.responses.enumerated() {
             XCTAssert(response == presentation2.proof.responses[index])

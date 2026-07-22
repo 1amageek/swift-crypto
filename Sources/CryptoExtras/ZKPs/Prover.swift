@@ -43,8 +43,18 @@ struct Prover<H2G: HashToGroup>: ProofParticipant {
     }
 
     func prove() throws(CryptoKitMetaError) -> Proof<H2G> {
+        try self.prove(randomScalar: Group.Scalar.randomNonzero)
+    }
+
+    func prove(
+        randomScalar: () throws(CryptoKitMetaError) -> Group.Scalar
+    ) throws(CryptoKitMetaError) -> Proof<H2G> {
         // Create a blinding scalar for each scalar variable.
-        let blindings = (0..<self.scalars.count).map { _ in Group.Scalar.random }
+        var blindings: [Group.Scalar] = []
+        blindings.reserveCapacity(self.scalars.count)
+        for _ in self.scalars.indices {
+            blindings.append(try randomScalar())
+        }
         return try self.proveWithFixedRandomness(blindings: blindings)
     }
 
@@ -57,6 +67,9 @@ struct Prover<H2G: HashToGroup>: ProofParticipant {
         // Check that there is one blinding scalar for each allocated scalar variable.
         if (blindings.count != self.scalars.count) {
             throw cryptoExtrasError(ZKPErrors.invalidInputLength)
+        }
+        if blindings.contains(.zero) {
+            throw cryptoExtrasError(ZKPErrors.invalidScalar)
         }
 
         // For each constraint, compute the blinded version of the constraint element.
@@ -75,16 +88,19 @@ struct Prover<H2G: HashToGroup>: ProofParticipant {
                 }
             }
 
-            // TODO: expose the identity point from ECToolbox, and use `.reduce(0, +)` instead.
-            // Compute the first multiplication in the constraint.
-            let scalarIndex = linearCombination[0].0.index
-            let pointIndex = linearCombination[0].1.index
-            let firstBlindedPoint = blindings[scalarIndex] * self.points[pointIndex]
+            guard let firstTerm = linearCombination.first else {
+                throw cryptoExtrasError(ZKPErrors.invalidProofFields)
+            }
 
-            // Compute the rest of the multiplications in the constraint.
-            let blindedPoint = (linearCombination[1...]).map { (scalar, point) in
-                blindings[scalar.index] * self.points[point.index]
-            }.reduce(firstBlindedPoint, +)
+            var blindedPoint = try self.points[firstTerm.1.index].multiplied(
+                by: blindings[firstTerm.0.index]
+            )
+            for (scalar, point) in linearCombination.dropFirst() {
+                let product = try self.points[point.index].multiplied(
+                    by: blindings[scalar.index]
+                )
+                blindedPoint = try blindedPoint.adding(product)
+            }
 
             blindedPoints.append(blindedPoint)
             blindedPointsLabels.append(self.pointLabels[constraintPoint.index] + "-blind")
@@ -98,7 +114,8 @@ struct Prover<H2G: HashToGroup>: ProofParticipant {
         var responses: [Group.Scalar] = []
         for (index, scalar) in self.scalars.enumerated() {
             let blinding = blindings[index]
-            responses.append(blinding - challenge * scalar)
+            let challengeResponse = try challenge.multiplied(by: scalar)
+            responses.append(try blinding.subtracting(challengeResponse))
         }
 
         return Proof(challenge: challenge, responses: responses)

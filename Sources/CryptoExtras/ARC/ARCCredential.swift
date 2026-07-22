@@ -40,7 +40,12 @@ extension ARC {
             }
 
             // Decrypt Enc(U') from the credential response, to get U'
-            let UPrime = credentialResponse.encUPrime - credentialResponse.X0Aux - clientSecrets.r1 * credentialResponse.X1Aux - clientSecrets.r2 * credentialResponse.X2Aux
+            let r1Commitment = try credentialResponse.X1Aux.multiplied(by: clientSecrets.r1)
+            let r2Commitment = try credentialResponse.X2Aux.multiplied(by: clientSecrets.r2)
+            let UPrime = try credentialResponse.encUPrime
+                .subtracting(credentialResponse.X0Aux)
+                .subtracting(r1Commitment)
+                .subtracting(r2Commitment)
 
             self = Self(m1: clientSecrets.m1, U: credentialResponse.U, UPrime: UPrime, X1: serverPublicKey.X1, ciphersuite: ciphersuite, generatorG: generatorG, generatorH: generatorH, presentationState: ARC.PresentationState())
         }
@@ -56,9 +61,37 @@ extension ARC {
             self.presentationState = presentationState
         }
 
-        mutating func makePresentation(presentationContext: Data, presentationLimit: Int, a: Group.Scalar = Group.Scalar.random, r: Group.Scalar = Group.Scalar.random, z: Group.Scalar = Group.Scalar.random, optionalNonce: Int? = nil) throws -> (Presentation<H2G>, Int) {
-            let nonce = try self.presentationState.update(presentationContext: presentationContext, presentationLimit: presentationLimit, optionalNonce: optionalNonce)
+        mutating func makePresentation(
+            presentationContext: Data,
+            presentationLimit: Int,
+            optionalNonce: Int? = nil
+        ) throws -> (Presentation<H2G>, Int) {
+            try self.makePresentation(
+                presentationContext: presentationContext,
+                presentationLimit: presentationLimit,
+                a: Group.Scalar.randomNonzero(),
+                r: Group.Scalar.randomNonzero(),
+                z: Group.Scalar.randomNonzero(),
+                optionalNonce: optionalNonce
+            )
+        }
+
+        mutating func makePresentation(
+            presentationContext: Data,
+            presentationLimit: Int,
+            a: Group.Scalar,
+            r: Group.Scalar,
+            z: Group.Scalar,
+            optionalNonce: Int? = nil
+        ) throws -> (Presentation<H2G>, Int) {
+            var updatedPresentationState = self.presentationState
+            let nonce = try updatedPresentationState.update(
+                presentationContext: presentationContext,
+                presentationLimit: presentationLimit,
+                optionalNonce: optionalNonce
+            )
             let presentation = try Presentation<H2G>(credential: self, a: a, r: r, z: z, presentationContext: presentationContext, nonce: nonce, generatorG: self.generatorG, generatorH: self.generatorH)
+            self.presentationState = updatedPresentationState
             return (presentation, nonce)
         }
     }
@@ -83,11 +116,15 @@ extension ARC {
             }
             // If optionalNonce is set, use that nonce (eg for test vectors).
             // Otherwise, generate a random nonce that has not yet been used.
-            var nonce = optionalNonce != nil ? optionalNonce! : Int.random(in: 0..<presentationLimit)
+            var nonce: Int
+            if let optionalNonce {
+                nonce = optionalNonce
+            } else {
+                nonce = Int.random(in: 0..<presentationLimit)
+            }
 
             // Store the nonce in presentationNonces for that presentationContext.
-            if self.state[presentationContext] != nil {
-                let presentationContextState = self.state[presentationContext]!
+            if let presentationContextState = self.state[presentationContext] {
                 if presentationLimit != presentationContextState.0 {
                     throw ARC.Errors.invalidPresentationLimit
                 }
@@ -105,7 +142,9 @@ extension ARC {
                     }
                 }
 
-                self.state[presentationContext]!.1.insert(nonce)
+                var updatedState = presentationContextState
+                updatedState.1.insert(nonce)
+                self.state[presentationContext] = updatedState
             } else {
                 self.state[presentationContext] = (presentationLimit, [nonce])
             }

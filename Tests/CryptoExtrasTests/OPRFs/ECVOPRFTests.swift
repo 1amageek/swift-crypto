@@ -410,7 +410,7 @@ final class ECVOPRFTests: XCTestCase {
             error: OPRF.Errors.invalidScalar
         )
 
-        let privateKey = Group.Scalar.random
+        let privateKey = try Group.Scalar.randomNonzero()
         let client = try OPRF.VerifiableClient(ciphersuite: ciphersuite, mode: .verifiable)
         let server = try OPRF.VerifiableServer(
             ciphersuite: ciphersuite,
@@ -418,7 +418,10 @@ final class ECVOPRFTests: XCTestCase {
             mode: .verifiable
         )
         let messages = [Data("first".utf8), Data("second".utf8)]
-        let blinds = [Group.Scalar.random, Group.Scalar.random]
+        let blinds = [
+            try Group.Scalar.randomNonzero(),
+            try Group.Scalar.randomNonzero(),
+        ]
         var blindedElements: [Group.Element] = []
         blindedElements.reserveCapacity(messages.count)
         for index in messages.indices {
@@ -519,21 +522,23 @@ final class ECVOPRFTests: XCTestCase {
             error: OPRF.Errors.infoTooLong
         )
 
-        let secretScalar = HashToGroup.G.Scalar.random
+        let secretScalar = try HashToGroup.G.Scalar.randomNonzero()
         let point = try HashToGroup.G.Element.generator()
+        let publicKey = try point.multiplied(by: secretScalar)
+        let proofScalar = try HashToGroup.G.Scalar.randomNonzero()
         let oversizedBatch = repeatElement(point, count: Int(UInt16.max) + 2)
         XCTAssertThrowsError(
             try DLEQ<HashToGroup>.prove(
                 secretScalar: secretScalar,
                 generator: point,
-                publicKey: secretScalar * point,
+                publicKey: publicKey,
                 inputs: oversizedBatch,
                 outputs: oversizedBatch,
                 context: Data(),
                 hashToScalarDomainSeparationTag: HashToGroup.hashToScalarDomainSeparationTag(
                     context: Data()
                 ),
-                proofScalar: .random
+                proofScalar: proofScalar
             ),
             error: OPRF.Errors.batchTooLarge
         )
@@ -541,19 +546,22 @@ final class ECVOPRFTests: XCTestCase {
 
     func testEmptyDLEQBatchFails() throws {
         typealias HashToGroup = CurveHashToGroup<P256>
-        let secretScalar = HashToGroup.G.Scalar.random
+        let secretScalar = try HashToGroup.G.Scalar.randomNonzero()
+        let generator = try HashToGroup.G.Element.generator()
+        let publicKey = try generator.multiplied(by: secretScalar)
+        let proofScalar = try HashToGroup.G.Scalar.randomNonzero()
         XCTAssertThrowsError(
             try DLEQ<HashToGroup>.prove(
                 secretScalar: secretScalar,
-                generator: HashToGroup.G.Element.generator(),
-                publicKey: secretScalar * HashToGroup.G.Element.generator(),
+                generator: generator,
+                publicKey: publicKey,
                 inputs: [HashToGroup.G.Element](),
                 outputs: [HashToGroup.G.Element](),
                 context: Data(),
                 hashToScalarDomainSeparationTag: HashToGroup.hashToScalarDomainSeparationTag(
                     context: Data()
                 ),
-                proofScalar: .random
+                proofScalar: proofScalar
             )
         ) { error in
             guard case OPRF.Errors.emptyBatch = error else {
@@ -572,28 +580,31 @@ final class ECVOPRFTests: XCTestCase {
         }
     }
 
-    func testDistributivity() {
-        let multiplier = PrimeOrderCurveGroup<P256>.Scalar.random
-        let first = PrimeOrderCurveGroup<P256>.Scalar.random
-        let second = PrimeOrderCurveGroup<P256>.Scalar.random
+    func testDistributivity() throws {
+        let multiplier = try PrimeOrderCurveGroup<P256>.Scalar.randomNonzero()
+        let first = try PrimeOrderCurveGroup<P256>.Scalar.randomNonzero()
+        let second = try PrimeOrderCurveGroup<P256>.Scalar.randomNonzero()
 
-        let sum = first + second
-        let firstProduct = first * multiplier
-        let secondProduct = second * multiplier
+        let sum = try first.adding(second)
+        let firstProduct = try first.multiplied(by: multiplier)
+        let secondProduct = try second.multiplied(by: multiplier)
+        let sumProduct = try sum.multiplied(by: multiplier)
 
-        XCTAssertEqual(sum - second, first)
-        XCTAssertEqual(sum - first, second)
-        XCTAssertEqual(sum * multiplier - secondProduct, firstProduct)
-        XCTAssertEqual(sum * multiplier - firstProduct, secondProduct)
+        XCTAssertEqual(try sum.subtracting(second), first)
+        XCTAssertEqual(try sum.subtracting(first), second)
+        XCTAssertEqual(try sumProduct.subtracting(secondProduct), firstProduct)
+        XCTAssertEqual(try sumProduct.subtracting(firstProduct), secondProduct)
     }
 
     func testDLEQProof() throws {
         typealias HashToGroup = CurveHashToGroup<P256>
-        let secretScalar = HashToGroup.G.Scalar.random
+        let secretScalar = try HashToGroup.G.Scalar.randomNonzero()
         let generator = try HashToGroup.G.Element.generator()
-        let publicKey = secretScalar * generator
-        let input = HashToGroup.G.Element.random
-        let output = secretScalar * input
+        let publicKey = try generator.multiplied(by: secretScalar)
+        let inputScalar = try HashToGroup.G.Scalar.randomNonzero()
+        let input = try generator.multiplied(by: inputScalar)
+        let output = try input.multiplied(by: secretScalar)
+        let proofScalar = try HashToGroup.G.Scalar.randomNonzero()
         let hashToScalarDomainSeparationTag = HashToGroup.hashToScalarDomainSeparationTag(
             context: Data()
         )
@@ -606,7 +617,7 @@ final class ECVOPRFTests: XCTestCase {
             outputs: CollectionOfOne(output),
             context: Data(),
             hashToScalarDomainSeparationTag: hashToScalarDomainSeparationTag,
-            proofScalar: .random
+            proofScalar: proofScalar
         )
 
         XCTAssertTrue(

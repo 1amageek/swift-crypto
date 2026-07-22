@@ -232,12 +232,6 @@ struct PrimeOrderCurveScalar<C: HashToGroupCurve>: GroupScalar, CustomStringConv
         return Self(reducedInteger)
     }
 
-    static var random: Self {
-        requireCryptographicInvariant("Unable to generate a group scalar") {
-            try Self.randomNonzero()
-        }
-    }
-
     static func randomNonzero() throws(CryptoKitMetaError) -> Self {
         try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
             let runtime = try C.runtime()
@@ -282,18 +276,6 @@ struct PrimeOrderCurveScalar<C: HashToGroupCurve>: GroupScalar, CustomStringConv
         Self(.zero)
     }
 
-    static func + (left: Self, right: Self) -> Self {
-        requireCryptographicInvariant("Unable to add group scalars") {
-            try left.adding(right)
-        }
-    }
-
-    static func - (left: Self, right: Self) -> Self {
-        requireCryptographicInvariant("Unable to subtract group scalars") {
-            try left.subtracting(right)
-        }
-    }
-
     func inverted() throws(CryptoKitMetaError) -> Self {
         let inverse = try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
             let runtime = try C.runtime()
@@ -303,18 +285,6 @@ struct PrimeOrderCurveScalar<C: HashToGroupCurve>: GroupScalar, CustomStringConv
             throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
         }
         return Self(inverse)
-    }
-
-    static func * (left: Self, right: Self) -> Self {
-        requireCryptographicInvariant("Unable to multiply group scalars") {
-            try left.multiplied(by: right)
-        }
-    }
-
-    static prefix func - (left: Self) -> Self {
-        requireCryptographicInvariant("Unable to negate a group scalar") {
-            try left.negated()
-        }
     }
 
     static func == (left: Self, right: Self) -> Bool {
@@ -371,20 +341,6 @@ struct PrimeOrderCurvePoint<C: HashToGroupCurve>: GroupElement {
         }
     }
 
-    static var random: Self {
-        requireCryptographicInvariant("Unable to generate a group element") {
-            let runtime = try C.runtime()
-            let randomBytes = SystemRandomNumberGenerator.randomBytes(count: runtime.group.order.byteCount)
-            let dst = Data("Random EC Point Generation".utf8)
-            let point = try EllipticCurvePoint(
-                hashing: randomBytes,
-                to: runtime.group,
-                domainSeparationTag: dst
-            )
-            return Self(point: point)
-        }
-    }
-
     consuming func adding(_ other: consuming Self) throws(CryptoKitMetaError) -> Self {
         try withCryptoExtrasBoringError { () throws(CryptoBoringWrapperError) in
             let runtime = try C.runtime()
@@ -419,35 +375,6 @@ struct PrimeOrderCurvePoint<C: HashToGroupCurve>: GroupElement {
         }
     }
 
-    static func + (left: Self, right: Self) -> Self {
-        requireCryptographicInvariant("Unable to add group elements") {
-            try left.adding(right)
-        }
-    }
-
-    static func - (left: Self, right: Self) -> Self {
-        requireCryptographicInvariant("Unable to subtract group elements") {
-            try left.subtracting(right)
-        }
-    }
-
-    static prefix func - (left: Self) -> Self {
-        requireCryptographicInvariant("Unable to negate a group element") {
-            try left.negated()
-        }
-    }
-
-    static func * (left: Scalar, right: Self) -> Self {
-        requireCryptographicInvariant("Unable to multiply a group element") {
-            try right.multiplied(by: left)
-        }
-    }
-
-    static func == (left: Self, right: Self) -> Bool {
-        requireCryptographicInvariant("Unable to compare group elements") {
-            try left.isEqual(to: right)
-        }
-    }
 }
 
 extension PrimeOrderCurvePoint {

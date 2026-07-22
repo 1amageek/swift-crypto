@@ -16,42 +16,69 @@ import Crypto
 import XCTest
 
 class ARCTests: XCTestCase {
+    private typealias Group = PrimeOrderCurveGroup<P256>
+
+    private func assertEqual(_ left: Group.Element, _ right: Group.Element) throws {
+        XCTAssertTrue(try left.isEqual(to: right))
+    }
+
     func assertEndToEndWorkflow() throws {
         let ciphersuite = P256._ARCV1.ciphersuite
         let (generatorG, generatorH) = try ARC.getGenerators(suite: ciphersuite)
 
         // Create a server, passing in the server keys and key blinding.
-        let x0 = PrimeOrderCurveGroup<P256>.Scalar.random
-        let x1 = PrimeOrderCurveGroup<P256>.Scalar.random
-        let x2 = PrimeOrderCurveGroup<P256>.Scalar.random
-        let x0Blinding = PrimeOrderCurveGroup<P256>.Scalar.random
+        let x0 = try Group.Scalar.randomNonzero()
+        let x1 = try Group.Scalar.randomNonzero()
+        let x2 = try Group.Scalar.randomNonzero()
+        let x0Blinding = try Group.Scalar.randomNonzero()
         let serverPrivateKey = ARC.ServerPrivateKey(x0: x0, x1: x1, x2: x2, x0Blinding: x0Blinding)
         let server = try ARC.Server(ciphersuite: ciphersuite, x0: x0, x1: x1, x2: x2, x0Blinding: x0Blinding)
         let serverPublicKey = server.serverPublicKey
-        XCTAssert(serverPublicKey.X0 == x0 * generatorG + x0Blinding * generatorH)
-        XCTAssert(serverPublicKey.X1 == x1 * generatorH)
-        XCTAssert(serverPublicKey.X2 == x2 * generatorH)
+        let x0Commitment = try generatorG.multiplied(by: x0)
+        let x0BlindingCommitment = try generatorH.multiplied(by: x0Blinding)
+        try self.assertEqual(
+            serverPublicKey.X0,
+            x0Commitment.adding(x0BlindingCommitment)
+        )
+        try self.assertEqual(serverPublicKey.X1, generatorH.multiplied(by: x1))
+        try self.assertEqual(serverPublicKey.X2, generatorH.multiplied(by: x2))
 
         // Create a client with two private attributes.
         let presentationLimit = 2
         let requestContext = Data("test request context".utf8)
-        let m1 = PrimeOrderCurveGroup<P256>.Scalar.random
-        let r1 = PrimeOrderCurveGroup<P256>.Scalar.random
-        let r2 = PrimeOrderCurveGroup<P256>.Scalar.random
+        let m1 = try Group.Scalar.randomNonzero()
+        let r1 = try Group.Scalar.randomNonzero()
+        let r2 = try Group.Scalar.randomNonzero()
         let precredential = try ARC.Precredential(ciphersuite: ciphersuite, m1: m1, requestContext: requestContext, r1: r1, r2: r2, serverPublicKey: serverPublicKey)
 
         // Client makes an CredentialRequest using its private attributes.
         let request = precredential.credentialRequest
-        let m1Decrypted = request.m1Enc - r1 * generatorH
-        XCTAssert(m1Decrypted == m1 * generatorG)
-        let m2Decrypted = request.m2Enc - r2 * generatorH
-        XCTAssert(m2Decrypted == precredential.clientSecrets.m2 * generatorG)
+        let r1Commitment = try generatorH.multiplied(by: r1)
+        let m1Decrypted = try request.m1Enc.subtracting(r1Commitment)
+        try self.assertEqual(m1Decrypted, generatorG.multiplied(by: m1))
+        let r2Commitment = try generatorH.multiplied(by: r2)
+        let m2Decrypted = try request.m2Enc.subtracting(r2Commitment)
+        try self.assertEqual(
+            m2Decrypted,
+            generatorG.multiplied(by: precredential.clientSecrets.m2)
+        )
         XCTAssert(try request.verify(generatorG: generatorG, generatorH: generatorH, ciphersuite: ciphersuite))
 
         // Server receives the CredentialRequest, and makes an CredentialResponse with its server keys.
         let issuance = try server.respond(credentialRequest: request)
-        let decryptedUPrime = issuance.encUPrime - issuance.X0Aux - r1 * issuance.X1Aux - r2 * issuance.X2Aux
-        XCTAssert(decryptedUPrime == (x0 + m1 * x1 + precredential.clientSecrets.m2 * x2) * issuance.U)
+        let r1X1 = try issuance.X1Aux.multiplied(by: r1)
+        let r2X2 = try issuance.X2Aux.multiplied(by: r2)
+        let decryptedUPrime = try issuance.encUPrime
+            .subtracting(issuance.X0Aux)
+            .subtracting(r1X1)
+            .subtracting(r2X2)
+        let m1x1 = try m1.multiplied(by: x1)
+        let m2x2 = try precredential.clientSecrets.m2.multiplied(by: x2)
+        let credentialScalar = try x0.adding(m1x1).adding(m2x2)
+        try self.assertEqual(
+            decryptedUPrime,
+            issuance.U.multiplied(by: credentialScalar)
+        )
 
         // Client receives the CredentialResponse, and uses it to make a credential from the precredential.
         var credential = try precredential.makeCredential(credentialResponse: issuance)
@@ -75,9 +102,10 @@ class ARCTests: XCTestCase {
         // Server verifies Presentation1 with its server keys.
         XCTAssert(try server.verify(presentation: presentation1, requestContext: requestContext, presentationContext: presentationContext, presentationLimit: presentationLimit, nonce: nonce1))
         // Verify presentation individually
+        let serverX1 = try generatorH.multiplied(by: x1)
         XCTAssert(try presentation1.verify(
             serverPrivateKey: serverPrivateKey,
-            X1: x1 * generatorH,
+            X1: serverX1,
             m2: precredential.clientSecrets.m2,
             presentationContext: presentationContext,
             presentationLimit: presentationLimit,
@@ -96,7 +124,7 @@ class ARCTests: XCTestCase {
         // Verify presentation individually
         XCTAssert(try presentation2.verify(
             serverPrivateKey: serverPrivateKey,
-            X1: x1 * generatorH,
+            X1: serverX1,
             m2: precredential.clientSecrets.m2,
             presentationContext: presentationContext,
             presentationLimit: presentationLimit,
@@ -155,6 +183,54 @@ class ARCTests: XCTestCase {
         try assertEndToEndWorkflow()
     }
 
+    func testFailedPresentationDoesNotConsumeNonce() throws {
+        let ciphersuite = P256._ARCV1.ciphersuite
+        let server = try ARC.Server(ciphersuite: ciphersuite)
+        let requestContext = Data("request context".utf8)
+        let precredential = try ARC.Precredential(
+            ciphersuite: ciphersuite,
+            requestContext: requestContext,
+            serverPublicKey: server.serverPublicKey
+        )
+        let response = try server.respond(
+            credentialRequest: precredential.credentialRequest
+        )
+        let credential = try precredential.makeCredential(
+            credentialResponse: response
+        )
+
+        var oneBytes = Data(repeating: 0, count: ciphersuite.scalarByteCount)
+        oneBytes[oneBytes.index(before: oneBytes.endIndex)] = 1
+        let one = try Group.Scalar(canonicalRepresentation: oneBytes)
+        let negativeOne = try one.negated()
+        var failingCredential = ARC.Credential(
+            m1: negativeOne,
+            U: credential.U,
+            UPrime: credential.UPrime,
+            X1: credential.X1,
+            ciphersuite: credential.ciphersuite,
+            generatorG: credential.generatorG,
+            generatorH: credential.generatorH,
+            presentationState: ARC.PresentationState()
+        )
+
+        let presentationContext = Data("presentation context".utf8)
+        let a = try Group.Scalar.randomNonzero()
+        let r = try Group.Scalar.randomNonzero()
+        let z = try Group.Scalar.randomNonzero()
+        XCTAssertThrowsError(
+            try failingCredential.makePresentation(
+                presentationContext: presentationContext,
+                presentationLimit: 2,
+                a: a,
+                r: r,
+                z: z,
+                optionalNonce: 1
+            )
+        )
+        XCTAssertTrue(failingCredential.presentationState.state.isEmpty)
+    }
+
     func testPresentationState() throws {
         let context1 = Data("context1".utf8)
         let context2 = Data("context2".utf8)
@@ -183,7 +259,10 @@ class ARCTests: XCTestCase {
             }
             // Test that exceeding the rate limit for a presentationContext throws an error
             XCTAssertThrowsError(try largePresentationState.update(presentationContext: presentationContext, presentationLimit: presentationLimit), error: ARC.Errors.presentationLimitExceeded)
-            XCTAssertEqual(largePresentationState.state[presentationContext]!.1.count, presentationLimit)
+            guard let storedState = largePresentationState.state[presentationContext] else {
+                return XCTFail("Expected stored presentation state")
+            }
+            XCTAssertEqual(storedState.1.count, presentationLimit)
             // Test that using an incorrect presentationLimit throws an error
             XCTAssertThrowsError(try largePresentationState.update(presentationContext: presentationContext, presentationLimit: presentationLimit-1), error: ARC.Errors.invalidPresentationLimit)
         }

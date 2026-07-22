@@ -280,9 +280,9 @@ extension P256._ARCV1.PublicKey {
     ) throws -> P256._ARCV1.Precredential {
         try self.prepareCredentialRequest(
             requestContext: requestContext,
-            m1: .random,
-            r1: .random,
-            r2: .random
+            m1: .randomNonzero(),
+            r1: .randomNonzero(),
+            r2: .randomNonzero()
         )
     }
 }
@@ -298,7 +298,7 @@ extension P256._ARCV1.PrivateKey {
 
     /// Generate a credential response from a credential request.
     public func issue(_ credentialRequest: P256._ARCV1.CredentialRequest) throws -> P256._ARCV1.CredentialResponse {
-        try self.issue(credentialRequest, b: .random)
+        try self.issue(credentialRequest, b: .randomNonzero())
     }
 }
 
@@ -350,9 +350,9 @@ extension P256._ARCV1.Credential {
             context: context,
             presentationLimit: presentationLimit,
             fixedNonce: nil,
-            a: .random,
-            r: .random,
-            z: .random
+            a: .randomNonzero(),
+            r: .randomNonzero(),
+            z: .randomNonzero()
         )
     }
 }

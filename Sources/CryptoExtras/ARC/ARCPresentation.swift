@@ -40,13 +40,26 @@ extension ARC {
         /// Proof of correct computation of U, UPrimeCommit, m1Commit, and tag, given the presentationContext, nonce, generators, and secrets.
         let proof: Proof<H2G>
 
-        init(credential: Credential<H2G>, a: Group.Scalar = Group.Scalar.random, r: Group.Scalar = Group.Scalar.random, z: Group.Scalar = Group.Scalar.random, presentationContext: Data, nonce: Int, generatorG: Group.Element, generatorH: Group.Element) throws {
+        init(
+            credential: Credential<H2G>,
+            a: Group.Scalar,
+            r: Group.Scalar,
+            z: Group.Scalar,
+            presentationContext: Data,
+            nonce: Int,
+            generatorG: Group.Element,
+            generatorH: Group.Element
+        ) throws {
             // Randomize (U, UPrime)
-            let U = a * credential.U
-            let m1Commit = credential.m1 * U + z * generatorH
-            let UPrime = a * credential.UPrime
-            let UPrimeCommit = UPrime + r * generatorG
-            let V = z * credential.X1 - r * generatorG
+            let U = try credential.U.multiplied(by: a)
+            let m1Commitment = try U.multiplied(by: credential.m1)
+            let zCommitment = try generatorH.multiplied(by: z)
+            let m1Commit = try m1Commitment.adding(zCommitment)
+            let UPrime = try credential.UPrime.multiplied(by: a)
+            let rCommitment = try generatorG.multiplied(by: r)
+            let UPrimeCommit = try UPrime.adding(rCommitment)
+            let zX1 = try credential.X1.multiplied(by: z)
+            let V = try zX1.subtracting(rCommitment)
 
             // Create tag: (m1 + nonce)^(-1) * H2G(presentationContext)
             let nonceScalar = try Group.Scalar(
@@ -55,19 +68,21 @@ extension ARC {
                     outputByteCount: credential.ciphersuite.scalarByteCount
                 )
             )
-            let inverse = try (nonceScalar + credential.m1).inverted()
+            let nonceDenominator = try nonceScalar.adding(credential.m1)
+            let inverse = try nonceDenominator.inverted()
             let T = try H2G.hashToGroup(presentationContext, domainSeparationString: Data(("HashToGroup-" + credential.ciphersuite.domain + "Tag").utf8))
-            let tag = inverse * T
+            let tag = try T.multiplied(by: inverse)
 
             // m1Tag is a helper element in the ZKP, and is needed to ensure the
             // client-claimed nonce is equal to the nonce used to compute the tag.
-            let m1Tag = credential.m1 * tag
+            let m1Tag = try tag.multiplied(by: credential.m1)
 
             // Create a prover, and allocate variables for the constrained scalars.
             var prover = Prover<H2G>(label: credential.ciphersuite.domain + credential.ciphersuite.domain + "CredentialPresentation")
             let m1Var = prover.appendScalar(label: "m1", assignment: credential.m1)
             let zVar = prover.appendScalar(label: "z", assignment: z)
-            let rNegVar = prover.appendScalar(label: "-r", assignment: -r)
+            let rNegated = try r.negated()
+            let rNegVar = prover.appendScalar(label: "-r", assignment: rNegated)
             let nonceVar = prover.appendScalar(label: "nonce", assignment: nonceScalar)
 
             // Allocate variables for the constrained points, and add the constraints.
@@ -104,17 +119,30 @@ extension ARC {
             }
 
 
-            if (self.U == self.U + self.U) || (self.UPrimeCommit == self.UPrimeCommit + self.UPrimeCommit) {
+            if try self.U.isIdentity() || self.UPrimeCommit.isIdentity() {
                 return false // U or UPrimeCommit are 0
             }
-            let V = serverPrivateKey.x0 * self.U + serverPrivateKey.x1 * self.m1Commit + serverPrivateKey.x2 * m2 * self.U - self.UPrimeCommit
+            let x0U = try self.U.multiplied(by: serverPrivateKey.x0)
+            let x1Commitment = try self.m1Commit.multiplied(by: serverPrivateKey.x1)
+            let x2m2 = try serverPrivateKey.x2.multiplied(by: m2)
+            let x2m2U = try self.U.multiplied(by: x2m2)
+            let V = try x0U
+                .adding(x1Commitment)
+                .adding(x2m2U)
+                .subtracting(self.UPrimeCommit)
 
             // Recompute T = H2G(presentationContext)
             let T = try H2G.hashToGroup(presentationContext, domainSeparationString: Data(("HashToGroup-" + ciphersuite.domain + "Tag").utf8))
 
             // Recompute m1Tag = H2G(presentationContext) - nonce * tag
-            var m1Tag = T
-            for _ in 0..<nonce { m1Tag = m1Tag - self.tag }
+            let nonceScalar = try Group.Scalar(
+                canonicalRepresentation: I2OSP(
+                    value: nonce,
+                    outputByteCount: ciphersuite.scalarByteCount
+                )
+            )
+            let nonceTag = try self.tag.multiplied(by: nonceScalar)
+            let m1Tag = try T.subtracting(nonceTag)
 
             // Create a verifier, and allocate variables for the constrained scalars.
             var verifier = Verifier<H2G>(label: ciphersuite.domain + ciphersuite.domain + "CredentialPresentation")
@@ -129,7 +157,7 @@ extension ARC {
             return try verifier.verify(proof: self.proof)
         }
 
-        static internal func proofConstrain<P: ProofParticipant>(participant: inout P, generatorG: Group.Element, generatorH: Group.Element, U: Group.Element, UPrimeCommit: Group.Element, m1Commit: Group.Element, V: Group.Element, X1: Group.Element, T: Group.Element, tag: Group.Element, m1Tag: Group.Element, m1Var: ScalarVar, zVar: ScalarVar, rNegVar: ScalarVar, nonceVar: ScalarVar) {
+        static internal func proofConstrain<P: ProofParticipant>(participant: inout P, generatorG: Group.Element, generatorH: Group.Element, U: Group.Element, UPrimeCommit: Group.Element, m1Commit: Group.Element, V: Group.Element, X1: Group.Element, T: Group.Element, tag: Group.Element, m1Tag: Group.Element, m1Var: ScalarVar, zVar: ScalarVar, rNegVar: ScalarVar, nonceVar: ScalarVar) where P.Point == Group.Element {
             // Allocate point variables
             let genGVar = participant.appendPoint(label: "genG", assignment: generatorG)
             let genHVar = participant.appendPoint(label: "genH", assignment: generatorH)

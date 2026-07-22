@@ -43,7 +43,29 @@ extension ARC {
         let generatorH: Group.Element
         let credentialRequest: CredentialRequest<H2G>
 
-        init(ciphersuite: Ciphersuite<H2G>, m1: Group.Scalar = Group.Scalar.random, requestContext: Data, r1: Group.Scalar = Group.Scalar.random, r2: Group.Scalar = Group.Scalar.random, serverPublicKey: ServerPublicKey<H2G>) throws {
+        init(
+            ciphersuite: Ciphersuite<H2G>,
+            requestContext: Data,
+            serverPublicKey: ServerPublicKey<H2G>
+        ) throws {
+            try self.init(
+                ciphersuite: ciphersuite,
+                m1: Group.Scalar.randomNonzero(),
+                requestContext: requestContext,
+                r1: Group.Scalar.randomNonzero(),
+                r2: Group.Scalar.randomNonzero(),
+                serverPublicKey: serverPublicKey
+            )
+        }
+
+        init(
+            ciphersuite: Ciphersuite<H2G>,
+            m1: Group.Scalar,
+            requestContext: Data,
+            r1: Group.Scalar,
+            r2: Group.Scalar,
+            serverPublicKey: ServerPublicKey<H2G>
+        ) throws {
             let m2 = try H2G.hashToScalar(requestContext, domainSeparationContext: Data((ciphersuite.domain + "requestContext").utf8))
             self.clientSecrets = ClientSecrets(m1: m1, m2: m2, r1: r1, r2: r2)
             self.serverPublicKey = serverPublicKey

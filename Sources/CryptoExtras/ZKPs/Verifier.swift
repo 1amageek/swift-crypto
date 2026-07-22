@@ -41,7 +41,9 @@ struct Verifier<H2G: HashToGroup>: ProofParticipant {
 
     func verify(proof: Proof<H2G>) throws(CryptoKitMetaError) -> Bool {
         // Perform size checks on proof fields.
-        if self.points.count != self.pointLabels.count {
+        if self.points.count != self.pointLabels.count
+            || proof.responses.count != self.scalarLabels.count
+        {
             throw cryptoExtrasError(ZKPErrors.invalidProofFields)
         }
 
@@ -51,21 +53,32 @@ struct Verifier<H2G: HashToGroup>: ProofParticipant {
         var blindedPoints: [Group.Element] = []
         var blindedPointsLabels: [String] = []
         for (constraintPoint, linearCombination) in self.constraints {
+            guard !linearCombination.isEmpty else {
+                throw cryptoExtrasError(ZKPErrors.invalidProofFields)
+            }
+
             // Check that all PointVar and ScalarVar variables in the constraint have been correctly allocated.
             if !(0..<self.points.count).contains(constraintPoint.index) {
                 throw cryptoExtrasError(ZKPErrors.invalidVariableAllocation)
             }
-            for (_, pointVar) in linearCombination {
-                if !(0..<self.points.count).contains(pointVar.index) {
+            for (scalarVar, pointVar) in linearCombination {
+                if !(0..<proof.responses.count).contains(scalarVar.index)
+                    || !(0..<self.points.count).contains(pointVar.index)
+                {
                     throw cryptoExtrasError(ZKPErrors.invalidVariableAllocation)
                 }
             }
 
             // challenge * constraintPoint
-            let challengePoint = proof.challenge * self.points[constraintPoint.index]
-            let blindedPoint = (linearCombination).map { (scalar, point) in
-                proof.responses[scalar.index] * self.points[point.index]
-            }.reduce(challengePoint, +)
+            var blindedPoint = try self.points[constraintPoint.index].multiplied(
+                by: proof.challenge
+            )
+            for (scalar, point) in linearCombination {
+                let responsePoint = try self.points[point.index].multiplied(
+                    by: proof.responses[scalar.index]
+                )
+                blindedPoint = try blindedPoint.adding(responsePoint)
+            }
 
             blindedPoints.append(blindedPoint)
             blindedPointsLabels.append(self.pointLabels[constraintPoint.index] + "-blind")
@@ -77,5 +90,3 @@ struct Verifier<H2G: HashToGroup>: ProofParticipant {
         return challenge == proof.challenge
     }
 }
-
-

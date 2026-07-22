@@ -30,6 +30,7 @@ enum ZKPErrors: Error {
     case invalidVariableAllocation
     case invalidInputLength
     case invalidProofFields
+    case invalidScalar
 }
 
 internal func cryptoExtrasError(_ error: ZKPErrors) -> CryptoKitMetaError {
@@ -81,9 +82,9 @@ extension ProofParticipant {
         self.constraints.append((result, linearCombination))
     }
 
-    mutating func appendPoint(label: String, assignment: any GroupElement) -> PointVar {
+    mutating func appendPoint(label: String, assignment: Point) -> PointVar {
         self.pointLabels.append(label)
-        self.points.append(assignment as! Self.Point)
+        self.points.append(assignment)
         return PointVar(index: self.points.count - 1)
     }
 }

@@ -120,20 +120,9 @@ protocol GroupScalar: Sendable, Equatable {
 
     consuming func negated() throws(CryptoKitMetaError) -> Self
 
-    // Generates a Random Scalar Element
-    static var random: Self { get }
-
     static var zero: Self { get }
 
-    static func + (left: Self, right: Self) -> Self
-
-    static func - (left: Self, right: Self) -> Self
-
     func inverted() throws(CryptoKitMetaError) -> Self
-
-    static func * (left: Self, right: Self) -> Self
-
-    static prefix func - (left: Self) -> Self
 
     // Constant-time Comparison
     static func == (left: Self, right: Self) -> Bool
@@ -167,17 +156,4 @@ protocol GroupElement: Sendable {
 
     consuming func negated() throws(CryptoKitMetaError) -> Self
 
-    // Generates a Random Group Element
-    static var random: Self { get }
-
-    static func + (left: Self, right: Self) -> Self
-
-    static func - (left: Self, right: Self) -> Self
-
-    static prefix func - (left: Self) -> Self
-
-    // Group Point Multiplication
-    static func * (left: Scalar, right: Self) -> Self
-    // Constant-time Comparison
-    static func == (left: Self, right: Self) -> Bool
 }

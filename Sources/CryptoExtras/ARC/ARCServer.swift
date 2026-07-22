@@ -46,10 +46,18 @@ extension ARC {
             self.X2 = X2
         }
 
-        init(serverPrivateKey: ServerPrivateKey<Group.Scalar>, generatorG: Group.Element, generatorH: Group.Element) {
-            self.X0 = serverPrivateKey.x0 * generatorG + serverPrivateKey.x0Blinding * generatorH
-            self.X1 = serverPrivateKey.x1 * generatorH
-            self.X2 = serverPrivateKey.x2 * generatorH
+        init(
+            serverPrivateKey: ServerPrivateKey<Group.Scalar>,
+            generatorG: Group.Element,
+            generatorH: Group.Element
+        ) throws(CryptoKitMetaError) {
+            let x0Commitment = try generatorG.multiplied(by: serverPrivateKey.x0)
+            let x0BlindingCommitment = try generatorH.multiplied(
+                by: serverPrivateKey.x0Blinding
+            )
+            self.X0 = try x0Commitment.adding(x0BlindingCommitment)
+            self.X1 = try generatorH.multiplied(by: serverPrivateKey.x1)
+            self.X2 = try generatorH.multiplied(by: serverPrivateKey.x2)
         }
      }
 
@@ -61,16 +69,47 @@ extension ARC {
         let generatorG: Group.Element
         let generatorH: Group.Element
 
-        init(ciphersuite: Ciphersuite<H2G>, x0: Group.Scalar = Group.Scalar.random, x1: Group.Scalar = Group.Scalar.random, x2: Group.Scalar = Group.Scalar.random, x0Blinding: Group.Scalar = Group.Scalar.random
+        init(ciphersuite: Ciphersuite<H2G>) throws {
+            try self.init(
+                ciphersuite: ciphersuite,
+                x0: Group.Scalar.randomNonzero(),
+                x1: Group.Scalar.randomNonzero(),
+                x2: Group.Scalar.randomNonzero(),
+                x0Blinding: Group.Scalar.randomNonzero()
+            )
+        }
+
+        init(
+            ciphersuite: Ciphersuite<H2G>,
+            x0: Group.Scalar,
+            x1: Group.Scalar,
+            x2: Group.Scalar,
+            x0Blinding: Group.Scalar
         ) throws {
             self.ciphersuite = ciphersuite
             (self.generatorG, self.generatorH) = try ARC.getGenerators(suite: ciphersuite)
 
             self.serverPrivateKey = ServerPrivateKey(x0: x0, x1: x1, x2: x2, x0Blinding: x0Blinding)
-            self.serverPublicKey = ServerPublicKey(serverPrivateKey: self.serverPrivateKey, generatorG: self.generatorG, generatorH: self.generatorH)
+            self.serverPublicKey = try ServerPublicKey(
+                serverPrivateKey: self.serverPrivateKey,
+                generatorG: self.generatorG,
+                generatorH: self.generatorH
+            )
         }
 
-        func respond(credentialRequest: CredentialRequest<H2G>, b: Group.Scalar = Group.Scalar.random) throws -> CredentialResponse<H2G> {
+        func respond(
+            credentialRequest: CredentialRequest<H2G>
+        ) throws -> CredentialResponse<H2G> {
+            try self.respond(
+                credentialRequest: credentialRequest,
+                b: Group.Scalar.randomNonzero()
+            )
+        }
+
+        func respond(
+            credentialRequest: CredentialRequest<H2G>,
+            b: Group.Scalar
+        ) throws -> CredentialResponse<H2G> {
             guard
                 try credentialRequest.verify(generatorG: generatorG, generatorH: generatorH, ciphersuite: self.ciphersuite)
             else {

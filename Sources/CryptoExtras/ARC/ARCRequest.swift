@@ -31,8 +31,13 @@ extension ARC {
         let proof: Proof<H2G>
 
         init(clientSecrets: ClientSecrets<Group.Scalar>, generatorG: Group.Element, generatorH: Group.Element, ciphersuite: Ciphersuite<H2G>) throws {
-            let m1Enc = clientSecrets.m1 * generatorG + clientSecrets.r1 * generatorH
-            let m2Enc = clientSecrets.m2 * generatorG + clientSecrets.r2 * generatorH
+            let m1Commitment = try generatorG.multiplied(by: clientSecrets.m1)
+            let r1Commitment = try generatorH.multiplied(by: clientSecrets.r1)
+            let m1Enc = try m1Commitment.adding(r1Commitment)
+
+            let m2Commitment = try generatorG.multiplied(by: clientSecrets.m2)
+            let r2Commitment = try generatorH.multiplied(by: clientSecrets.r2)
+            let m2Enc = try m2Commitment.adding(r2Commitment)
 
             // Create a prover, and allocate variables for the constrained scalars.
             var prover = Prover<H2G>(label: ciphersuite.domain + ciphersuite.domain + "CredentialRequest")
@@ -56,8 +61,15 @@ extension ARC {
 
         func verify(generatorG: Group.Element, generatorH: Group.Element, ciphersuite: Ciphersuite<H2G>) throws -> Bool {
             // Check that the encrypted attributes were generated with nonzero `m` and `r` values.
-            if (self.m1Enc == generatorG || self.m1Enc == generatorH || self.m1Enc == self.m1Enc + self.m1Enc) ||
-               (self.m2Enc == generatorG || self.m2Enc == generatorH || self.m2Enc == self.m2Enc + self.m2Enc) {
+            let m1IsInvalid =
+                try self.m1Enc.isEqual(to: generatorG)
+                || self.m1Enc.isEqual(to: generatorH)
+                || self.m1Enc.isIdentity()
+            let m2IsInvalid =
+                try self.m2Enc.isEqual(to: generatorG)
+                || self.m2Enc.isEqual(to: generatorH)
+                || self.m2Enc.isIdentity()
+            if m1IsInvalid || m2IsInvalid {
                 return false
             }
 
@@ -74,7 +86,7 @@ extension ARC {
             return try verifier.verify(proof: self.proof)
         }
 
-        static internal func proofConstrain<P: ProofParticipant>(participant: inout P, generatorG: Group.Element, generatorH: Group.Element, m1Enc: Group.Element, m2Enc: Group.Element, m1Var: ScalarVar, m2Var: ScalarVar, r1Var: ScalarVar, r2Var: ScalarVar) {
+        static internal func proofConstrain<P: ProofParticipant>(participant: inout P, generatorG: Group.Element, generatorH: Group.Element, m1Enc: Group.Element, m2Enc: Group.Element, m1Var: ScalarVar, m2Var: ScalarVar, r1Var: ScalarVar, r2Var: ScalarVar) where P.Point == Group.Element {
             // Allocate point variables
             let genGVar = participant.appendPoint(label: "genG", assignment: generatorG)
             let genHVar = participant.appendPoint(label: "genH", assignment: generatorH)
