@@ -33,8 +33,47 @@ jobs:
       - name: Build with CMake 3.29
         run: |
           set -euo pipefail
-          curl -fsSL --retry 3 https://raw.githubusercontent.com/apple/swift-nio/main/scripts/cmake-build.sh \
+          swift --version | grep -E 'Apple Swift version 6\.4([^0-9]|$)|^Swift version 6\.4([^0-9]|$)'
+          curl -fsSL --retry 3 https://raw.githubusercontent.com/apple/swift-nio/199ccb983c1085583a11e7eb46f053ccdec64c52/scripts/cmake-build.sh \
             | CMAKE_VERSION=3.29.9 TARGET_DIRECTORY=. bash
+
+  macos:
+    name: macOS package validation with Swift 6.4
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          submodules: true
+      - name: Install Swift 6.4 toolchain
+        run: |
+          set -euo pipefail
+          metadata="$(curl -fsSL --retry 3 https://www.swift.org/api/v1/install/dev/6.4.x/macos.json)"
+          snapshot="$(jq -er '.universal[0].dir' <<< "$metadata")"
+          download="$(jq -er '.universal[0].download' <<< "$metadata")"
+          [[ "$snapshot" == swift-6.4.x-* ]]
+          [[ "$download" == "${snapshot}-osx.pkg" ]]
+          package="${RUNNER_TEMP}/${download}"
+          curl -fsSL --retry 3 \
+            "https://download.swift.org/swift-6.4.x-branch/xcode/${snapshot}/${download}" \
+            -o "$package"
+          pkgutil --check-signature "$package" \
+            | grep -F 'Developer ID Installer: Swift Open Source (V9AUD2URP3)'
+          installer -pkg "$package" -target CurrentUserHomeDirectory
+          toolchain="${HOME}/Library/Developer/Toolchains/${snapshot}.xctoolchain"
+          test -d "$toolchain"
+          toolchain_identifier="$(plutil -extract CFBundleIdentifier raw "${toolchain}/Info.plist")"
+          test -n "$toolchain_identifier"
+          echo "TOOLCHAINS=${toolchain_identifier}" >> "$GITHUB_ENV"
+      - name: Run macOS package validators
+        run: |
+          set -euo pipefail
+          xcrun swift --version \
+            | grep -E 'Apple Swift version 6\.4([^0-9]|$)|^Swift version 6\.4([^0-9]|$)'
+          xcrun swift run crypto-digest-validation
+          xcrun swift run crypto-capability-validation
 
   wasm:
     name: Standard and Embedded WebAssembly
@@ -53,15 +92,17 @@ jobs:
           set -euo pipefail
           apt-get update -q
           apt-get install -y -q ca-certificates curl jq
-          snapshot="$(curl -fsSL --retry 3 https://www.swift.org/api/v1/install/dev/main/ubuntu2204.json \
-            | jq -r '.x86_64[0].dir')"
-          test -n "$snapshot"
-          sdk_archive="/tmp/${snapshot}_wasm.artifactbundle.tar.gz"
-          curl -fsSL --retry 3 \
-            "https://download.swift.org/development/wasm-sdk/${snapshot}/${snapshot}_wasm.artifactbundle.tar.gz" \
-            -o "$sdk_archive"
-          swift sdk install --swift-sdks-path /tmp/swiftsdks "$sdk_archive"
-          swift --version
+          metadata="$(curl -fsSL --retry 3 https://www.swift.org/api/v1/install/dev/6.4.x/wasm-sdk.json)"
+          snapshot="$(jq -er '.[0].dir' <<< "$metadata")"
+          download="$(jq -er '.[0].download' <<< "$metadata")"
+          checksum="$(jq -er '.[0].checksum' <<< "$metadata")"
+          [[ "$snapshot" == swift-6.4.x-* ]]
+          [[ -n "$download" ]]
+          [[ "$checksum" =~ ^[0-9a-f]{64}$ ]]
+          sdk_url="https://download.swift.org/swift-6.4.x-branch/wasm-sdk/${snapshot}/${download}"
+          swift sdk install --swift-sdks-path /tmp/swiftsdks "$sdk_url" --checksum "$checksum"
+          swift --version \
+            | grep -E 'Apple Swift version 6\.4([^0-9]|$)|^Swift version 6\.4([^0-9]|$)'
       - name: Run WebAssembly validators
         run: |
           set -euo pipefail
@@ -92,15 +133,17 @@ jobs:
           set -euo pipefail
           apt-get update -q
           apt-get install -y -q ca-certificates curl jq
-          snapshot="$(curl -fsSL --retry 3 https://www.swift.org/api/v1/install/dev/main/ubuntu2204.json \
-            | jq -r '.x86_64[0].dir')"
-          test -n "$snapshot"
-          sdk_archive="/tmp/${snapshot}_static-linux-0.1.0.artifactbundle.tar.gz"
-          curl -fsSL --retry 3 \
-            "https://download.swift.org/development/static-sdk/${snapshot}/${snapshot}_static-linux-0.1.0.artifactbundle.tar.gz" \
-            -o "$sdk_archive"
-          swift sdk install --swift-sdks-path /tmp/swiftsdks "$sdk_archive"
-          swift --version
+          metadata="$(curl -fsSL --retry 3 https://www.swift.org/api/v1/install/dev/6.4.x/static-sdk.json)"
+          snapshot="$(jq -er '.[0].dir' <<< "$metadata")"
+          download="$(jq -er '.[0].download' <<< "$metadata")"
+          checksum="$(jq -er '.[0].checksum' <<< "$metadata")"
+          [[ "$snapshot" == swift-6.4.x-* ]]
+          [[ -n "$download" ]]
+          [[ "$checksum" =~ ^[0-9a-f]{64}$ ]]
+          sdk_url="https://download.swift.org/swift-6.4.x-branch/static-sdk/${snapshot}/${download}"
+          swift sdk install --swift-sdks-path /tmp/swiftsdks "$sdk_url" --checksum "$checksum"
+          swift --version \
+            | grep -E 'Apple Swift version 6\.4([^0-9]|$)|^Swift version 6\.4([^0-9]|$)'
       - name: Run static Linux validator
         run: |
           set -euo pipefail
