@@ -133,7 +133,7 @@ extension AES {
     }
 
     struct Block {
-        private static var blockSize: Int { 16 }
+        private static let blockSize = 16
 
         typealias BlockBytes = (
             UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
@@ -201,20 +201,6 @@ extension AES {
 
         mutating func withUnsafeMutableBytes<ReturnType, E: Error>(_ body: (UnsafeMutableRawBufferPointer) throws(E) -> ReturnType) throws(E) -> ReturnType {
             return try Swift.withUnsafeMutableBytes(of: &self.blockBytes, body)
-        }
-
-        static func ^= (lhs: inout Block, rhs: Block) {
-            // Ideally we'd not use raw pointers for this.
-            lhs.withUnsafeMutableBytes { lhsPtr in
-                rhs.withUnsafeBytes { rhsPtr in
-                    assert(lhsPtr.count == Self.blockSize)
-                    assert(rhsPtr.count == Self.blockSize)
-
-                    for index in 0..<Self.blockSize {
-                        lhsPtr[index] ^= rhsPtr[index]
-                    }
-                }
-            }
         }
     }
 
