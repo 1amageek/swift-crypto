@@ -59,13 +59,6 @@ let privacyManifestResource: [PackageDescription.Resource] =
 
 let package = Package(
     name: "swift-crypto",
-    platforms: [
-        .macOS(.v26),
-        .iOS(.v26),
-        .watchOS(.v26),
-        .tvOS(.v26),
-        .visionOS(.v26),
-    ],
     products: [
         .library(name: "Crypto", targets: ["Crypto"]),
         .library(name: "CryptoExtras", targets: ["CryptoExtras"]),
