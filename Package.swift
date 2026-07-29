@@ -59,6 +59,13 @@ let privacyManifestResource: [PackageDescription.Resource] =
 
 let package = Package(
     name: "swift-crypto",
+    platforms: [
+        .macOS(.v26),
+        .iOS(.v26),
+        .watchOS(.v26),
+        .tvOS(.v26),
+        .visionOS(.v26),
+    ],
     products: [
         .library(name: "Crypto", targets: ["Crypto"]),
         .library(name: "CryptoExtras", targets: ["CryptoExtras"]),
@@ -190,6 +197,7 @@ let package = Package(
                 "CryptoBoringWrapper",
                 "Crypto",
                 "CryptoExtras",
+                .product(name: "SwiftASN1", package: "swift-asn1"),
             ]
         ),
         .testTarget(
@@ -226,7 +234,7 @@ let package = Package(
 package.dependencies += [
     .package(
         url: "https://github.com/1amageek/swift-asn1.git",
-        revision: "b6ceb273cb9c35b7a44f853ddd9e6e5044938102"
+        revision: "5942b1c691c8c6c1d3b139a998d011f001774858"
     )
 ]
 

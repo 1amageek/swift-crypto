@@ -80,99 +80,6 @@ enum RSAPSSSPKIErrors: Error {
     case invalidSaltLength
 }
 
-#if hasFeature(Embedded)
-public struct RSAPSSSPKIError: Error {
-    internal var error: RSAPSSSPKIErrors
-}
-#else
-struct RSAPSSSPKIError: Error {
-    internal var error: RSAPSSSPKIErrors
-}
-#endif
-
-#if hasFeature(Embedded)
-@nonexhaustive
-public enum CryptoKitMetaError: Error {
-    case cryptoKitError(underlyingError: CryptoKitError)
-    case asn1Error(underlyingError: CryptoKitASN1Error)
-    case hpkeError(underlyingError: HPKE.Errors)
-    case kemError(underlyingError: KEM.Errors)
-    case rsapssspkiError(underlyingError: RSAPSSSPKIError)
-}
-
-@usableFromInline
-internal func error(_ error: CryptoKitError) -> CryptoKitMetaError {
-    .cryptoKitError(underlyingError: error)
-}
-internal func error(_ error: CryptoKitASN1Error) -> CryptoKitMetaError {
-    .asn1Error(underlyingError: error)
-}
-internal func error(_ error: HPKE.Errors) -> CryptoKitMetaError {
-    .hpkeError(underlyingError: error)
-}
-internal func error(_ error: KEM.Errors) -> CryptoKitMetaError {
-    .kemError(underlyingError: error)
-}
-internal func error(_ error: RSAPSSSPKIErrors) -> CryptoKitMetaError {
-    .rsapssspkiError(underlyingError: RSAPSSSPKIError(error: error))
-}
-internal func error(_ error: CryptoBoringWrapperError) -> CryptoKitMetaError {
-    switch error {
-    case .incorrectKeySize:
-        return .cryptoKitError(underlyingError: .incorrectKeySize)
-    case .incorrectParameterSize:
-        return .cryptoKitError(underlyingError: .incorrectParameterSize)
-    case .authenticationFailure:
-        return .cryptoKitError(underlyingError: .authenticationFailure)
-    case .underlyingCoreCryptoError(let errorCode):
-        return .cryptoKitError(underlyingError: .underlyingCoreCryptoError(error: errorCode))
-    case .wrapFailure:
-        return .cryptoKitError(underlyingError: .wrapFailure)
-    case .unwrapFailure:
-        return .cryptoKitError(underlyingError: .unwrapFailure)
-    case .invalidParameter:
-        return .cryptoKitError(underlyingError: .invalidParameter)
-    }
-}
-
-internal func withCryptoKitMetaError<T>(
-    _ body: () throws(CryptoKitMetaError) -> T
-) throws(CryptoKitMetaError) -> T {
-    try body()
-}
-
-internal func withCryptoKitMetaError<T>(
-    _ body: () throws(CryptoKitError) -> T
-) throws(CryptoKitMetaError) -> T {
-    try withCryptoKitError(body)
-}
-
-internal func withCryptoKitMetaError<T>(
-    _ body: () throws(CryptoBoringWrapperError) -> T
-) throws(CryptoKitMetaError) -> T {
-    try withCryptoBoringWrapperError(body)
-}
-
-internal func withCryptoKitError<T>(
-    _ body: () throws(CryptoKitError) -> T
-) throws(CryptoKitMetaError) -> T {
-    do {
-        return try body()
-    } catch let cryptoKitError {
-        throw error(cryptoKitError)
-    }
-}
-
-internal func withCryptoBoringWrapperError<T>(
-    _ body: () throws(CryptoBoringWrapperError) -> T
-) throws(CryptoKitMetaError) -> T {
-    do {
-        return try body()
-    } catch let wrapperError {
-        throw error(wrapperError)
-    }
-}
-#else
 public typealias CryptoKitMetaError = any Error
 @usableFromInline
 internal func error(_ error: CryptoKitError) -> CryptoKitError { error }
@@ -196,6 +103,5 @@ internal func withCryptoBoringWrapperError<T>(
 ) throws -> T {
     try body()
 }
-#endif
 
 #endif

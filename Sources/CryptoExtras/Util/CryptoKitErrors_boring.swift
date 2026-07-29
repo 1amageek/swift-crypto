@@ -18,19 +18,11 @@ import CryptoBoringWrapper
 
 @usableFromInline
 internal func cryptoExtrasError(_ error: CryptoKitError) -> CryptoKitMetaError {
-    #if hasFeature(Embedded)
-    return .cryptoKitError(underlyingError: error)
-    #else
     return error
-    #endif
 }
 
 internal func cryptoExtrasError(_ error: CryptoKitASN1Error) -> CryptoKitMetaError {
-    #if hasFeature(Embedded)
-    return .asn1Error(underlyingError: error)
-    #else
     return error
-    #endif
 }
 
 internal func cryptoExtrasError(_ error: CryptoBoringWrapperError) -> CryptoKitMetaError {
@@ -77,15 +69,7 @@ internal func withCryptoExtrasBoringError<Result>(
 internal func withCryptoExtrasInvalidParameter<Result, E: Error>(
     _ body: () throws(E) -> Result
 ) throws(CryptoKitMetaError) -> Result {
-    #if hasFeature(Embedded)
-    do throws(E) {
-        return try body()
-    } catch {
-        throw cryptoExtrasError(CryptoKitError.incorrectParameterSize)
-    }
-    #else
     return try body()
-    #endif
 }
 
 extension CryptoKitError {

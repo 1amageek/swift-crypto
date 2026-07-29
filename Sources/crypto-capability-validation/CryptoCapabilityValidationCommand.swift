@@ -12,6 +12,7 @@
 import Crypto
 import CryptoBoringWrapper
 import CryptoExtras
+import SwiftASN1
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -28,6 +29,8 @@ struct CryptoCapabilityValidationCommand {
         validateEncryptionAndEntropy()
         print("Validating authenticated encryption")
         validateAuthenticatedEncryption()
+        print("Validating parsing error contracts")
+        validateParsingErrorContracts()
         #if !canImport(CryptoKit)
         print("Validating segmented key derivation")
         validateSegmentedKeyDerivation()
@@ -77,6 +80,17 @@ struct CryptoCapabilityValidationCommand {
             preconditionFailure("Valid Base64 was rejected")
         }
         precondition(decoded.elementsEqual(expected))
+    }
+
+    private static func validateParsingErrorContracts() {
+        do {
+            _ = try Curve25519.Signing.PrivateKey(derRepresentation: [0x01, 0x02, 0x03])
+            preconditionFailure("Invalid DER unexpectedly produced a private key")
+        } catch is ASN1Error {
+            // The public API preserves the SwiftASN1 failure on every target.
+        } catch {
+            preconditionFailure("Invalid DER produced the wrong error type")
+        }
     }
 
     #if !canImport(FoundationEssentials) && !canImport(Foundation)
@@ -1035,14 +1049,7 @@ struct CryptoCapabilityValidationCommand {
         _ error: CryptoKitMetaError,
         _ expectedError: CryptoKitError
     ) -> Bool {
-        #if hasFeature(Embedded)
-        guard case .cryptoKitError(let underlyingError) = error else {
-            return false
-        }
-        return underlyingError == expectedError
-        #else
         return (error as? CryptoKitError) == expectedError
-        #endif
     }
 
     #if !canImport(CryptoKit)
@@ -1050,28 +1057,14 @@ struct CryptoCapabilityValidationCommand {
         _ error: CryptoKitMetaError,
         _ expectedError: HPKE.Errors
     ) -> Bool {
-        #if hasFeature(Embedded)
-        guard case .hpkeError(let underlyingError) = error else {
-            return false
-        }
-        return underlyingError == expectedError
-        #else
         return (error as? HPKE.Errors) == expectedError
-        #endif
     }
 
     private static func isKEMError(
         _ error: CryptoKitMetaError,
         _ expectedError: KEM.Errors
     ) -> Bool {
-        #if hasFeature(Embedded)
-        guard case .kemError(let underlyingError) = error else {
-            return false
-        }
-        return underlyingError == expectedError
-        #else
         return (error as? KEM.Errors) == expectedError
-        #endif
     }
     #endif
 

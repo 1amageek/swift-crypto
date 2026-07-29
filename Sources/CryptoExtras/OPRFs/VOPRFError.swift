@@ -43,25 +43,6 @@ private func voprfError(
     from error: CryptoKitMetaError,
     fallback: VOPRFError
 ) -> VOPRFError {
-    #if hasFeature(Embedded)
-    switch error {
-    case .cryptoKitError(let underlyingError):
-        switch underlyingError {
-        case .authenticationFailure:
-            return .invalidProof
-        case .incorrectKeySize, .incorrectParameterSize, .invalidParameter:
-            return fallback
-        case .underlyingCoreCryptoError, .wrapFailure, .unwrapFailure:
-            return .internalFailure
-        @unknown default:
-            return .internalFailure
-        }
-    case .asn1Error, .hpkeError, .kemError, .rsapssspkiError:
-        return .internalFailure
-    @unknown default:
-        return .internalFailure
-    }
-    #else
     if let oprfError = error as? OPRF.Errors {
         switch oprfError {
         case .invalidProof:
@@ -88,5 +69,4 @@ private func voprfError(
         return .internalFailure
     }
     return .internalFailure
-    #endif
 }
