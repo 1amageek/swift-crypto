@@ -14,24 +14,24 @@
 
 internal import CCryptoBoringSSL
 import Crypto
-import Synchronization
+import CryptoBoringWrapper
 
 #if canImport(Darwin)
 import Darwin
 #endif
 
 final class SHA512256DigestContext: Sendable {
-    private let state: Mutex<SHA512_CTX>
+    private let state: CryptoMutex<SHA512_CTX>
 
     init() {
         guard let state = SHA512256DigestOperations.initialize() else {
             preconditionFailure("Unable to initialize digest state")
         }
-        self.state = Mutex(state)
+        self.state = CryptoMutex(state)
     }
 
     private init(_ state: SHA512_CTX) {
-        self.state = Mutex(state)
+        self.state = CryptoMutex(state)
     }
 
     func copy() -> SHA512256DigestContext {

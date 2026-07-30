@@ -13,7 +13,6 @@
 //===----------------------------------------------------------------------===//
 import Crypto
 import CryptoBoringWrapper
-import Synchronization
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -75,7 +74,7 @@ extension P256: HashToGroupCurve {
     @usableFromInline
     typealias H = SHA256
 
-    private static let primeOrderCurveRuntime = Mutex<PrimeOrderCurveRuntime?>(nil)
+    private static let primeOrderCurveRuntime = CryptoMutex<PrimeOrderCurveRuntime?>(nil)
 
     @usableFromInline
     static func runtime() throws(CryptoBoringWrapperError) -> PrimeOrderCurveRuntime {
@@ -134,7 +133,7 @@ extension P384: HashToGroupCurve {
     @usableFromInline
     typealias H = SHA384
 
-    private static let primeOrderCurveRuntime = Mutex<PrimeOrderCurveRuntime?>(nil)
+    private static let primeOrderCurveRuntime = CryptoMutex<PrimeOrderCurveRuntime?>(nil)
 
     @usableFromInline
     static func runtime() throws(CryptoBoringWrapperError) -> PrimeOrderCurveRuntime {

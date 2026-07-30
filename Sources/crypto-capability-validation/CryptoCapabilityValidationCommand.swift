@@ -31,6 +31,8 @@ struct CryptoCapabilityValidationCommand {
         validateAuthenticatedEncryption()
         print("Validating parsing error contracts")
         validateParsingErrorContracts()
+        print("Validating NIST curve PEM round trips")
+        validateNISTCurvePEMRoundTrips()
         #if !canImport(CryptoKit)
         print("Validating segmented key derivation")
         validateSegmentedKeyDerivation()
@@ -90,6 +92,25 @@ struct CryptoCapabilityValidationCommand {
             // The public API preserves the SwiftASN1 failure on every target.
         } catch {
             preconditionFailure("Invalid DER produced the wrong error type")
+        }
+    }
+
+    private static func validateNISTCurvePEMRoundTrips() {
+        do {
+            let privateKey = try P256.Signing.PrivateKey(
+                rawRepresentation: [UInt8](repeating: 1, count: 32)
+            )
+            let privateKeyRoundTrip = try P256.Signing.PrivateKey(
+                pemRepresentation: privateKey.pemRepresentation
+            )
+            precondition(privateKeyRoundTrip.rawRepresentation == privateKey.rawRepresentation)
+
+            let publicKeyRoundTrip = try P256.Signing.PublicKey(
+                pemRepresentation: privateKey.publicKey.pemRepresentation
+            )
+            precondition(publicKeyRoundTrip.rawRepresentation == privateKey.publicKey.rawRepresentation)
+        } catch {
+            preconditionFailure("NIST curve PEM round trip failed")
         }
     }
 

@@ -11,14 +11,14 @@
 
 #if !canImport(CryptoKit)
 import CXKCP
-import Synchronization
+import CryptoBoringWrapper
 
 /// Owns one Keccak state with scoped, synchronized access.
 final class KeccakDigestContext: Sendable {
-    private let state: Mutex<Keccak_HashInstance>
+    private let state: CryptoMutex<Keccak_HashInstance>
 
     init(_ state: Keccak_HashInstance) {
-        self.state = Mutex(state)
+        self.state = CryptoMutex(state)
     }
 
     func copy() -> KeccakDigestContext {

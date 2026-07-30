@@ -10,15 +10,15 @@
 //===----------------------------------------------------------------------===//
 
 #if !canImport(CryptoKit)
-import Synchronization
 internal import CCryptoBoringSSL
+import CryptoBoringWrapper
 
 /// Owns one SHA-256 state with scoped, synchronized access.
 final class SHA256DigestContext: Sendable {
-    private let state: Mutex<SHA256_CTX>
+    private let state: CryptoMutex<SHA256_CTX>
 
     init(_ state: SHA256_CTX) {
-        self.state = Mutex(state)
+        self.state = CryptoMutex(state)
     }
 
     func copy() -> SHA256DigestContext {

@@ -232,10 +232,7 @@ let package = Package(
 )
 
 package.dependencies += [
-    .package(
-        url: "https://github.com/1amageek/swift-asn1.git",
-        revision: "5942b1c691c8c6c1d3b139a998d011f001774858"
-    )
+    .package(path: "../swift-asn1")
 ]
 
 // ---    STANDARD CROSS-REPO SETTINGS DO NOT EDIT   --- //

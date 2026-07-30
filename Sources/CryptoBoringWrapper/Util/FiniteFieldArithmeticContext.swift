@@ -13,7 +13,6 @@
 //===----------------------------------------------------------------------===//
 
 internal import CCryptoBoringSSL
-import Synchronization
 
 /// Owns the modulus and reusable arithmetic workspace for finite-field operations.
 ///
@@ -27,7 +26,7 @@ package final class FiniteFieldArithmeticContext: Sendable {
         let workspace: OpaquePointer
     }
 
-    private let state: Mutex<State>
+    private let state: CryptoMutex<State>
 
     @usableFromInline
     package init(modulus: ArbitraryPrecisionInteger) throws(CryptoBoringWrapperError) {
@@ -35,7 +34,7 @@ package final class FiniteFieldArithmeticContext: Sendable {
             throw CryptoBoringWrapperError.internalBoringSSLError()
         }
         CCryptoBoringSSL_BN_CTX_start(workspace)
-        self.state = Mutex(State(modulus: modulus, workspace: workspace))
+        self.state = CryptoMutex(State(modulus: modulus, workspace: workspace))
     }
 
     deinit {

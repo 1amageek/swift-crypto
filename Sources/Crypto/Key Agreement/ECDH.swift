@@ -82,7 +82,6 @@ extension P256 {
                 impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
-#if !hasFeature(Embedded)
             /// Creates a P-256 public key for signing from a Privacy-Enhanced Mail
             /// (PEM) representation.
             ///
@@ -95,7 +94,6 @@ extension P256 {
                 }
                 self = try .init(derRepresentation: pem.derBytes)
             }
-#endif
 
             /// Creates a P-256 public key for signing from a Distinguished Encoding
             /// Rules (DER) encoded representation.
@@ -134,13 +132,11 @@ extension P256 {
                 return Data(serializer.serializedBytes)
             }
 
-#if !hasFeature(Embedded)
             /// A Privacy-Enhanced Mail (PEM) representation of the public key.
             public var pemRepresentation: String {
                 let pemDocument = ASN1.PEMDocument(type: "PUBLIC KEY", derBytes: self.derRepresentation)
                 return pemDocument.pemString
             }
-#endif
         }
 
         /// A P-256 private key used to create cryptographic signatures.
@@ -178,7 +174,6 @@ extension P256 {
                 impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
-#if !hasFeature(Embedded)
             /// Creates a P-256 private key for signing from a Privacy-Enhanced Mail
             /// PEM) representation.
             ///
@@ -198,7 +193,6 @@ extension P256 {
                     throw CryptoKitASN1Error.invalidPEMDocument
                 }
             }
-#endif
 
             /// Creates a P-256 private key for signing from a Distinguished Encoding
             /// Rules (DER) encoded representation.
@@ -245,13 +239,11 @@ extension P256 {
                 return Data(serializer.serializedBytes)
             }
 
-#if !hasFeature(Embedded)
             /// A Privacy-Enhanced Mail (PEM) representation of the private key.
             public var pemRepresentation: String {
                 let pemDocument = ASN1.PEMDocument(type: "PRIVATE KEY", derBytes: self.derRepresentation)
                 return pemDocument.pemString
             }
-#endif
         }
     }
 }
@@ -306,7 +298,6 @@ extension P256 {
                 impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
-#if !hasFeature(Embedded)
             /// Creates a P-256 public key for key agreement from a Privacy-Enhanced Mail
             /// (PEM) representation.
             ///
@@ -319,7 +310,6 @@ extension P256 {
                 }
                 self = try .init(derRepresentation: pem.derBytes)
             }
-#endif
 
             /// Creates a P-256 public key for key agreement from a Distinguished Encoding
             /// Rules (DER) encoded representation.
@@ -358,13 +348,11 @@ extension P256 {
                 return Data(serializer.serializedBytes)
             }
 
-#if !hasFeature(Embedded)
             /// A Privacy-Enhanced Mail (PEM) representation of the public key.
             public var pemRepresentation: String {
                 let pemDocument = ASN1.PEMDocument(type: "PUBLIC KEY", derBytes: self.derRepresentation)
                 return pemDocument.pemString
             }
-#endif
         }
 
         /// A P-256 private key used for key agreement.
@@ -402,7 +390,6 @@ extension P256 {
                 impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
-#if !hasFeature(Embedded)
             /// Creates a P-256 private key for key agreement from a Privacy-Enhanced Mail
             /// PEM) representation.
             ///
@@ -422,7 +409,6 @@ extension P256 {
                     throw CryptoKitASN1Error.invalidPEMDocument
                 }
             }
-#endif
 
             /// Creates a P-256 private key for key agreement from a Distinguished Encoding
             /// Rules (DER) encoded representation.
@@ -469,13 +455,11 @@ extension P256 {
                 return Data(serializer.serializedBytes)
             }
 
-#if !hasFeature(Embedded)
             /// A Privacy-Enhanced Mail (PEM) representation of the private key.
             public var pemRepresentation: String {
                 let pemDocument = ASN1.PEMDocument(type: "PRIVATE KEY", derBytes: self.derRepresentation)
                 return pemDocument.pemString
             }
-#endif
         }
     }
 }
@@ -529,7 +513,6 @@ extension P384 {
                 impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
-#if !hasFeature(Embedded)
             /// Creates a P-384 public key for signing from a Privacy-Enhanced Mail
             /// (PEM) representation.
             ///
@@ -542,7 +525,6 @@ extension P384 {
                 }
                 self = try .init(derRepresentation: pem.derBytes)
             }
-#endif
 
             /// Creates a P-384 public key for signing from a Distinguished Encoding
             /// Rules (DER) encoded representation.
@@ -581,13 +563,11 @@ extension P384 {
                 return Data(serializer.serializedBytes)
             }
 
-#if !hasFeature(Embedded)
             /// A Privacy-Enhanced Mail (PEM) representation of the public key.
             public var pemRepresentation: String {
                 let pemDocument = ASN1.PEMDocument(type: "PUBLIC KEY", derBytes: self.derRepresentation)
                 return pemDocument.pemString
             }
-#endif
         }
 
         /// A P-384 private key used to create cryptographic signatures.
@@ -625,7 +605,6 @@ extension P384 {
                 impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
-#if !hasFeature(Embedded)
             /// Creates a P-384 private key for signing from a Privacy-Enhanced Mail
             /// PEM) representation.
             ///
@@ -645,7 +624,6 @@ extension P384 {
                     throw CryptoKitASN1Error.invalidPEMDocument
                 }
             }
-#endif
 
             /// Creates a P-384 private key for signing from a Distinguished Encoding
             /// Rules (DER) encoded representation.
@@ -692,13 +670,11 @@ extension P384 {
                 return Data(serializer.serializedBytes)
             }
 
-#if !hasFeature(Embedded)
             /// A Privacy-Enhanced Mail (PEM) representation of the private key.
             public var pemRepresentation: String {
                 let pemDocument = ASN1.PEMDocument(type: "PRIVATE KEY", derBytes: self.derRepresentation)
                 return pemDocument.pemString
             }
-#endif
         }
     }
 }
@@ -753,7 +729,6 @@ extension P384 {
                 impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
-#if !hasFeature(Embedded)
             /// Creates a P-384 public key for key agreement from a Privacy-Enhanced Mail
             /// (PEM) representation.
             ///
@@ -766,7 +741,6 @@ extension P384 {
                 }
                 self = try .init(derRepresentation: pem.derBytes)
             }
-#endif
 
             /// Creates a P-384 public key for key agreement from a Distinguished Encoding
             /// Rules (DER) encoded representation.
@@ -805,13 +779,11 @@ extension P384 {
                 return Data(serializer.serializedBytes)
             }
 
-#if !hasFeature(Embedded)
             /// A Privacy-Enhanced Mail (PEM) representation of the public key.
             public var pemRepresentation: String {
                 let pemDocument = ASN1.PEMDocument(type: "PUBLIC KEY", derBytes: self.derRepresentation)
                 return pemDocument.pemString
             }
-#endif
         }
 
         /// A P-384 private key used for key agreement.
@@ -849,7 +821,6 @@ extension P384 {
                 impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
-#if !hasFeature(Embedded)
             /// Creates a P-384 private key for key agreement from a Privacy-Enhanced Mail
             /// PEM) representation.
             ///
@@ -869,7 +840,6 @@ extension P384 {
                     throw CryptoKitASN1Error.invalidPEMDocument
                 }
             }
-#endif
 
             /// Creates a P-384 private key for key agreement from a Distinguished Encoding
             /// Rules (DER) encoded representation.
@@ -916,13 +886,11 @@ extension P384 {
                 return Data(serializer.serializedBytes)
             }
 
-#if !hasFeature(Embedded)
             /// A Privacy-Enhanced Mail (PEM) representation of the private key.
             public var pemRepresentation: String {
                 let pemDocument = ASN1.PEMDocument(type: "PRIVATE KEY", derBytes: self.derRepresentation)
                 return pemDocument.pemString
             }
-#endif
         }
     }
 }
@@ -976,7 +944,6 @@ extension P521 {
                 impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
-#if !hasFeature(Embedded)
             /// Creates a P-521 public key for signing from a Privacy-Enhanced Mail
             /// (PEM) representation.
             ///
@@ -989,7 +956,6 @@ extension P521 {
                 }
                 self = try .init(derRepresentation: pem.derBytes)
             }
-#endif
 
             /// Creates a P-521 public key for signing from a Distinguished Encoding
             /// Rules (DER) encoded representation.
@@ -1028,13 +994,11 @@ extension P521 {
                 return Data(serializer.serializedBytes)
             }
 
-#if !hasFeature(Embedded)
             /// A Privacy-Enhanced Mail (PEM) representation of the public key.
             public var pemRepresentation: String {
                 let pemDocument = ASN1.PEMDocument(type: "PUBLIC KEY", derBytes: self.derRepresentation)
                 return pemDocument.pemString
             }
-#endif
         }
 
         /// A P-521 private key used to create cryptographic signatures.
@@ -1072,7 +1036,6 @@ extension P521 {
                 impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
-#if !hasFeature(Embedded)
             /// Creates a P-521 private key for signing from a Privacy-Enhanced Mail
             /// PEM) representation.
             ///
@@ -1092,7 +1055,6 @@ extension P521 {
                     throw CryptoKitASN1Error.invalidPEMDocument
                 }
             }
-#endif
 
             /// Creates a P-521 private key for signing from a Distinguished Encoding
             /// Rules (DER) encoded representation.
@@ -1139,13 +1101,11 @@ extension P521 {
                 return Data(serializer.serializedBytes)
             }
 
-#if !hasFeature(Embedded)
             /// A Privacy-Enhanced Mail (PEM) representation of the private key.
             public var pemRepresentation: String {
                 let pemDocument = ASN1.PEMDocument(type: "PRIVATE KEY", derBytes: self.derRepresentation)
                 return pemDocument.pemString
             }
-#endif
         }
     }
 }
@@ -1200,7 +1160,6 @@ extension P521 {
                 impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
-#if !hasFeature(Embedded)
             /// Creates a P-521 public key for key agreement from a Privacy-Enhanced Mail
             /// (PEM) representation.
             ///
@@ -1213,7 +1172,6 @@ extension P521 {
                 }
                 self = try .init(derRepresentation: pem.derBytes)
             }
-#endif
 
             /// Creates a P-521 public key for key agreement from a Distinguished Encoding
             /// Rules (DER) encoded representation.
@@ -1252,13 +1210,11 @@ extension P521 {
                 return Data(serializer.serializedBytes)
             }
 
-#if !hasFeature(Embedded)
             /// A Privacy-Enhanced Mail (PEM) representation of the public key.
             public var pemRepresentation: String {
                 let pemDocument = ASN1.PEMDocument(type: "PUBLIC KEY", derBytes: self.derRepresentation)
                 return pemDocument.pemString
             }
-#endif
         }
 
         /// A P-521 private key used for key agreement.
@@ -1296,7 +1252,6 @@ extension P521 {
                 impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
-#if !hasFeature(Embedded)
             /// Creates a P-521 private key for key agreement from a Privacy-Enhanced Mail
             /// PEM) representation.
             ///
@@ -1316,7 +1271,6 @@ extension P521 {
                     throw CryptoKitASN1Error.invalidPEMDocument
                 }
             }
-#endif
 
             /// Creates a P-521 private key for key agreement from a Distinguished Encoding
             /// Rules (DER) encoded representation.
@@ -1363,13 +1317,11 @@ extension P521 {
                 return Data(serializer.serializedBytes)
             }
 
-#if !hasFeature(Embedded)
             /// A Privacy-Enhanced Mail (PEM) representation of the private key.
             public var pemRepresentation: String {
                 let pemDocument = ASN1.PEMDocument(type: "PRIVATE KEY", derBytes: self.derRepresentation)
                 return pemDocument.pemString
             }
-#endif
         }
     }
 }

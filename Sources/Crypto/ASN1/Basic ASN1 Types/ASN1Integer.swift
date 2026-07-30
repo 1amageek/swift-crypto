@@ -93,10 +93,10 @@ extension ASN1IntegerRepresentable {
                 // If self is unsigned and the first byte has the top bit set, we need to prepend a 0 byte.
                 if !Self.isSigned, let topByte = integerBytes.first, topByte.topBitSet {
                     bytes.append(0)
-                    bytes.append(contentsOf: integerBytes)
+                    integerBytes.appendAllBytes(to: &bytes)
                 } else {
                     // Either self is signed, or the top bit isn't set. Either way, trim to make sure the representation is minimal.
-                    bytes.append(contentsOf: integerBytes.trimLeadingExcessBytes())
+                    integerBytes.appendMinimalIntegerBytes(to: &bytes)
                 }
             }
         }
@@ -219,49 +219,62 @@ extension Int: ASN1IntegerRepresentable { }
 extension UInt: ASN1IntegerRepresentable { }
 
 extension RandomAccessCollection where Element == UInt8 {
-    fileprivate func trimLeadingExcessBytes() -> SubSequence {
-        var slice = self[...]
-        guard let first = slice.first else {
-            // Easy case, empty.
-            return slice
+    fileprivate func appendAllBytes(to output: inout [UInt8]) {
+        var index = self.startIndex
+        while index != self.endIndex {
+            output.append(self[index])
+            self.formIndex(after: &index)
+        }
+    }
+
+    fileprivate func appendMinimalIntegerBytes(to output: inout [UInt8]) {
+        var firstIncludedIndex = self.startIndex
+        guard firstIncludedIndex != self.endIndex else {
+            return
         }
 
         let wholeByte: UInt8
 
-        switch first {
+        switch self[firstIncludedIndex] {
         case 0:
             wholeByte = 0
         case 0xFF:
             wholeByte = 0xFF
         default:
             // We're already fine, this is maximally compact. We need the whole thing.
-            return slice
+            self.appendAllBytes(to: &output)
+            return
         }
 
         // We never trim this to less than one byte, as that's always the smallest representation.
-        while slice.count > 1 {
-            // If the first byte is equal to our original first byte, and the top bit
-            // of the next byte is also equal to that, then we need to drop the byte and
-            // go again.
-            if slice.first != wholeByte {
+        while true {
+            let nextIndex = self.index(after: firstIncludedIndex)
+            guard nextIndex != self.endIndex else {
                 break
             }
 
-            guard let second = slice.dropFirst().first else {
-                preconditionFailure("Loop condition violated: must be at least two bytes left")
+            // If the first byte is equal to our original first byte, and the top bit
+            // of the next byte is also equal to that, then we need to drop the byte and
+            // go again.
+            if self[firstIncludedIndex] != wholeByte {
+                break
             }
 
-            if second & 0x80 != wholeByte & 0x80 {
+            if self[nextIndex] & 0x80 != wholeByte & 0x80 {
                 // Different top bit, we need the leading byte.
                 break
             }
 
             // Both the first byte and the top bit of the next are all zero or all 1, drop the leading
             // byte.
-            slice = slice.dropFirst()
+            firstIncludedIndex = nextIndex
         }
 
-        return slice
+        var index = firstIncludedIndex
+        while index != self.endIndex {
+            output.append(self[index])
+            self.formIndex(after: &index)
+        }
     }
 }
 

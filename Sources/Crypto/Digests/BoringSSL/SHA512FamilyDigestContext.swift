@@ -13,15 +13,15 @@
 //===----------------------------------------------------------------------===//
 
 #if !canImport(CryptoKit)
-import Synchronization
 internal import CCryptoBoringSSL
+import CryptoBoringWrapper
 
 /// Owns one SHA-384 or SHA-512 state with scoped, synchronized access.
 final class SHA512FamilyDigestContext: Sendable {
-    private let state: Mutex<SHA512_CTX>
+    private let state: CryptoMutex<SHA512_CTX>
 
     init(_ state: SHA512_CTX) {
-        self.state = Mutex(state)
+        self.state = CryptoMutex(state)
     }
 
     func copy() -> SHA512FamilyDigestContext {

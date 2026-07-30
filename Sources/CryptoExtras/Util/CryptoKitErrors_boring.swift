@@ -41,7 +41,17 @@ internal func cryptoExtrasError(_ error: CryptoBoringWrapperError) -> CryptoKitM
     case .unwrapFailure:
         cryptoError = .unwrapFailure
     case .invalidParameter:
+        #if canImport(CryptoKit)
+        if #available(macOS 13, iOS 16, watchOS 9, tvOS 16, visionOS 1, *) {
+            cryptoError = .invalidParameter
+        } else {
+            // CryptoKit did not expose invalidParameter on earlier Apple OS releases.
+            // Preserve an explicit parameter failure without raising deployment targets.
+            cryptoError = .incorrectParameterSize
+        }
+        #else
         cryptoError = .invalidParameter
+        #endif
     }
     return cryptoExtrasError(cryptoError)
 }

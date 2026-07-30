@@ -10,8 +10,8 @@
 //===----------------------------------------------------------------------===//
 
 #if !canImport(CryptoKit)
-import Synchronization
 internal import CCryptoBoringSSL
+import CryptoBoringWrapper
 
 /// Owns one MD5 state with scoped, synchronized access.
 ///
@@ -19,10 +19,10 @@ internal import CCryptoBoringSSL
 /// generic class. Swift 6.4 WASI can corrupt generic class release metadata
 /// when a generic field is instantiated with this C context.
 final class MD5DigestContext: Sendable {
-    private let state: Mutex<MD5_CTX>
+    private let state: CryptoMutex<MD5_CTX>
 
     init(_ state: MD5_CTX) {
-        self.state = Mutex(state)
+        self.state = CryptoMutex(state)
     }
 
     func copy() -> MD5DigestContext {
