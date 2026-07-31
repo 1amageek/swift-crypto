@@ -22,7 +22,7 @@ import Foundation
 
 @main
 struct CryptoCapabilityValidationCommand {
-    static func main() {
+    static func main() async {
         print("Validating Base64")
         validateBase64()
         print("Validating encryption and entropy")
@@ -43,6 +43,8 @@ struct CryptoCapabilityValidationCommand {
         validateHybridPublicKeyEncryption()
         print("Validating finite-field arithmetic")
         validateFiniteFieldArithmetic()
+        print("Validating concurrent finite-field arithmetic")
+        await validateConcurrentFiniteFieldArithmetic()
         #if !canImport(CryptoKit)
         print("Validating platform-sized secure storage")
         validateSecureStorageCapacity()
@@ -210,6 +212,10 @@ struct CryptoCapabilityValidationCommand {
 
         let contiguousSalt = salt.firstRegion + salt.secondRegion
         let contiguousInfo = info.firstRegion + info.secondRegion
+        precondition(
+            SHA256.hash(data: salt) == SHA256.hash(data: contiguousSalt),
+            "Segmented SHA-256 input changed the digest"
+        )
         contiguousSalt.withUnsafeBytes { saltBytes in
             contiguousInfo.withUnsafeBytes { infoBytes in
                 let initializedPrefixByteCount = 3
@@ -1117,6 +1123,48 @@ struct CryptoCapabilityValidationCommand {
             }
         } catch {
             preconditionFailure("Finite-field arithmetic capability validation failed")
+        }
+    }
+
+    private static func validateConcurrentFiniteFieldArithmetic() async {
+        do {
+            let arithmeticContext = try FiniteFieldArithmeticContext(modulus: 17)
+            let allOperationsSucceeded = await withTaskGroup(
+                of: Bool.self,
+                returning: Bool.self
+            ) { group in
+                for taskIndex in 0..<8 {
+                    group.addTask {
+                        do {
+                            for iteration in 0..<64 {
+                                let lhsValue = (taskIndex + iteration) % 16 + 1
+                                let rhsValue = (taskIndex * 3 + iteration) % 16 + 1
+                                let lhs = ArbitraryPrecisionInteger(integerLiteral: Int64(lhsValue))
+                                let rhs = ArbitraryPrecisionInteger(integerLiteral: Int64(rhsValue))
+                                let product = try arithmeticContext.multiply(lhs, rhs)
+                                let expected = ArbitraryPrecisionInteger(
+                                    integerLiteral: Int64((lhsValue * rhsValue) % 17)
+                                )
+                                guard product == expected else {
+                                    return false
+                                }
+                            }
+                            return true
+                        } catch {
+                            return false
+                        }
+                    }
+                }
+
+                var succeeded = true
+                for await result in group {
+                    succeeded = succeeded && result
+                }
+                return succeeded
+            }
+            precondition(allOperationsSucceeded, "Concurrent finite-field arithmetic failed")
+        } catch {
+            preconditionFailure("Concurrent finite-field arithmetic setup failed")
         }
     }
 

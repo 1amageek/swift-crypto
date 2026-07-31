@@ -53,6 +53,9 @@ let includePrivacyManifest: Bool = {
     #endif
 }()
 
+let includePerformanceValidation =
+    ProcessInfo.processInfo.environment["SWIFT_CRYPTO_ENABLE_PERFORMANCE_VALIDATION"] == "1"
+
 let privacyManifestExclude: [String] = includePrivacyManifest ? [] : ["PrivacyInfo.xcprivacy"]
 let privacyManifestResource: [PackageDescription.Resource] =
     includePrivacyManifest ? [.copy("PrivacyInfo.xcprivacy")] : []
@@ -231,8 +234,20 @@ let package = Package(
     cxxLanguageStandard: .cxx17
 )
 
+if includePerformanceValidation {
+    package.targets.append(
+        .executableTarget(
+            name: "crypto-performance-validation",
+            dependencies: [
+                "CCryptoBoringSSL",
+                "Crypto",
+            ]
+        )
+    )
+}
+
 package.dependencies += [
-    .package(path: "../swift-asn1")
+    .package(url: "https://github.com/1amageek/swift-asn1.git", branch: "main")
 ]
 
 // ---    STANDARD CROSS-REPO SETTINGS DO NOT EDIT   --- //

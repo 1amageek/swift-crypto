@@ -26,6 +26,7 @@ Sources/Crypto/Digests/Digests.swift.gyb
 Sources/Crypto/Digests/HashFunctions.swift
 Sources/Crypto/Digests/HashFunctions_SHA2.swift
 Sources/Crypto/Digests/HashFunctions_SHA3.swift
+Sources/Crypto/Digests/SHA256State.swift
 Sources/Crypto/HPKE/Ciphersuite/HPKE-AEAD.swift
 Sources/Crypto/HPKE/Ciphersuite/HPKE-AuthenticatedSharedSecretTranscript.swift
 Sources/Crypto/HPKE/Ciphersuite/HPKE-Ciphersuite.swift

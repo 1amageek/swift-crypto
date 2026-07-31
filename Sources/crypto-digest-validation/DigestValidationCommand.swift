@@ -13,7 +13,7 @@ import Crypto
 
 @main
 struct DigestValidationCommand {
-    static func main() {
+    static func main() async {
         validate(Insecure.MD5.self, expectedHex: "900150983cd24fb0d6963f7d28e17f72")
         validate(Insecure.SHA1.self, expectedHex: "a9993e364706816aba3e25717850c26c9cd0d89d")
         validate(SHA256.self, expectedHex: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
@@ -26,6 +26,8 @@ struct DigestValidationCommand {
             expectedHex: "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f"
         )
         #if !canImport(CryptoKit)
+        validateSHA256Boundaries()
+        await validateConcurrentSHA256Copies()
         validateKeccakInputChunking()
         validate(SHA3_256.self, expectedHex: "3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532")
         validate(
@@ -97,6 +99,76 @@ struct DigestValidationCommand {
     }
 
     #if !canImport(CryptoKit)
+    private static func validateSHA256Boundaries() {
+        let inputByteCounts = [
+            0, 1, 55, 56, 57, 63, 64, 65,
+            119, 120, 121, 127, 128, 129,
+            255, 256, 257, 1_023, 1_024, 1_025,
+            4_095, 4_096, 4_097,
+        ]
+        let chunkByteCounts = [1, 7, 55, 64, 65, 127]
+
+        for inputByteCount in inputByteCounts {
+            let input = makeSHA256Input(byteCount: inputByteCount)
+            let expected = SHA256.hash(data: input)
+            precondition(
+                SHA256.hash(bytes: input.span.bytes).elementsEqual(expected),
+                "SHA-256 RawSpan boundary validation failed"
+            )
+
+            input.withUnsafeBytes { inputBytes in
+                for chunkByteCount in chunkByteCounts {
+                    var hasher = SHA256()
+                    var offset = 0
+                    while offset < inputBytes.count {
+                        let end = min(offset + chunkByteCount, inputBytes.count)
+                        hasher.update(
+                            bufferPointer: UnsafeRawBufferPointer(
+                                rebasing: inputBytes[offset..<end]
+                            )
+                        )
+                        offset = end
+                    }
+                    precondition(
+                        hasher.finalize().elementsEqual(expected),
+                        "SHA-256 incremental boundary validation failed"
+                    )
+                }
+            }
+        }
+    }
+
+    private static func validateConcurrentSHA256Copies() async {
+        let prefix = makeSHA256Input(byteCount: 193)
+        var prefixState = SHA256()
+        prefixState.update(data: prefix)
+        let sharedPrefixState = prefixState
+
+        await withTaskGroup(of: Void.self) { group in
+            for taskIndex in 0..<32 {
+                let suffix = makeSHA256Input(byteCount: 55 + taskIndex)
+                group.addTask {
+                    var localState = sharedPrefixState
+                    localState.update(data: suffix)
+                    let expected = SHA256.hash(data: prefix + suffix)
+                    precondition(
+                        localState.finalize().elementsEqual(expected),
+                        "Concurrent SHA-256 copy-on-write validation failed"
+                    )
+                }
+            }
+        }
+    }
+
+    private static func makeSHA256Input(byteCount: Int) -> [UInt8] {
+        [UInt8](unsafeUninitializedCapacity: byteCount) { buffer, initializedCount in
+            for index in buffer.indices {
+                buffer[index] = UInt8(truncatingIfNeeded: index &* 31 &+ 17)
+            }
+            initializedCount = byteCount
+        }
+    }
+
     private static func validateKeccakInputChunking() {
         let input = Array(UInt8.min...UInt8(10))
         input.withUnsafeBytes { inputBuffer in

@@ -18,8 +18,11 @@ import FoundationEssentials
 import Foundation
 #endif
 
+#if os(WASI)
+import WASILibc
+#endif
 
-#if canImport(CryptoKit)
+#if canImport(CryptoKit) && !CRYPTO_SHA256_STATE_STANDALONE_VALIDATION
 import CryptoKit
 #else
 
@@ -32,7 +35,14 @@ extension UnsafeMutableRawBufferPointer: Zeroization {
         guard let baseAddress, count > 0 else {
             return
         }
+        #if os(WASI)
+        // WASI exposes an optimizer-resistant libc primitive. Keeping this
+        // path in WASILibc makes Pure Swift digest state independent of the
+        // vendored BoringSSL cleanse symbol.
+        explicit_bzero(baseAddress, count)
+        #else
         memset_s(baseAddress, count, 0, count)
+        #endif
     }
 }
 
@@ -53,4 +63,4 @@ extension Data: Zeroization {
     }
 }
 
-#endif // canImport(CryptoKit)
+#endif  // canImport(CryptoKit) && !CRYPTO_SHA256_STATE_STANDALONE_VALIDATION

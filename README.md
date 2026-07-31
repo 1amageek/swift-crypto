@@ -37,6 +37,79 @@ When building Swift Crypto for use on other platforms, Swift Crypto builds subst
 
 The API code, and some cryptographic primitives which are directly implemented in Swift, are exactly the same for both Apple CryptoKit and Swift Crypto. The BoringSSL/XKCP backing implementation is unique to Swift Crypto. In addition, there is another product, `CryptoExtras`, which provides additional functionality that is not offered in CryptoKit, which contains cryptographic APIs predominantly useful in the server ecosystem. **Note**: if you depend on CryptoExtras you'll bundle the BoringSSL/XKCP implementation of the library in your application, no matter the platform.
 
+### Pure Swift SHA-256 on WASI and Embedded WASM
+
+On non-CryptoKit builds, SHA-256 compression, buffering, padding, and digest emission
+use a Pure Swift implementation with one immutable-when-shared copy-on-write owner.
+Contiguous full blocks are compressed directly from borrowed input, without
+materializing an intermediate block. Only fragments and the final 0...63 input bytes
+are copied into bounded inline or padding storage. The 32-byte digest is initialized
+directly in its result storage.
+
+Persistent state, the inline partial-block buffer, and finalization temporaries are
+explicitly cleared. WASI uses `explicit_bzero`, so the SHA-256 object has no
+`CCryptoBoringSSL_*` symbol dependency. The per-block 16-word message schedule is a
+transient stack value and is not explicitly cleared; clearing it on every block was
+not added to the measured hot path.
+
+The following results were measured on 2026-07-31 on an Apple M4 Max using
+`wasmkit 0.3.1`. Each value is the median of three independent process medians; the
+range shows all three processes.
+
+| Runtime and 1-MiB public operation | Pure Swift speedup | Three-process range | Processes meeting 1.10x |
+| --- | ---: | ---: | ---: |
+| WASI, one-shot `DataProtocol` | 1.151x | 1.150x...1.152x | 3/3 |
+| WASI, one-shot borrowed `RawSpan` | 1.150x | 1.147x...1.152x | 3/3 |
+| WASI, incremental 64-byte chunks | 1.109x | 1.104x...1.110x | 3/3 |
+| Embedded WASM, one-shot `DataProtocol` | 1.153x | 1.152x...1.154x | 3/3 |
+| Embedded WASM, one-shot borrowed `RawSpan` | 1.154x | 1.153x...1.157x | 3/3 |
+| Embedded WASM, incremental 64-byte chunks | 1.157x | 1.153x...1.159x | 3/3 |
+
+These are end-to-end public API comparisons against the vendored BoringSSL commit
+`0226f30467f540a3f62ef48d453f93927da199b6` in the same WASI runtime. The BoringSSL
+reference was built with `OPENSSL_NO_ASM`; the results do not describe native
+assembly-enabled BoringSSL or CryptoKit. The dependency resolution was locked to
+SwiftASN1 revision `5942b1c691c8c6c1d3b139a998d011f001774858`.
+
+For each process, the harness collects 11 paired samples, alternates BoringSSL and
+Pure Swift execution order within the gated samples, consumes all 32 output bytes,
+and requires the paired median time ratio to be at most `1 / 1.10`. All 42 gated
+process medians covering 1 MiB, 1 MiB + 1 byte, and the unaligned tail cases passed.
+The table reports sustained median throughput, not a universal short-message or
+tail-latency guarantee. Three per-process nearest-rank p90 diagnostics over each set
+of 11 paired ratios have less than a 1.10x margin.
+
+The benchmark executable is absent from the default package manifest, products, and
+test schemes. It is added only when
+`SWIFT_CRYPTO_ENABLE_PERFORMANCE_VALIDATION=1`, keeping it separate from normal
+tests. Build and run the ordinary WASI benchmark with the pinned toolchain and SDK:
+
+```bash
+SWIFT_CRYPTO_ENABLE_PERFORMANCE_VALIDATION=1 \
+TOOLCHAINS=org.swift.64202607231a \
+xcrun swift build -c release \
+  --swift-sdk swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-07-23-a_wasm \
+  --product crypto-performance-validation
+
+SWIFT_CRYPTO_ENABLE_PERFORMANCE_VALIDATION=1 \
+TOOLCHAINS=org.swift.64202607231a \
+xcrun swift run --skip-build -c release \
+  --swift-sdk swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-07-23-a_wasm \
+  crypto-performance-validation
+```
+
+To reproduce the table, build once and run the second command sequentially three
+times, retaining each complete stdout separately. Do not run the processes in
+parallel, because they would compete for the same host CPU. Each successful log must
+end with `SUMMARY,target_passed`; aggregate the reciprocal of the gated `RESULT`
+`paired_median_ratio` values, then report the median and full range across the three
+processes. The harness also emits all 11 paired `SAMPLE` rows for independent
+recalculation.
+
+For Embedded WASM, use the matching
+`swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-07-23-a_wasm-embedded` SDK and pass its
+`libswiftUnicodeDataTables.a` plus `-lc++abi` to both build and run commands.
+
 ## Evolution
 
 The vast majority of the Swift Crypto code is intended to remain in lockstep with the current version of Apple CryptoKit. For this reason, patches that extend the API of Swift Crypto will be evaluated cautiously. For any such extension there are two possible outcomes for adding the API.

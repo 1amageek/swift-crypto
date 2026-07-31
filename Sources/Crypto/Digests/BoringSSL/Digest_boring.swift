@@ -97,46 +97,6 @@ extension Insecure.SHA1 {
     }
 }
 
-extension SHA256 {
-    static var digestSize: Int {
-        Int(SHA256_DIGEST_LENGTH)
-    }
-
-    static func makeContext() -> SHA256DigestContext? {
-        var state = SHA256_CTX()
-        guard CCryptoBoringSSL_SHA256_Init(&state) == 1 else {
-            return nil
-        }
-        return SHA256DigestContext(state)
-    }
-
-    static func copyContext(_ context: SHA256DigestContext) -> SHA256DigestContext {
-        context.copy()
-    }
-
-    static func update(_ context: SHA256DigestContext, data: UnsafeRawBufferPointer) -> Bool {
-        context.withState { state in
-            CCryptoBoringSSL_SHA256_Update(&state, data.baseAddress, data.count) == 1
-        }
-    }
-
-    static func finalize(
-        _ context: SHA256DigestContext,
-        digest: UnsafeMutableRawBufferPointer
-    ) -> Bool {
-        guard let baseAddress = digest.baseAddress, digest.count == digestSize else {
-            return false
-        }
-        return context.withState { state in
-            var finalState = state
-            defer {
-                withUnsafeMutableBytes(of: &finalState) { $0.zeroize() }
-            }
-            return CCryptoBoringSSL_SHA256_Final(baseAddress, &finalState) == 1
-        }
-    }
-}
-
 extension SHA384 {
     static var digestSize: Int {
         Int(SHA384_DIGEST_LENGTH)

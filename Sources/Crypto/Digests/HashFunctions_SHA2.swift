@@ -12,6 +12,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#elseif canImport(Foundation)
+import Foundation
+#endif
 
 #if canImport(CryptoKit)
 import CryptoKit
@@ -49,8 +54,8 @@ public struct SHA256: DigestHashFunction, Sendable {
     public static let byteCount: Int = 32
     /// The digest type for a SHA256 hash function.
     public typealias Digest = SHA256Digest
-    
-    private var context: SHA256DigestContext
+
+    private var context: SHA256State
 
     /// Creates a SHA256 hash function.
     ///
@@ -63,10 +68,27 @@ public struct SHA256: DigestHashFunction, Sendable {
     /// If your data fits into a single buffer, you can use the ``hash(data:)``
     /// method instead, to compute the digest in a single call.
     public init() {
-        guard let context = Self.makeContext() else {
-            preconditionFailure("Unable to initialize SHA-256 state")
+        self.context = SHA256State()
+    }
+
+    /// Computes a digest while borrowing one contiguous data region directly.
+    public static func hash<D: DataProtocol>(data: D) -> Self.Digest {
+        if data.regions.count == 1 {
+            return data.regions.first!.withUnsafeBytes { input in
+                Self.makeDigest { SHA256State.hash(input, into: $0) }
+            }
         }
-        self.context = context
+
+        var hasher = Self()
+        hasher.update(data: data)
+        return hasher.finalize()
+    }
+
+    /// Computes a digest while borrowing the supplied span directly.
+    public static func hash(bytes: RawSpan) -> Self.Digest {
+        bytes.withUnsafeBytes { input in
+            Self.makeDigest { SHA256State.hash(input, into: $0) }
+        }
     }
 
     /// Incrementally updates the hash function with the contents of the buffer.
@@ -87,12 +109,7 @@ public struct SHA256: DigestHashFunction, Sendable {
     ///   - bufferPointer: A pointer to the next block of data for the ongoing
     /// digest calculation.
     public mutating func update(bufferPointer: UnsafeRawBufferPointer) {
-        if !isKnownUniquelyReferenced(&context) {
-            context = Self.copyContext(context)
-        }
-        guard Self.update(context, data: bufferPointer) else {
-            preconditionFailure("Unable to update SHA-256 state")
-        }
+        context.update(bufferPointer)
     }
 
     /// Finalizes the hash function and returns the computed digest.
@@ -105,19 +122,29 @@ public struct SHA256: DigestHashFunction, Sendable {
     ///
     /// - Returns: The computed digest of the data.
     public func finalize() -> Self.Digest {
-        withUnsafeTemporaryAllocation(
-            byteCount: Self.digestSize,
-            alignment: 1
-        ) { digestPointer in
-            defer { digestPointer.zeroize() }
-            guard Self.finalize(context, digest: digestPointer) else {
-                preconditionFailure("Unable to finalize SHA-256 state")
-            }
-            guard let digest = SHA256Digest(copying: digestPointer.bytes) else {
-                preconditionFailure("Invalid SHA-256 digest size")
-            }
-            return digest
+        Self.makeDigest { context.finalize(into: $0) }
+    }
+
+    @inline(__always)
+    private static func makeDigest(
+        _ initialize: (UnsafeMutableRawBufferPointer) -> Bool
+    ) -> Self.Digest {
+        guard
+            let digest = SHA256Digest(initializingWith: { output in
+                output.withUnsafeMutableBytes { buffer, initializedCount in
+                    let digestBuffer = UnsafeMutableRawBufferPointer(
+                        rebasing: buffer[initializedCount..<initializedCount + Self.byteCount]
+                    )
+                    guard initialize(digestBuffer) else {
+                        preconditionFailure("Unable to finalize SHA-256 state")
+                    }
+                    initializedCount += Self.byteCount
+                }
+            })
+        else {
+            preconditionFailure("Invalid SHA-256 digest size")
         }
+        return digest
     }
 }
 
@@ -152,7 +179,7 @@ public struct SHA384: DigestHashFunction, Sendable {
     public static let blockByteCount: Int = 128
     /// The number of bytes in a SHA384 digest.
     public static let byteCount: Int = 48
-    
+
     /// The digest type for a SHA384 hash function.
     public typealias Digest = SHA384Digest
     private var context: SHA512FamilyDigestContext
@@ -260,7 +287,7 @@ public struct SHA512: DigestHashFunction, Sendable {
     public static let byteCount: Int = 64
     /// The digest type for a SHA512 hash function.
     public typealias Digest = SHA512Digest
-    
+
     private var context: SHA512FamilyDigestContext
 
     /// Creates a SHA512 hash function.
@@ -332,4 +359,4 @@ public struct SHA512: DigestHashFunction, Sendable {
         }
     }
 }
-#endif // canImport(CryptoKit)
+#endif  // canImport(CryptoKit)
