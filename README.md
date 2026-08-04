@@ -9,7 +9,7 @@ Swift Crypto is available as a Swift Package Manager package. To use it, add the
 ```swift
 // swift-crypto 1.x, 2.x, 3.x, 4.x, and 5.x are almost API compatible, so most clients
 // should allow any of them
-.package(url: "https://github.com/apple/swift-crypto.git", "1.0.0" ..< "6.0.0"),
+.package(url: "https://github.com/1amageek/swift-crypto.git", "1.0.0" ..< "6.0.0"),
 ```
 
 and to your target, add `Crypto` to your dependencies. You can then `import Crypto` to get access to Swift Crypto's functionality.
@@ -24,91 +24,38 @@ For specific API documentation, please see our documentation.
 
 ## Implementation
 
-Swift Crypto compiles in two distinct modes depending on the platform for which it is being built.
+This fork has one cryptographic backend on every supported target. `Crypto` is a
+compatibility facade and `SSLCrypto` owns the implementations. The package graph is
+therefore deliberately small:
 
-When building Swift Crypto for use on an Apple platform where CryptoKit is already available, Swift Crypto compiles its entire API surface down to nothing and simply re-exports the API of CryptoKit. This means that when using Apple platforms Swift Crypto simply delegates all work to the core implementation of CryptoKit, as though Swift Crypto was not even there.
-
-When building Swift Crypto for use on other platforms, Swift Crypto builds substantially more code. In particular, we build:
-
-1. A vendored copy of BoringSSL's libcrypto.
-2. A vendored copy of XKCP's libXKCP.
-3. The common API of Swift Crypto and CryptoKit.
-4. The backing implementation of this common API, which calls into BoringSSL or XKCP.
-
-The API code, and some cryptographic primitives which are directly implemented in Swift, are exactly the same for both Apple CryptoKit and Swift Crypto. The BoringSSL/XKCP backing implementation is unique to Swift Crypto. In addition, there is another product, `CryptoExtras`, which provides additional functionality that is not offered in CryptoKit, which contains cryptographic APIs predominantly useful in the server ecosystem. **Note**: if you depend on CryptoExtras you'll bundle the BoringSSL/XKCP implementation of the library in your application, no matter the platform.
-
-### Pure Swift SHA-256 on WASI and Embedded WASM
-
-On non-CryptoKit builds, SHA-256 compression, buffering, padding, and digest emission
-use a Pure Swift implementation with one immutable-when-shared copy-on-write owner.
-Contiguous full blocks are compressed directly from borrowed input, without
-materializing an intermediate block. Only fragments and the final 0...63 input bytes
-are copied into bounded inline or padding storage. The 32-byte digest is initialized
-directly in its result storage.
-
-Persistent state, the inline partial-block buffer, and finalization temporaries are
-explicitly cleared. WASI uses `explicit_bzero`, so the SHA-256 object has no
-`CCryptoBoringSSL_*` symbol dependency. The per-block 16-word message schedule is a
-transient stack value and is not explicitly cleared; clearing it on every block was
-not added to the measured hot path.
-
-The following results were measured on 2026-07-31 on an Apple M4 Max using
-`wasmkit 0.3.1`. Each value is the median of three independent process medians; the
-range shows all three processes.
-
-| Runtime and 1-MiB public operation | Pure Swift speedup | Three-process range | Processes meeting 1.10x |
-| --- | ---: | ---: | ---: |
-| WASI, one-shot `DataProtocol` | 1.151x | 1.150x...1.152x | 3/3 |
-| WASI, one-shot borrowed `RawSpan` | 1.150x | 1.147x...1.152x | 3/3 |
-| WASI, incremental 64-byte chunks | 1.109x | 1.104x...1.110x | 3/3 |
-| Embedded WASM, one-shot `DataProtocol` | 1.153x | 1.152x...1.154x | 3/3 |
-| Embedded WASM, one-shot borrowed `RawSpan` | 1.154x | 1.153x...1.157x | 3/3 |
-| Embedded WASM, incremental 64-byte chunks | 1.157x | 1.153x...1.159x | 3/3 |
-
-These are end-to-end public API comparisons against the vendored BoringSSL commit
-`0226f30467f540a3f62ef48d453f93927da199b6` in the same WASI runtime. The BoringSSL
-reference was built with `OPENSSL_NO_ASM`; the results do not describe native
-assembly-enabled BoringSSL or CryptoKit. The dependency resolution was locked to
-SwiftASN1 revision `5942b1c691c8c6c1d3b139a998d011f001774858`.
-
-For each process, the harness collects 11 paired samples, alternates BoringSSL and
-Pure Swift execution order within the gated samples, consumes all 32 output bytes,
-and requires the paired median time ratio to be at most `1 / 1.10`. All 42 gated
-process medians covering 1 MiB, 1 MiB + 1 byte, and the unaligned tail cases passed.
-The table reports sustained median throughput, not a universal short-message or
-tail-latency guarantee. Three per-process nearest-rank p90 diagnostics over each set
-of 11 paired ratios have less than a 1.10x margin.
-
-The benchmark executable is absent from the default package manifest, products, and
-test schemes. It is added only when
-`SWIFT_CRYPTO_ENABLE_PERFORMANCE_VALIDATION=1`, keeping it separate from normal
-tests. Build and run the ordinary WASI benchmark with the pinned toolchain and SDK:
-
-```bash
-SWIFT_CRYPTO_ENABLE_PERFORMANCE_VALIDATION=1 \
-TOOLCHAINS=org.swift.64202607231a \
-xcrun swift build -c release \
-  --swift-sdk swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-07-23-a_wasm \
-  --product crypto-performance-validation
-
-SWIFT_CRYPTO_ENABLE_PERFORMANCE_VALIDATION=1 \
-TOOLCHAINS=org.swift.64202607231a \
-xcrun swift run --skip-build -c release \
-  --swift-sdk swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-07-23-a_wasm \
-  crypto-performance-validation
+```mermaid
+flowchart LR
+    Consumer[Consumer] --> Crypto[Crypto facade]
+    Crypto --> SSLCrypto[swift-ssl / SSLCrypto]
+    SSLCrypto --> SSLCore[swift-ssl / SSLCore]
+    SSLCrypto --> PureSwift[Pure Swift algorithms]
 ```
 
-To reproduce the table, build once and run the second command sequentially three
-times, retaining each complete stdout separately. Do not run the processes in
-parallel, because they would compete for the same host CPU. Each successful log must
-end with `SUMMARY,target_passed`; aggregate the reciprocal of the gated `RESULT`
-`paired_median_ratio` values, then report the median and full range across the three
-processes. The harness also emits all 11 paired `SAMPLE` rows for independent
-recalculation.
+The graph contains no BoringSSL, XKCP, Security.framework, or CryptoExtras target.
+The historical C backend source trees have been removed from this fork, so there is
+no alternate backend that can be selected by a build flag or by a consuming package.
+Unsupported APIs fail at the typed API boundary; they do not silently fall back to
+another backend.
 
-For Embedded WASM, use the matching
-`swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-07-23-a_wasm-embedded` SDK and pass its
-`libswiftUnicodeDataTables.a` plus `-lc++abi` to both build and run commands.
+`Crypto` keeps the CryptoKit-shaped public ownership boundary. The facade may
+materialize an owned `Data` value at that API boundary, while `SSLCrypto` keeps
+borrowed byte ranges, secret scalars, and shared secrets in scoped storage. Native,
+WASI, and Embedded WASI `Crypto` products are compile-verified with the pinned Swift
+6.4 development snapshot.
+
+Long-running performance and differential measurements are intentionally not part of
+the normal `Crypto` test target. They live in
+[`swift-ssl/Benchmarks`](../swift-ssl/Benchmarks), with the current result tables in
+[`swift-ssl/README.md`](../swift-ssl/README.md). The current Native SHA-256 gate is
+not claimed as passed: the measured 64-byte, 1-KiB, and 16-KiB workloads are
+`1.0939x`, `0.8612x`, and `0.8399x` relative to the pinned BoringSSL reference.
+The WASI and Embedded WASI 1-MiB exploratory workloads are above `1.10x`, but they
+do not replace the Native gate.
 
 ## Evolution
 
@@ -122,11 +69,15 @@ Note that Swift Crypto does not intend to support all possible cryptographic pri
 
 ### Code Organisation
 
-Files in this repository are divided into two groups, based on whether they have a name that ends in `_boring`/`_xkcp` or are in a `BoringSSL`/`XKCP` directory, or if they are not.
+The public facade lives under `Sources/Crypto`. Backend adapters live in the
+`SSLCrypto` directories and are the only implementations included by the SwiftPM
+target. The old C backend directories are not part of this fork.
 
-Files that meet the above criteria are specific to the Swift Crypto implementation. Changes to these files can be made fairly easily, so long as they meet the criteria below. If your file needs to `import CCryptoBoringSSL` or `import CXKCP` or access a BoringSSL or XKCP API, it needs to be marked this way.
-
-Files that do not have the `_boring` or `_xkcp` suffix are part of the public API of CryptoKit. Changing these requires passing a higher bar, as any change in these files must be accompanied by a change in CryptoKit itself.
+Changes to the facade should preserve its CryptoKit-compatible ownership and error
+contracts. Changes to an `SSLCrypto` adapter must preserve the backend protocol,
+borrowed-buffer lifetime, and secret-memory clearing rules. New primitives belong in
+`swift-ssl/SSLCrypto` first, followed by a small facade adapter and differential tests
+at the facade boundary.
 
 ## Contributing
 
@@ -210,14 +161,14 @@ Swift Crypto 2.0.0 was released in September 2021. The only breaking change betw
 
 Swift Crypto 3.0.0 was released in September 2023. Again the only breaking change was the addition of new cases in the `CryptoError` enumeration, so most users can safely depend on the 1.0.0, 2.0.0, or 3.0.0 series of releases.
 
-Swift Crypto 4.0.0 was released in September 2025. Again the only breaking change was the addition of new cases in the `CryptoError` enumeration, so most users can safely depend on the 1.0.0, 2.0.0, 3.0.0, or 4.0.0 series of releases. Note that in this release `_CryptoExtras` was renamed to `CryptoExtras`. Use `CryptoExtras` for all new and migrated code.
+Swift Crypto 4.0.0 was released in September 2025. Again the only breaking change was the addition of new cases in the `CryptoError` enumeration, so most users can safely depend on the 1.0.0, 2.0.0, 3.0.0, or 4.0.0 series of releases. This fork does not publish the historical `CryptoExtras` product.
 
 Swift Crypto 5.0.0 was released in September 2026. Because this version is only supported on Swift versions that support extensible enums, this release has mechanically marked all non-frozen public enums in CryptoKit as `@nonexhaustive`, which should mitigate the need for any future major releases of Swift Crypto. Most users will be able to depend on the 1.0.0, 2.0.0, 3.0.0, 4.0.0 or 5.0.0 series of releases.
 
 To do so, please use the following dependency in your `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/apple/swift-crypto.git", "1.0.0" ..< "6.0.0"),
+.package(url: "https://github.com/1amageek/swift-crypto.git", "1.0.0" ..< "6.0.0"),
 ```
 
 ### Developing Swift Crypto on macOS
@@ -227,4 +178,5 @@ Swift Crypto normally defers to the OS implementation of CryptoKit on macOS. Nat
 
 ## Acknowledgements
 
-This project contains source code from the BoringSSL and XKCP projects.
+This fork is implemented in Swift and uses the Pure Swift backend supplied by
+[`swift-ssl`](../swift-ssl). No historical C backend files remain in the source tree.

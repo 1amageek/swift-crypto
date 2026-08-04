@@ -19,10 +19,14 @@ import Foundation
 #endif
 
 
-#if canImport(CryptoKit)
+#if canImport(CryptoKit) && !SWIFT_CRYPTO_PURE_SWIFT
 import CryptoKit
 #else
+#if SWIFT_CRYPTO_PURE_SWIFT
 typealias ChaChaPolyImpl = OpenSSLChaChaPolyImpl
+#else
+typealias ChaChaPolyImpl = OpenSSLChaChaPolyImpl
+#endif
 
 
 

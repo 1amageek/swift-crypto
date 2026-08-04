@@ -19,10 +19,14 @@ import Foundation
 #endif
 
 
-#if canImport(CryptoKit)
+#if canImport(CryptoKit) && !SWIFT_CRYPTO_PURE_SWIFT
 import CryptoKit
 #else
+#if SWIFT_CRYPTO_PURE_SWIFT
 typealias AESGCMImpl = OpenSSLAESGCMImpl
+#else
+typealias AESGCMImpl = OpenSSLAESGCMImpl
+#endif
 
 
 extension AES {
@@ -34,7 +38,11 @@ extension AES {
         static let defaultNonceByteCount = 12
 
         /// Fixed-length array of tagByteCount bytes.
+#if SWIFT_CRYPTO_PURE_SWIFT
+        typealias TagStorage = ContiguousArray<UInt8>
+#else
         typealias TagStorage = [16 of UInt8]
+#endif
 
         /// Secures the given plaintext message with encryption and an
         /// authentication tag that covers both the encrypted data and

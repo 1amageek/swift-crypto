@@ -13,9 +13,9 @@
 //===----------------------------------------------------------------------===//
 
 
-#if canImport(CryptoKit)
+#if canImport(CryptoKit) && !SWIFT_CRYPTO_PURE_SWIFT
 import CryptoKit
-#else
+#elseif !SWIFT_CRYPTO_PURE_SWIFT
 /// An implementation of Secure Hashing Algorithm 3 (SHA-3) hashing with a 256-bit digest.
 ///
 /// The ``SHA3_256`` hash implements the ``HashFunction`` protocol for the

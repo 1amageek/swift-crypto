@@ -13,10 +13,11 @@
 //===----------------------------------------------------------------------===//
 
 
-#if canImport(CryptoKit)
+#if canImport(CryptoKit) && !SWIFT_CRYPTO_PURE_SWIFT
 import CryptoKit
 #else
 
+#if !SWIFT_CRYPTO_PURE_SWIFT
 extension InlineArray where Element == UInt8 {
     /// Copy of the bytes of the given raw span into this array. The span
     /// must have exactly count bytes in it.
@@ -29,6 +30,7 @@ extension InlineArray where Element == UInt8 {
         }
     }
 }
+#endif
 
 extension Array where Element == UInt8 {
     /// Copy of the bytes of the given raw span into this array. The span

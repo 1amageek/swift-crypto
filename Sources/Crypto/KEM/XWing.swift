@@ -19,17 +19,22 @@ import Foundation
 #endif
 
 
-#if canImport(CryptoKit)
+#if canImport(CryptoKit) && !SWIFT_CRYPTO_PURE_SWIFT
 import CryptoKit
 #else
 
-#if canImport(CryptoKit)
+#if canImport(CryptoKit) && !SWIFT_CRYPTO_PURE_SWIFT
 import CryptoKit
 #else
 
 
+#if SWIFT_CRYPTO_PURE_SWIFT
+typealias XWingPublicKeyImpl = SSLCryptoXWingPublicKeyImpl
+typealias XWingPrivateKeyImpl = SSLCryptoXWingPrivateKeyImpl
+#else
 typealias XWingPublicKeyImpl = OpenSSLXWingPublicKeyImpl
 typealias XWingPrivateKeyImpl = OpenSSLXWingPrivateKeyImpl
+#endif
 
 /// The X-Wing (ML-KEM768 with X25519) Key Encapsulation Mechanism, defined in
 /// https://datatracker.ietf.org/doc/html/draft-connolly-cfrg-xwing-kem-06

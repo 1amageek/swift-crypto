@@ -19,18 +19,13 @@ import Foundation
 #endif
 
 
-#if canImport(CryptoKit)
-import CryptoKit
-#else
-import CryptoBoringWrapper
-
-typealias NISTCurvePublicKeyImpl = OpenSSLNISTCurvePublicKeyImpl
-typealias NISTCurvePrivateKeyImpl = OpenSSLNISTCurvePrivateKeyImpl
+typealias NISTCurvePublicKeyImpl = SSLCryptoNISTCurvePublicKeyImpl
+typealias NISTCurvePrivateKeyImpl = SSLCryptoNISTCurvePrivateKeyImpl
 
 
-// MARK: - Generated file, do NOT edit
-// any edits of this file WILL be overwritten and thus discarded
-// see section `gyb` in `README` for details.
+// MARK: - CryptoKit-compatible key agreement surface
+// The implementation mapping below is source-owned and always routes through
+// the Pure Swift SSLCrypto backend.
 
 // MARK: - P256 + Signing
 extension P256 {
@@ -50,7 +45,7 @@ extension P256 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
             }
 
             /// Creates a P-256 public key for signing from a compact
@@ -60,7 +55,7 @@ extension P256 {
             ///   - compactRepresentation: A compact representation of the key
             /// as a collection of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compactRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
             }
 
             /// Creates a P-256 public key for signing from an ANSI x9.63
@@ -69,7 +64,7 @@ extension P256 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
             }
             
             /// Creates a P-256 public key for signing from a compressed representation of
@@ -79,7 +74,7 @@ extension P256 {
             ///   - compressedRepresentation: A compressed representation of the key as a collection
             /// of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compressedRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
             /// Creates a P-256 public key for signing from a Privacy-Enhanced Mail
@@ -162,7 +157,7 @@ extension P256 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
             }
 
             /// Creates a P-256 private key for signing from a collection of bytes.
@@ -171,7 +166,7 @@ extension P256 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<Bytes: ContiguousBytes>(rawRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
             /// Creates a P-256 private key for signing from a Privacy-Enhanced Mail
@@ -266,7 +261,7 @@ extension P256 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
             }
 
             /// Creates a P-256 public key for key agreement from a compact
@@ -276,7 +271,7 @@ extension P256 {
             ///   - compactRepresentation: A compact representation of the key
             /// as a collection of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compactRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
             }
 
             /// Creates a P-256 public key for key agreement from an ANSI x9.63
@@ -285,7 +280,7 @@ extension P256 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
             }
             
             /// Creates a P-256 public key for key agreement from a compressed representation of
@@ -295,7 +290,7 @@ extension P256 {
             ///   - compressedRepresentation: A compressed representation of the key as a collection
             /// of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compressedRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
             /// Creates a P-256 public key for key agreement from a Privacy-Enhanced Mail
@@ -378,7 +373,7 @@ extension P256 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
             }
 
             /// Creates a P-256 private key for key agreement from a collection of bytes.
@@ -387,7 +382,7 @@ extension P256 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<Bytes: ContiguousBytes>(rawRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
             /// Creates a P-256 private key for key agreement from a Privacy-Enhanced Mail
@@ -481,7 +476,7 @@ extension P384 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
             }
 
             /// Creates a P-384 public key for signing from a compact
@@ -491,7 +486,7 @@ extension P384 {
             ///   - compactRepresentation: A compact representation of the key
             /// as a collection of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compactRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
             }
 
             /// Creates a P-384 public key for signing from an ANSI x9.63
@@ -500,7 +495,7 @@ extension P384 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
             }
             
             /// Creates a P-384 public key for signing from a compressed representation of
@@ -510,7 +505,7 @@ extension P384 {
             ///   - compressedRepresentation: A compressed representation of the key as a collection
             /// of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compressedRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
             /// Creates a P-384 public key for signing from a Privacy-Enhanced Mail
@@ -593,7 +588,7 @@ extension P384 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
             }
 
             /// Creates a P-384 private key for signing from a collection of bytes.
@@ -602,7 +597,7 @@ extension P384 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<Bytes: ContiguousBytes>(rawRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
             /// Creates a P-384 private key for signing from a Privacy-Enhanced Mail
@@ -697,7 +692,7 @@ extension P384 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
             }
 
             /// Creates a P-384 public key for key agreement from a compact
@@ -707,7 +702,7 @@ extension P384 {
             ///   - compactRepresentation: A compact representation of the key
             /// as a collection of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compactRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
             }
 
             /// Creates a P-384 public key for key agreement from an ANSI x9.63
@@ -716,7 +711,7 @@ extension P384 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
             }
             
             /// Creates a P-384 public key for key agreement from a compressed representation of
@@ -726,7 +721,7 @@ extension P384 {
             ///   - compressedRepresentation: A compressed representation of the key as a collection
             /// of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compressedRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
             /// Creates a P-384 public key for key agreement from a Privacy-Enhanced Mail
@@ -809,7 +804,7 @@ extension P384 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
             }
 
             /// Creates a P-384 private key for key agreement from a collection of bytes.
@@ -818,7 +813,7 @@ extension P384 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<Bytes: ContiguousBytes>(rawRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
             /// Creates a P-384 private key for key agreement from a Privacy-Enhanced Mail
@@ -912,7 +907,7 @@ extension P521 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
             }
 
             /// Creates a P-521 public key for signing from a compact
@@ -922,7 +917,7 @@ extension P521 {
             ///   - compactRepresentation: A compact representation of the key
             /// as a collection of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compactRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
             }
 
             /// Creates a P-521 public key for signing from an ANSI x9.63
@@ -931,7 +926,7 @@ extension P521 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
             }
             
             /// Creates a P-521 public key for signing from a compressed representation of
@@ -941,7 +936,7 @@ extension P521 {
             ///   - compressedRepresentation: A compressed representation of the key as a collection
             /// of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compressedRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
             /// Creates a P-521 public key for signing from a Privacy-Enhanced Mail
@@ -1024,7 +1019,7 @@ extension P521 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
             }
 
             /// Creates a P-521 private key for signing from a collection of bytes.
@@ -1033,7 +1028,7 @@ extension P521 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<Bytes: ContiguousBytes>(rawRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
             /// Creates a P-521 private key for signing from a Privacy-Enhanced Mail
@@ -1128,7 +1123,7 @@ extension P521 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(rawRepresentation: rawRepresentation) }
             }
 
             /// Creates a P-521 public key for key agreement from a compact
@@ -1138,7 +1133,7 @@ extension P521 {
             ///   - compactRepresentation: A compact representation of the key
             /// as a collection of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compactRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(compactRepresentation: compactRepresentation) }
             }
 
             /// Creates a P-521 public key for key agreement from an ANSI x9.63
@@ -1147,7 +1142,7 @@ extension P521 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(x963Representation: x963Representation) }
             }
             
             /// Creates a P-521 public key for key agreement from a compressed representation of
@@ -1157,7 +1152,7 @@ extension P521 {
             ///   - compressedRepresentation: A compressed representation of the key as a collection
             /// of contiguous bytes.
             public init<Bytes: ContiguousBytes>(compressedRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePublicKeyImpl(compressedRepresentation: compressedRepresentation) }
             }
 
             /// Creates a P-521 public key for key agreement from a Privacy-Enhanced Mail
@@ -1240,7 +1235,7 @@ extension P521 {
             /// - Parameters:
             ///   - x963Representation: An ANSI x9.63 representation of the key.
             public init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePrivateKeyImpl(x963: x963Representation) }
             }
 
             /// Creates a P-521 private key for key agreement from a collection of bytes.
@@ -1249,7 +1244,7 @@ extension P521 {
             ///   - rawRepresentation: A raw representation of the key as a collection of
             /// contiguous bytes.
             public init<Bytes: ContiguousBytes>(rawRepresentation: Bytes) throws(CryptoKitMetaError) {
-                impl = try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
+                impl = try withCryptoBackendError { () throws(CryptoBackendError) in try NISTCurvePrivateKeyImpl(data: rawRepresentation) }
             }
 
             /// Creates a P-521 private key for key agreement from a Privacy-Enhanced Mail
@@ -1335,7 +1330,7 @@ extension P256.KeyAgreement.PrivateKey: DiffieHellmanKeyAgreement {
     /// key from this user to create the shared secret.
     /// - Returns: The computed shared secret.
     public func sharedSecretFromKeyAgreement(with publicKeyShare: P256.KeyAgreement.PublicKey) throws(CryptoKitMetaError) -> SharedSecret {
-        return try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try self.openSSLSharedSecretFromKeyAgreement(with: publicKeyShare) }
+        return try self.openSSLSharedSecretFromKeyAgreement(with: publicKeyShare)
     }
 }
 // MARK: - P384 + DH
@@ -1347,7 +1342,7 @@ extension P384.KeyAgreement.PrivateKey: DiffieHellmanKeyAgreement {
     /// key from this user to create the shared secret.
     /// - Returns: The computed shared secret.
     public func sharedSecretFromKeyAgreement(with publicKeyShare: P384.KeyAgreement.PublicKey) throws(CryptoKitMetaError) -> SharedSecret {
-        return try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try self.openSSLSharedSecretFromKeyAgreement(with: publicKeyShare) }
+        return try self.openSSLSharedSecretFromKeyAgreement(with: publicKeyShare)
     }
 }
 // MARK: - P521 + DH
@@ -1359,7 +1354,6 @@ extension P521.KeyAgreement.PrivateKey: DiffieHellmanKeyAgreement {
     /// key from this user to create the shared secret.
     /// - Returns: The computed shared secret.
     public func sharedSecretFromKeyAgreement(with publicKeyShare: P521.KeyAgreement.PublicKey) throws(CryptoKitMetaError) -> SharedSecret {
-        return try withCryptoBoringWrapperError { () throws(CryptoBoringWrapperError) in try self.openSSLSharedSecretFromKeyAgreement(with: publicKeyShare) }
+        return try self.openSSLSharedSecretFromKeyAgreement(with: publicKeyShare)
     }
 }
-#endif // canImport(CryptoKit)

@@ -19,7 +19,7 @@ import Foundation
 #endif
 
 
-#if canImport(CryptoKit)
+#if canImport(CryptoKit) && !SWIFT_CRYPTO_PURE_SWIFT
 import CryptoKit
 #else
 
@@ -48,8 +48,12 @@ protocol DigestPrivate: Digest {
 extension DigestPrivate {
     @inlinable
     init?(copying bytes: RawSpan) {
-        self.init() {
-            $0.append(contentsOf: bytes)
+        self.init() { output in
+            bytes.withUnsafeBytes { source in
+                for index in 0..<source.count {
+                    output.append(source[index])
+                }
+            }
         }
     }
 }

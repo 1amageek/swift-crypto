@@ -18,9 +18,13 @@ import FoundationEssentials
 import Foundation
 #endif
 
-#if canImport(CryptoKit)
+#if canImport(CryptoKit) && !SWIFT_CRYPTO_PURE_SWIFT
 import CryptoKit
 #else
+// The legacy context-backed implementations remain available only while the
+// C backend is selected. The Pure Swift definitions live in
+// `SSLCryptoHashFunctions.swift` and use SSLCrypto's owned contexts.
+#if !SWIFT_CRYPTO_PURE_SWIFT
 /// An implementation of Secure Hashing Algorithm 2 (SHA-2) hashing with a
 /// 256-bit digest.
 ///
@@ -359,4 +363,5 @@ public struct SHA512: DigestHashFunction, Sendable {
         }
     }
 }
+#endif
 #endif  // canImport(CryptoKit)

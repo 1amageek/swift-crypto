@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 
-#if canImport(CryptoKit)
+#if canImport(CryptoKit) && !SWIFT_CRYPTO_PURE_SWIFT
 import CryptoKit
 #else
 

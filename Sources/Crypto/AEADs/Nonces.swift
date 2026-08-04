@@ -19,7 +19,7 @@ import Foundation
 #endif
 
 
-#if canImport(CryptoKit)
+#if canImport(CryptoKit) && !SWIFT_CRYPTO_PURE_SWIFT
 import CryptoKit
 #else
 // MARK: - Generated file, do NOT edit
@@ -61,7 +61,7 @@ extension AES.GCM {
                 throw error(CryptoKitError.incorrectParameterSize)
             }
 
-            self.storage = data.withUnsafeBytes { Storage(copying: $0.bytes) }
+            self.storage = data.withUnsafeBytes { ContiguousArray(Array($0)) }
         }
 
         /// Creates a nonce from the given data.
@@ -77,7 +77,7 @@ extension AES.GCM {
                 throw error(CryptoKitError.incorrectParameterSize)
             }
 
-            self.storage = Storage(copying: bytes)
+            self.storage = bytes.withUnsafeBytes { ContiguousArray(Array($0)) }
         }
 
         /// Creates a nonce from the given data.
@@ -161,7 +161,11 @@ extension ChaChaPoly {
     /// that nonces are unique per call to encryption APIs in order to protect the
     /// integrity of the encryption.
     public struct Nonce: ContiguousBytes, Sequence, Sendable {
+        #if SWIFT_CRYPTO_PURE_SWIFT
+        typealias Storage = ContiguousArray<UInt8>
+        #else
         typealias Storage = [12 of UInt8]
+        #endif
 
         let storage: Storage
 
@@ -185,7 +189,11 @@ extension ChaChaPoly {
                 throw error(CryptoKitError.incorrectParameterSize)
             }
 
+            #if SWIFT_CRYPTO_PURE_SWIFT
+            self.storage = data.withUnsafeBytes { ContiguousArray(Array($0)) }
+            #else
             self.storage = data.withUnsafeBytes { Storage(copying: $0.bytes) }
+            #endif
         }
 
         /// Creates a nonce from the given data.
@@ -201,7 +209,11 @@ extension ChaChaPoly {
                 throw error(CryptoKitError.incorrectParameterSize)
             }
 
+            #if SWIFT_CRYPTO_PURE_SWIFT
+            self.storage = bytes.withUnsafeBytes { ContiguousArray(Array($0)) }
+            #else
             self.storage = Storage(copying: bytes)
+            #endif
         }
 
         /// Creates a nonce from the given data.
@@ -217,7 +229,11 @@ extension ChaChaPoly {
                 throw error(CryptoKitError.incorrectParameterSize)
             }
 
+            #if SWIFT_CRYPTO_PURE_SWIFT
+            self.storage = ContiguousArray(data)
+            #else
             self.storage = Data(data).withUnsafeBytes { Storage(copying: $0.bytes) }
+            #endif
         }
 
         /// Calls the given closure with a pointer to the underlying bytes of the array’s
@@ -260,7 +276,11 @@ extension ChaChaPoly {
 
         /// Storage for a new, random nonce.
         static var randomNonceStorage: Storage {
+            #if SWIFT_CRYPTO_PURE_SWIFT
+            var data = Storage(repeating: 0, count: ChaChaPoly.nonceByteCount)
+            #else
             var data = Storage(repeating: 0)
+            #endif
 
             var mutableSpan = data.mutableSpan
             var mutableBytes = mutableSpan.mutableBytes

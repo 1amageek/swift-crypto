@@ -13,11 +13,6 @@
 //===----------------------------------------------------------------------===//
 
 
-#if canImport(CryptoKit)
-@_exported import CryptoKit
-#else
-import CryptoBoringWrapper
-
 /// General cryptography errors used by CryptoKit.
 @nonexhaustive
 public enum CryptoKitError: Error {
@@ -27,7 +22,7 @@ public enum CryptoKitError: Error {
     case incorrectParameterSize
     /// The authentication tag or signature is incorrect.
     case authenticationFailure
-    /// The underlying corecrypto library is unable to complete the requested
+    /// The underlying cryptographic backend is unable to complete the requested
     /// action.
     case underlyingCoreCryptoError(error: Int32)
     /// The framework can't wrap the specified key.
@@ -87,7 +82,7 @@ internal func error(_ error: CryptoKitASN1Error) -> CryptoKitASN1Error { error }
 internal func error(_ error: HPKE.Errors) -> HPKE.Errors { error }
 internal func error(_ error: KEM.Errors) -> KEM.Errors { error }
 internal func error(_ error: RSAPSSSPKIErrors) -> RSAPSSSPKIErrors { error }
-internal func error(_ error: CryptoBoringWrapperError) -> CryptoBoringWrapperError { error }
+internal func error<E: Error>(_ error: E) -> E { error }
 internal func withCryptoKitMetaError<T>(_ body: () throws -> T) throws -> T {
     try body()
 }
@@ -98,10 +93,11 @@ internal func withCryptoKitError<T>(
     try body()
 }
 
-internal func withCryptoBoringWrapperError<T>(
-    _ body: () throws(CryptoBoringWrapperError) -> T
+/// Error type used by the Pure Swift cryptographic backend.
+internal typealias CryptoBackendError = CryptoKitError
+
+internal func withCryptoBackendError<T>(
+    _ body: () throws(CryptoBackendError) -> T
 ) throws -> T {
     try body()
 }
-
-#endif

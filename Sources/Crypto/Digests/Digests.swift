@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 
-#if canImport(CryptoKit)
+#if canImport(CryptoKit) && !SWIFT_CRYPTO_PURE_SWIFT
 import CryptoKit
 #else
 // MARK: - Generated file, do NOT edit
@@ -331,7 +331,7 @@ public struct SHA1Digest: DigestPrivate {
         array.appendByte(bytes.0)
         array.appendByte(bytes.1)
         array.appendByte(bytes.2)
-        return array.prefix(SHA1Digest.byteCount)
+        return array.prefix(Self.byteCount)
     }
 
 #if !hasFeature(Embedded)
@@ -412,7 +412,7 @@ public struct MD5Digest: DigestPrivate {
         var array = [UInt8]()
         array.appendByte(bytes.0)
         array.appendByte(bytes.1)
-        return array.prefix(MD5Digest.byteCount)
+        return array.prefix(Self.byteCount)
     }
 
 #if !hasFeature(Embedded)

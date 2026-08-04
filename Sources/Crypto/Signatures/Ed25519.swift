@@ -18,7 +18,7 @@ import FoundationEssentials
 import Foundation
 #endif
 
-#if canImport(CryptoKit)
+#if canImport(CryptoKit) && !SWIFT_CRYPTO_PURE_SWIFT
 import CryptoKit
 #else
 
@@ -38,6 +38,7 @@ extension Curve25519.Signing {
     }
 }
 
+#if !SWIFT_CRYPTO_PURE_SWIFT
 extension Curve25519.Signing.PublicKey: DataValidator {
     typealias Signature = Data
     
@@ -74,4 +75,5 @@ extension Curve25519.Signing.PrivateKey: Signer {
         }
     }
 }
+#endif
 #endif // canImport(CryptoKit)

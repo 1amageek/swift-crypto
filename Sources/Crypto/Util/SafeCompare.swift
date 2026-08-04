@@ -18,12 +18,25 @@ import FoundationEssentials
 import Foundation
 #endif
 
-#if canImport(CryptoKit)
+#if canImport(CryptoKit) && !SWIFT_CRYPTO_PURE_SWIFT
 import CryptoKit
 #else
 
 internal func safeCompare<LHS: ContiguousBytes, RHS: ContiguousBytes>(_ lhs: LHS, _ rhs: RHS) -> Bool {
+    #if SWIFT_CRYPTO_PURE_SWIFT
+    return lhs.withUnsafeBytes { lhsBytes in
+        rhs.withUnsafeBytes { rhsBytes in
+            guard lhsBytes.count == rhsBytes.count else { return false }
+            var difference: UInt8 = 0
+            for index in 0..<lhsBytes.count {
+                difference |= lhsBytes[index] ^ rhsBytes[index]
+            }
+            return difference == 0
+        }
+    }
+    #else
     return openSSLSafeCompare(lhs, rhs)
+    #endif
 }
 
 #endif // canImport(CryptoKit)

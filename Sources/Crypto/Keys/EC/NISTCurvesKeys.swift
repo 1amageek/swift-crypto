@@ -20,10 +20,17 @@ import Foundation
 
 
 
-#if canImport(CryptoKit)
+#if canImport(CryptoKit) && !SWIFT_CRYPTO_PURE_SWIFT
 import CryptoKit
 #else
+#if SWIFT_CRYPTO_PURE_SWIFT
+extension P256 { static let coordinateByteCount = 32 }
+extension P384 { static let coordinateByteCount = 48 }
+extension P521 { static let coordinateByteCount = 66 }
+typealias SupportedCurveDetailsImpl = SSLCryptoNISTCurvePublicKeyImpl
+#else
 typealias SupportedCurveDetailsImpl = OpenSSLSupportedNISTCurve
+#endif
 
 protocol ECPublicKey {
     init <Bytes: ContiguousBytes>(rawRepresentation: Bytes) throws(CryptoKitMetaError)

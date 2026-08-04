@@ -13,8 +13,55 @@
 //===----------------------------------------------------------------------===//
 
 
-#if canImport(CryptoKit)
+#if canImport(CryptoKit) && !SWIFT_CRYPTO_PURE_SWIFT
 import CryptoKit
+#endif
+
+#if SWIFT_CRYPTO_PURE_SWIFT && (canImport(FoundationEssentials) || canImport(Foundation))
+
+@usableFromInline
+package func withUnsafeBytes<Bytes: ContiguousBytes, Result, E: Error>(
+    of bytes: Bytes,
+    _ body: (UnsafeRawBufferPointer) throws(E) -> Result
+) throws(E) -> Result {
+    do {
+        return try bytes.withUnsafeBytes { buffer in
+            try body(buffer)
+        }
+    } catch let typedError as E {
+        throw typedError
+    } catch {
+        preconditionFailure("Unexpected error type escaped ContiguousBytes.withUnsafeBytes")
+    }
+}
+
+// This helper keeps package-local consumers on the same borrowed-region
+// contract without materializing contiguous input at every call site.
+@usableFromInline
+package func withContiguousBytes<Bytes: DataProtocol, Result, E: Error>(
+    of bytes: Bytes,
+    _ body: (UnsafeRawBufferPointer) throws(E) -> Result
+) throws(E) -> Result {
+    do {
+        var regions = bytes.regions.makeIterator()
+        guard let firstRegion = regions.next() else {
+            return try body(UnsafeRawBufferPointer(start: nil, count: 0))
+        }
+        if regions.next() == nil {
+            return try firstRegion.withUnsafeBytes { buffer in
+                try body(buffer)
+            }
+        }
+        return try Array(bytes).withUnsafeBytes { buffer in
+            try body(buffer)
+        }
+    } catch let typedError as E {
+        throw typedError
+    } catch {
+        preconditionFailure("Unexpected error type escaped DataProtocol.withUnsafeBytes")
+    }
+}
+
 #endif
 
 #if canImport(FoundationEssentials)

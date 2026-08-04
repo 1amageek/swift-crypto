@@ -19,7 +19,7 @@ import Foundation
 #endif
 
 
-#if canImport(CryptoKit)
+#if canImport(CryptoKit) && !SWIFT_CRYPTO_PURE_SWIFT
 import CryptoKit
 #else
 
@@ -34,8 +34,13 @@ extension Curve25519 {
     /// Ed25519.
     @nonexhaustive
     public enum Signing: Sendable {
+        #if SWIFT_CRYPTO_PURE_SWIFT
+        typealias Curve25519PrivateKeyImpl = SSLCryptoCurve25519SigningPrivateKeyImpl
+        typealias Curve25519PublicKeyImpl = SSLCryptoCurve25519SigningPublicKeyImpl
+        #else
         typealias Curve25519PrivateKeyImpl = Curve25519.Signing.OpenSSLCurve25519PrivateKeyImpl
         typealias Curve25519PublicKeyImpl = Curve25519.Signing.OpenSSLCurve25519PublicKeyImpl
+        #endif
 
         /// A Curve25519 private key used to create cryptographic signatures.
         public struct PrivateKey: ECPrivateKey, Sendable {

@@ -18,12 +18,21 @@ import FoundationEssentials
 import Foundation
 #endif
 
+#if os(WASI)
+import WASILibc
+#endif
 
-#if canImport(CryptoKit)
+
+#if canImport(CryptoKit) && !SWIFT_CRYPTO_PURE_SWIFT
 import CryptoKit
 #else
 
-nonisolated(unsafe) private let emptyStorage:SecureBytes.Backing = SecureBytes.Backing.createEmpty()
+// The zero-length backing is a process-lifetime immutable owner. Every mutating
+// operation establishes unique ownership before changing count or bytes; the
+// retained singleton therefore cannot be mutated through a SecureBytes value.
+// `nonisolated(unsafe)` is limited to this immutable-after-publication owner and
+// avoids making the storage class globally Sendable.
+nonisolated(unsafe) private let emptyStorage: SecureBytes.Backing = SecureBytes.Backing.createEmpty()
 
 struct SecureBytes: @unchecked Sendable {
     var backing: Backing
@@ -352,8 +361,12 @@ extension SecureBytes {
             // We always clear the whole capacity, even if we don't think we used it all.
             let bytesToClear = self.header.capacity
 
-            _ = self.withUnsafeMutablePointerToElements { elementsPtr in
-                memset_s(elementsPtr, bytesToClear, 0, bytesToClear)
+            self.withUnsafeMutablePointerToElements { elementsPtr in
+#if os(WASI)
+                explicit_bzero(elementsPtr, bytesToClear)
+#else
+                _ = memset_s(elementsPtr, bytesToClear, 0, bytesToClear)
+#endif
             }
         }
 
@@ -513,7 +526,11 @@ extension SecureBytes {
 
         deinit {
             // We always clear the whole capacity, even if we don't think we used it all.
+#if os(WASI)
+            explicit_bzero(storage.baseAddress!, storage.count)
+#else
             memset_s(storage.baseAddress!, storage.count, 0, storage.count)
+#endif
             storage.deallocate()
         }
 

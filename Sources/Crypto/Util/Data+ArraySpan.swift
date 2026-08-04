@@ -18,7 +18,7 @@ import FoundationEssentials
 import Foundation
 #endif
 
-#if canImport(CryptoKit)
+#if canImport(CryptoKit) && !SWIFT_CRYPTO_PURE_SWIFT
 import CryptoKit
 #else
 
@@ -49,6 +49,7 @@ extension Data {
     }
 }
 
+#if !SWIFT_CRYPTO_PURE_SWIFT
 extension InlineArray where Element == UInt8 {
     init<D: DataProtocol>(copying data: D) {
         self.init { outputSpan in
@@ -60,6 +61,7 @@ extension InlineArray where Element == UInt8 {
         }
     }
 }
+#endif
 #endif
 
 #endif

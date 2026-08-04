@@ -25,12 +25,14 @@ enum TestError: Error {
 }
 
 func nullTestVectorForAlgorithm<H: HashFunction>(hashFunction: H.Type) throws -> String {
-    switch H.self {
-    case is SHA3_256.Type: return "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a"
-    case is SHA3_384.Type: return "0c63a75b845e4f7d01107d852e4c2485c51a50aaaa94fc61995e71bbee983a2ac3713831264adb47fb6bd1e058d5f004"
-    case is SHA3_512.Type: return "a69f73cca23a9ac5c8b567dc185a756e97c982164fe25859e0d1dcc1475c80a615b2123af1f5f94c11e3e9402c3ac558f500199d95b6d3e301758586281dcd26"
-    default:
-        break
+    if #available(macOS 26.0, iOS 26.0, tvOS 26.0, watchOS 26.0, visionOS 26.0, *) {
+        switch H.self {
+        case is SHA3_256.Type: return "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a"
+        case is SHA3_384.Type: return "0c63a75b845e4f7d01107d852e4c2485c51a50aaaa94fc61995e71bbee983a2ac3713831264adb47fb6bd1e058d5f004"
+        case is SHA3_512.Type: return "a69f73cca23a9ac5c8b567dc185a756e97c982164fe25859e0d1dcc1475c80a615b2123af1f5f94c11e3e9402c3ac558f500199d95b6d3e301758586281dcd26"
+        default:
+            break
+        }
     }
 
     switch H.self {
@@ -45,12 +47,14 @@ func nullTestVectorForAlgorithm<H: HashFunction>(hashFunction: H.Type) throws ->
 }
 
 func testVectorForAlgorithm<H: HashFunction>(hashFunction: H.Type) throws -> String {
-    switch H.self {
-    case is SHA3_256.Type: return "916f6061fe879741ca6469b43971dfdb28b1a32dc36cb3254e812be27aad1d18"
-    case is SHA3_384.Type: return "79407d3b5916b59c3e30b09822974791c313fb9ecc849e406f23592d04f625dc8c709b98b43b3852b337216179aa7fc7"
-    case is SHA3_512.Type: return "afebb2ef542e6579c50cad06d2e578f9f8dd6881d7dc824d26360feebf18a4fa73e3261122948efcfd492e74e82e2189ed0fb440d187f382270cb455f21dd185"
-    default:
-        break
+    if #available(macOS 26.0, iOS 26.0, tvOS 26.0, watchOS 26.0, visionOS 26.0, *) {
+        switch H.self {
+        case is SHA3_256.Type: return "916f6061fe879741ca6469b43971dfdb28b1a32dc36cb3254e812be27aad1d18"
+        case is SHA3_384.Type: return "79407d3b5916b59c3e30b09822974791c313fb9ecc849e406f23592d04f625dc8c709b98b43b3852b337216179aa7fc7"
+        case is SHA3_512.Type: return "afebb2ef542e6579c50cad06d2e578f9f8dd6881d7dc824d26360feebf18a4fa73e3261122948efcfd492e74e82e2189ed0fb440d187f382270cb455f21dd185"
+        default:
+            break
+        }
     }
 
 	switch H.self {
@@ -104,9 +108,11 @@ class DigestsTests: XCTestCase {
         try orFail { try testHashFunction(hf: SHA256.self) }
         try orFail { try testHashFunction(hf: SHA384.self) }
         try orFail { try testHashFunction(hf: SHA512.self) }
-        try orFail { try testHashFunction(hf: SHA3_256.self) }
-        try orFail { try testHashFunction(hf: SHA3_384.self) }
-        try orFail { try testHashFunction(hf: SHA3_512.self) }
+        if #available(macOS 26.0, iOS 26.0, tvOS 26.0, watchOS 26.0, visionOS 26.0, *) {
+            try orFail { try testHashFunction(hf: SHA3_256.self) }
+            try orFail { try testHashFunction(hf: SHA3_384.self) }
+            try orFail { try testHashFunction(hf: SHA3_512.self) }
+        }
 	}
 
     func testHashFunctionImplementsCoW<H: HashFunction>(hf: H.Type) throws {
@@ -129,9 +135,11 @@ class DigestsTests: XCTestCase {
         try orFail { try testHashFunctionImplementsCoW(hf: SHA256.self) }
         try orFail { try testHashFunctionImplementsCoW(hf: SHA384.self) }
         try orFail { try testHashFunctionImplementsCoW(hf: SHA512.self) }
-        try orFail { try testHashFunctionImplementsCoW(hf: SHA3_256.self) }
-        try orFail { try testHashFunctionImplementsCoW(hf: SHA3_384.self) }
-        try orFail { try testHashFunctionImplementsCoW(hf: SHA3_512.self) }
+        if #available(macOS 26.0, iOS 26.0, tvOS 26.0, watchOS 26.0, visionOS 26.0, *) {
+            try orFail { try testHashFunctionImplementsCoW(hf: SHA3_256.self) }
+            try orFail { try testHashFunctionImplementsCoW(hf: SHA3_384.self) }
+            try orFail { try testHashFunctionImplementsCoW(hf: SHA3_512.self) }
+        }
     }
 
     func assertHashFunctionCopyIsIndependent<H: HashFunction>(
@@ -170,9 +178,11 @@ class DigestsTests: XCTestCase {
         assertHashFunctionCopyIsIndependent(SHA256.self)
         assertHashFunctionCopyIsIndependent(SHA384.self)
         assertHashFunctionCopyIsIndependent(SHA512.self)
-        assertHashFunctionCopyIsIndependent(SHA3_256.self)
-        assertHashFunctionCopyIsIndependent(SHA3_384.self)
-        assertHashFunctionCopyIsIndependent(SHA3_512.self)
+        if #available(macOS 26.0, iOS 26.0, tvOS 26.0, watchOS 26.0, visionOS 26.0, *) {
+            assertHashFunctionCopyIsIndependent(SHA3_256.self)
+            assertHashFunctionCopyIsIndependent(SHA3_384.self)
+            assertHashFunctionCopyIsIndependent(SHA3_512.self)
+        }
     }
     
     func testBlockSizes() {
@@ -183,8 +193,10 @@ class DigestsTests: XCTestCase {
         XCTAssertEqual(SHA384.blockByteCount, 128)
         XCTAssertEqual(SHA512.blockByteCount, 128)
 
-        XCTAssertEqual(SHA3_256.blockByteCount, 136)
-        XCTAssertEqual(SHA3_384.blockByteCount, 104)
-        XCTAssertEqual(SHA3_512.blockByteCount, 72)
+        if #available(macOS 26.0, iOS 26.0, tvOS 26.0, watchOS 26.0, visionOS 26.0, *) {
+            XCTAssertEqual(SHA3_256.blockByteCount, 136)
+            XCTAssertEqual(SHA3_384.blockByteCount, 104)
+            XCTAssertEqual(SHA3_512.blockByteCount, 72)
+        }
     }
 }

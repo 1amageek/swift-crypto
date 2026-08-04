@@ -19,7 +19,7 @@ import Foundation
 #endif
 
 
-#if canImport(CryptoKit)
+#if canImport(CryptoKit) && !SWIFT_CRYPTO_PURE_SWIFT
 import CryptoKit
 #else
 
@@ -34,8 +34,13 @@ extension Curve25519 {
     /// performing X25519 key agreement.
     @nonexhaustive
     public enum KeyAgreement: Sendable {
+        #if SWIFT_CRYPTO_PURE_SWIFT
+        typealias Curve25519PrivateKeyImpl = SSLCryptoCurve25519PrivateKeyImpl
+        typealias Curve25519PublicKeyImpl = SSLCryptoCurve25519PublicKeyImpl
+        #else
         typealias Curve25519PrivateKeyImpl = Curve25519.KeyAgreement.OpenSSLCurve25519PrivateKeyImpl
         typealias Curve25519PublicKeyImpl = Curve25519.KeyAgreement.OpenSSLCurve25519PublicKeyImpl
+        #endif
 
         /// A Curve25519 public key used for key agreement.
         public struct PublicKey: ECPublicKey, Sendable {
@@ -104,7 +109,7 @@ extension Curve25519 {
                 do {
                     self.baseKey = try Curve25519PrivateKeyImpl(rawRepresentation: rawRepresentation)
                 } catch let cryptoKitError {
-                    throw error(cryptoKitError)
+                    throw cryptoKitError
                 }
             }
 
@@ -121,7 +126,7 @@ extension Curve25519 {
                 do {
                     return try self.baseKey.sharedSecretFromKeyAgreement(with: publicKeyShare.baseKey)
                 } catch let cryptoKitError {
-                    throw error(cryptoKitError)
+                    throw cryptoKitError
                 }
             }
             

@@ -19,12 +19,7 @@ import Foundation
 #endif
 
 
-#if canImport(CryptoKit)
-import CryptoKit
-#else
-
-
-typealias AESWRAPImpl = BoringSSLAESWRAPImpl
+typealias AESWRAPImpl = SSLCryptoAESWRAPImpl
 
 extension AES {
     /// An implementation of AES Key Wrapping in accordance with the IETF RFC
@@ -61,5 +56,3 @@ extension AES {
         }
     }
 }
-
-#endif // canImport(CryptoKit)

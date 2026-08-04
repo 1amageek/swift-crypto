@@ -1,15 +1,18 @@
 # ``Crypto``
 
-A cryptography library for Swift.
+Swift Crypto is the CryptoKit-shaped public facade for the Pure Swift
+implementations in ``swift-ssl/SSLCrypto``.
 
-## Overview
+The dependency direction is intentionally one-way:
 
-Swift Crypto provides a Swift library for common cryptographic operations. It is available as a Swift package and provides two main libraries:
+```text
+Consumer -> Crypto facade -> SSLCrypto -> Pure Swift algorithms
+```
 
-* `Crypto` - an open-source implementation of a substantial portion of the API of [Apple CryptoKit](https://developer.apple.com/documentation/cryptokit) suitable for use on Linux platforms. It enables cross-platform or server applications with the advantages of CryptoKit.
-* `CryptoExtras` - a collection of additional cryptographic primitives and utilities that are not part of CryptoKit but useful in a server environment.
-
-Swift Crypto is built on top of [BoringSSL](https://boringssl.googlesource.com/boringssl/), Google's fork of OpenSSL. The current features of Swift Crypto cover key exchange, key derivation, encryption and decryption, hashing, message authentication, and more.
+The facade owns API compatibility, representation validation, and typed errors.
+SSLCrypto owns byte-level algorithms, scoped borrows, secret zeroization, and
+target-independent storage. No alternate implementation is selected by this
+package; all supported operations use the same Pure Swift path on every target.
 
 ## Topics
 

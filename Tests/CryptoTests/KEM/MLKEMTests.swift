@@ -78,12 +78,12 @@ final class MLKEMTests: XCTestCase {
     }
 
     func test768KAT() throws {
-        // No support for encapsulateWithSeed in BoringSSL.
+        // The legacy test vector requires an API that is intentionally not public.
         throw XCTSkip()
     }
 
     func test1024KAT() throws {
-        // No support for encapsulateWithSeed in BoringSSL.
+        // The legacy test vector requires an API that is intentionally not public.
         throw XCTSkip()
     }
 }
