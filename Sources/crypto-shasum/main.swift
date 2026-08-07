@@ -39,12 +39,15 @@ With no FILE, or when FILE is -, read standard input.
 """
 
 enum ShasumError: Error, CustomStringConvertible {
+    case unableToConfigureStandardInput(errorCode: CInt)
     case unableToOpen(path: String, errorCode: CInt)
     case unableToRead(name: String, errorCode: CInt)
     case unableToReadArguments(errorCode: UInt16)
 
     var description: String {
         switch self {
+        case .unableToConfigureStandardInput(let errorCode):
+            return "Unable to configure standard input (errno \(errorCode))"
         case .unableToOpen(let path, let errorCode):
             return "Unable to open \(path) (errno \(errorCode))"
         case .unableToRead(let name, let errorCode):
@@ -60,8 +63,9 @@ struct InputFile {
     let descriptor: CInt
     let shouldClose: Bool
 
-    static var standardInput: Self {
-        Self(name: "-", descriptor: STDIN_FILENO, shouldClose: false)
+    static func standardInput() throws -> Self {
+        let descriptor = try systemStandardInput()
+        return Self(name: "-", descriptor: descriptor, shouldClose: false)
     }
 
     static func open(path: String) throws -> Self {
@@ -69,21 +73,77 @@ struct InputFile {
             systemOpen(pathPointer)
         }
         guard descriptor >= 0 else {
-            throw ShasumError.unableToOpen(path: path, errorCode: errno)
+            throw ShasumError.unableToOpen(path: path, errorCode: currentSystemError())
         }
         return Self(name: path, descriptor: descriptor, shouldClose: true)
     }
 
     func closeIfNeeded() {
         if self.shouldClose {
-            _ = close(self.descriptor)
+            systemClose(self.descriptor)
         }
     }
 }
 
 @inline(__always)
+private func currentSystemError() -> CInt {
+    #if os(Windows)
+    var errorCode: CInt = 0
+    _ = ucrt._get_errno(&errorCode)
+    return errorCode
+    #else
+    return errno
+    #endif
+}
+
+@inline(__always)
+private func systemStandardInput() throws -> CInt {
+    #if os(Windows)
+    let descriptor: CInt = 0
+    guard _setmode(descriptor, _O_BINARY) != -1 else {
+        throw ShasumError.unableToConfigureStandardInput(errorCode: currentSystemError())
+    }
+    return descriptor
+    #else
+    return STDIN_FILENO
+    #endif
+}
+
+@inline(__always)
 private func systemOpen(_ path: UnsafePointer<CChar>) -> CInt {
+    #if os(Windows)
+    var descriptor: CInt = -1
+    _ = ucrt._sopen_s(&descriptor, path, O_RDONLY | _O_BINARY, _SH_DENYNO, 0)
+    return descriptor
+    #else
     open(path, O_RDONLY)
+    #endif
+}
+
+@inline(__always)
+private func systemClose(_ descriptor: CInt) {
+    #if os(Windows)
+    _ = _close(descriptor)
+    #else
+    _ = close(descriptor)
+    #endif
+}
+
+@inline(__always)
+private func systemRead(
+    _ descriptor: CInt,
+    into buffer: UnsafeMutableRawPointer?,
+    byteCount: Int
+) -> Int {
+    #if os(Windows)
+    guard byteCount <= Int(CUnsignedInt.max) else {
+        _ = ucrt._set_errno(EINVAL)
+        return -1
+    }
+    return Int(_read(descriptor, buffer, CUnsignedInt(byteCount)))
+    #else
+    return read(descriptor, buffer, byteCount)
+    #endif
 }
 
 enum SupportedHashFunction {
@@ -123,16 +183,17 @@ enum SupportedHashFunction {
 
         while true {
             let byteCount = buffer.withUnsafeMutableBytes { bytes in
-                read(input.descriptor, bytes.baseAddress, bytes.count)
+                systemRead(input.descriptor, into: bytes.baseAddress, byteCount: bytes.count)
             }
             if byteCount == 0 {
                 break
             }
             if byteCount < 0 {
-                if errno == EINTR {
+                let errorCode = currentSystemError()
+                if errorCode == EINTR {
                     continue
                 }
-                throw ShasumError.unableToRead(name: input.name, errorCode: errno)
+                throw ShasumError.unableToRead(name: input.name, errorCode: errorCode)
             }
 
             buffer.withUnsafeBytes { bytes in
@@ -226,7 +287,7 @@ func main() throws {
             break flagsLoop
 
         case "-":
-            inputs.append(.standardInput)
+            inputs.append(try .standardInput())
             break flagsLoop
 
         default:
@@ -240,7 +301,7 @@ func main() throws {
     }
 
     if inputs.isEmpty {
-        inputs.append(.standardInput)
+        inputs.append(try .standardInput())
     }
 
     try processInputs(inputs, algorithm: algorithm)
