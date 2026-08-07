@@ -21,7 +21,7 @@ import XCTest
 
 class DERTests: XCTestCase {
     func testEncodeDecodeECDSASignature() throws {
-        let pointSize = self.coordinateSizeForCurve(P256.self)
+        let pointSize = P256.coordinateByteCount
         let r = self.randomBytes(count: pointSize)
         let s = self.randomBytes(count: pointSize)
         
@@ -35,10 +35,6 @@ class DERTests: XCTestCase {
         XCTAssertEqual(der.derRepresentation, signature.derRepresentation)
         
         XCTAssertEqual(der.rawRepresentation.count, 64)
-    }
-
-    func coordinateSizeForCurve<Curve: SupportedCurveDetailsImpl>(_ curve: Curve.Type) -> Int {
-        return self.openSSLCoordinateSizeForCurve(curve)
     }
 
     func randomBytes(count: Int) -> [UInt8] {

@@ -28,23 +28,23 @@ private func mapSSLCryptoNISTError(_ error: CryptoInputError) -> CryptoKitError 
     }
 }
 
-private func p256PrivateBytes<D: ContiguousBytes>(_ data: D) -> [UInt8] {
+private func copyContiguousBytes<D: ContiguousBytes>(_ data: D) -> [UInt8] {
     data.withUnsafeBytes { Array($0) }
+}
+
+private func nistCoordinateByteCount<Curve>(for curve: Curve.Type) -> Int? {
+    if curve == P256.self { return 32 }
+    if curve == P384.self { return 48 }
+    if curve == P521.self { return 66 }
+    return nil
 }
 
 struct SSLCryptoNISTCurvePublicKeyImpl<Curve>: Sendable {
     let x963Bytes: [UInt8]
 
     init<Bytes: ContiguousBytes>(rawRepresentation: Bytes) throws(CryptoKitError) {
-        let raw = p256PrivateBytes(rawRepresentation)
-        let coordinateByteCount: Int
-        if Curve.self == P256.self {
-            coordinateByteCount = 32
-        } else if Curve.self == P384.self {
-            coordinateByteCount = 48
-        } else if Curve.self == P521.self {
-            coordinateByteCount = 66
-        } else {
+        let raw = copyContiguousBytes(rawRepresentation)
+        guard let coordinateByteCount = nistCoordinateByteCount(for: Curve.self) else {
             throw .invalidParameter
         }
         guard raw.count == coordinateByteCount * 2 else { throw .incorrectParameterSize }
@@ -54,17 +54,33 @@ struct SSLCryptoNISTCurvePublicKeyImpl<Curve>: Sendable {
     }
 
     init<Bytes: ContiguousBytes>(compactRepresentation: Bytes) throws(CryptoKitError) {
-        // Compact points are rejected until a standards-based representation
-        // with an unambiguous encoding is implemented in SSLCrypto.
-        throw .invalidParameter
+        let compact = copyContiguousBytes(compactRepresentation)
+        guard let coordinateByteCount = nistCoordinateByteCount(for: Curve.self) else {
+            throw .invalidParameter
+        }
+        guard compact.count == coordinateByteCount else { throw .incorrectParameterSize }
+
+        var compressed = [UInt8](repeating: 0, count: coordinateByteCount + 1)
+        compressed.replaceSubrange(1..<compressed.count, with: compact)
+        compressed[0] = 0x02
+        let evenRoot = try Self(compressedRepresentation: compressed)
+        compressed[0] = 0x03
+        let oddRoot = try Self(compressedRepresentation: compressed)
+        let yStart = coordinateByteCount + 1
+        let evenY = evenRoot.x963Bytes[yStart...]
+        let oddY = oddRoot.x963Bytes[yStart...]
+
+        // The compact-point representation selects the numerically smaller
+        // square root, so the X coordinate determines exactly one point.
+        self = oddY.lexicographicallyPrecedes(evenY) ? oddRoot : evenRoot
     }
 
     init<Bytes: ContiguousBytes>(x963Representation: Bytes) throws(CryptoKitError) {
-        try self.init(validatedX963: p256PrivateBytes(x963Representation))
+        try self.init(validatedX963: copyContiguousBytes(x963Representation))
     }
 
     init<Bytes: ContiguousBytes>(compressedRepresentation: Bytes) throws(CryptoKitError) {
-        let compressed = p256PrivateBytes(compressedRepresentation)
+        let compressed = copyContiguousBytes(compressedRepresentation)
         do {
             if Curve.self == P256.self {
                 let key = try compressed.withUnsafeBufferPointer { raw in
@@ -152,7 +168,23 @@ struct SSLCryptoNISTCurvePublicKeyImpl<Curve>: Sendable {
         }
     }
 
-    var compactRepresentation: Data? { nil }
+    var compactRepresentation: Data? {
+        guard let coordinateByteCount = nistCoordinateByteCount(for: Curve.self) else {
+            preconditionFailure("Unsupported Pure Swift NIST curve")
+        }
+        var alternateCompressed = [UInt8](compressedRepresentation)
+        alternateCompressed[0] ^= 0x01
+        do {
+            let alternate = try Self(compressedRepresentation: alternateCompressed)
+            let yStart = coordinateByteCount + 1
+            let currentY = x963Bytes[yStart...]
+            let alternateY = alternate.x963Bytes[yStart...]
+            guard !alternateY.lexicographicallyPrecedes(currentY) else { return nil }
+            return Data(x963Bytes[1...coordinateByteCount])
+        } catch {
+            preconditionFailure("Validated Pure Swift NIST public key became invalid")
+        }
+    }
 
     var rawRepresentation: Data { Data(x963Bytes.dropFirst()) }
 
@@ -188,44 +220,22 @@ struct SSLCryptoNISTCurvePrivateKeyImpl<Curve>: Sendable {
 
     init(compactRepresentable: Bool = true) {
         do {
-            if Curve.self == P256.self {
-                let generated = try SSLCrypto.P256PrivateKey.generate()
-                let raw = generated.withBorrowedBytes { bytes in
-                    bytes.withUnsafeBytes { Array($0) }
+            for _ in 0..<100 {
+                let generated = try Self.generateKeyMaterial()
+                if !compactRepresentable || generated.publicKey.compactRepresentation != nil {
+                    key = generated.key
+                    publicKeyStorage = generated.publicKey
+                    return
                 }
-                let publicBytes = Array(copying: generated.publicKey().span.bytes)
-                key = SecureBytes(bytes: raw)
-                publicKeyStorage = try Self.makePublicKey(fromX963: publicBytes)
-                return
             }
-            if Curve.self == P384.self {
-                let generated = try SSLCrypto.P384PrivateKey.generate()
-                let raw = generated.withBorrowedBytes { bytes in
-                    bytes.withUnsafeBytes { Array($0) }
-                }
-                let publicBytes = Array(copying: generated.publicKey().span.bytes)
-                key = SecureBytes(bytes: raw)
-                publicKeyStorage = try Self.makePublicKey(fromX963: publicBytes)
-                return
-            }
-            if Curve.self == P521.self {
-                let generated = try SSLCrypto.P521PrivateKey.generate()
-                let raw = generated.withBorrowedBytes { bytes in
-                    bytes.withUnsafeBytes { Array($0) }
-                }
-                let publicBytes = Array(copying: generated.publicKey().span.bytes)
-                key = SecureBytes(bytes: raw)
-                publicKeyStorage = try Self.makePublicKey(fromX963: publicBytes)
-                return
-            }
-            preconditionFailure("Unsupported Pure Swift NIST curve")
+            preconditionFailure("Unable to generate a compact-representable Pure Swift NIST key")
         } catch {
-            preconditionFailure("Unable to generate a Pure Swift NIST key")
+            preconditionFailure("Unable to generate a Pure Swift NIST key: \(error)")
         }
     }
 
     init<Bytes: ContiguousBytes>(x963: Bytes) throws(CryptoKitError) {
-        let bytes = p256PrivateBytes(x963)
+        let bytes = copyContiguousBytes(x963)
         let coordinateByteCount: Int
         if Curve.self == P256.self { coordinateByteCount = 32 }
         else if Curve.self == P384.self { coordinateByteCount = 48 }
@@ -255,7 +265,7 @@ struct SSLCryptoNISTCurvePrivateKeyImpl<Curve>: Sendable {
     }
 
     init<Bytes: ContiguousBytes>(data: Bytes) throws(CryptoKitError) {
-        let scalar = p256PrivateBytes(data)
+        let scalar = copyContiguousBytes(data)
         let expectedCount: Int
         if Curve.self == P256.self { expectedCount = 32 }
         else if Curve.self == P384.self { expectedCount = 48 }
@@ -312,6 +322,39 @@ struct SSLCryptoNISTCurvePrivateKeyImpl<Curve>: Sendable {
             }
             throw CryptoInputError.invalidRange
         }
+    }
+
+    private static func generateKeyMaterial() throws -> (
+        key: SecureBytes,
+        publicKey: SSLCryptoNISTCurvePublicKeyImpl<Curve>
+    ) {
+        let raw: [UInt8]
+        let publicBytes: [UInt8]
+        if Curve.self == P256.self {
+            let generated = try SSLCrypto.P256PrivateKey.generate()
+            raw = generated.withBorrowedBytes { bytes in
+                bytes.withUnsafeBytes { Array($0) }
+            }
+            publicBytes = Array(copying: generated.publicKey().span.bytes)
+        } else if Curve.self == P384.self {
+            let generated = try SSLCrypto.P384PrivateKey.generate()
+            raw = generated.withBorrowedBytes { bytes in
+                bytes.withUnsafeBytes { Array($0) }
+            }
+            publicBytes = Array(copying: generated.publicKey().span.bytes)
+        } else if Curve.self == P521.self {
+            let generated = try SSLCrypto.P521PrivateKey.generate()
+            raw = generated.withBorrowedBytes { bytes in
+                bytes.withUnsafeBytes { Array($0) }
+            }
+            publicBytes = Array(copying: generated.publicKey().span.bytes)
+        } else {
+            throw CryptoInputError.invalidRange
+        }
+        return (
+            SecureBytes(bytes: raw),
+            try Self.makePublicKey(fromX963: publicBytes)
+        )
     }
 
     private static func makePublicKey(

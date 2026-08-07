@@ -146,29 +146,47 @@ class ECKeyEncodingsTests: XCTestCase {
     func testEncodingsKeyAgreementCompactRepresentation() {
         let p256KeyKA = P256.KeyAgreement.PrivateKey(compactRepresentable: true).publicKey
         let p256KeyKA_compact = p256KeyKA.compactRepresentation!
-        XCTAssertNoThrow(try P256.KeyAgreement.PublicKey(compactRepresentation: p256KeyKA_compact))
+        XCTAssertEqual(
+            try P256.KeyAgreement.PublicKey(compactRepresentation: p256KeyKA_compact).x963Representation,
+            p256KeyKA.x963Representation
+        )
         
         let p384KeyKA = P384.KeyAgreement.PrivateKey(compactRepresentable: true).publicKey
         let p384KeyKA_compact = p384KeyKA.compactRepresentation!
-        XCTAssertNoThrow(try P384.KeyAgreement.PublicKey(compactRepresentation: p384KeyKA_compact))
+        XCTAssertEqual(
+            try P384.KeyAgreement.PublicKey(compactRepresentation: p384KeyKA_compact).x963Representation,
+            p384KeyKA.x963Representation
+        )
         
         let p521KeyKA = P521.KeyAgreement.PrivateKey(compactRepresentable: true).publicKey
         let p521KeyKA_compact = p521KeyKA.compactRepresentation!
-        XCTAssertNoThrow(try P521.KeyAgreement.PublicKey(compactRepresentation: p521KeyKA_compact))
+        XCTAssertEqual(
+            try P521.KeyAgreement.PublicKey(compactRepresentation: p521KeyKA_compact).x963Representation,
+            p521KeyKA.x963Representation
+        )
     }
     
     func testEncodingsSigningCompactRepresentation() {
         let p256KeyKA = P256.Signing.PrivateKey(compactRepresentable: true).publicKey
         let p256KeyKA_compact = p256KeyKA.compactRepresentation!
-        XCTAssertNoThrow(try P256.Signing.PublicKey(compactRepresentation: p256KeyKA_compact))
+        XCTAssertEqual(
+            try P256.Signing.PublicKey(compactRepresentation: p256KeyKA_compact).x963Representation,
+            p256KeyKA.x963Representation
+        )
         
         let p384KeyKA = P384.Signing.PrivateKey(compactRepresentable: true).publicKey
         let p384KeyKA_compact = p384KeyKA.compactRepresentation!
-        XCTAssertNoThrow(try P384.Signing.PublicKey(compactRepresentation: p384KeyKA_compact))
+        XCTAssertEqual(
+            try P384.Signing.PublicKey(compactRepresentation: p384KeyKA_compact).x963Representation,
+            p384KeyKA.x963Representation
+        )
         
         let p521KeyKA = P521.Signing.PrivateKey(compactRepresentable: true).publicKey
         let p521KeyKA_compact = p521KeyKA.compactRepresentation!
-        XCTAssertNoThrow(try P521.Signing.PublicKey(compactRepresentation: p521KeyKA_compact))
+        XCTAssertEqual(
+            try P521.Signing.PublicKey(compactRepresentation: p521KeyKA_compact).x963Representation,
+            p521KeyKA.x963Representation
+        )
     }
     
     func testPEMPrivateKeyImport() throws {

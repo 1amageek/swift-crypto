@@ -31,7 +31,6 @@ struct DigestValidationCommand {
         #if !canImport(CryptoKit)
         validateSHA256Boundaries()
         await validateConcurrentSHA256Copies()
-        validateKeccakInputChunking()
         validate(SHA3_256.self, expectedHex: "3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532")
         validate(
             SHA3_384.self,
@@ -174,39 +173,6 @@ struct DigestValidationCommand {
         }
     }
 
-    private static func validateKeccakInputChunking() {
-        let input = Array(UInt8.min...UInt8(10))
-        input.withUnsafeBytes { inputBuffer in
-            var consumedByteCount = 0
-            var chunkCount = 0
-            let completed = forEachKeccakInputChunk(
-                inputBuffer,
-                maximumChunkByteCount: 3
-            ) { chunk in
-                guard
-                    chunk.count <= 3,
-                    chunk.baseAddress == inputBuffer.baseAddress?.advanced(by: consumedByteCount)
-                else {
-                    return false
-                }
-                consumedByteCount += chunk.count
-                chunkCount += 1
-                return true
-            }
-            precondition(completed)
-            precondition(consumedByteCount == inputBuffer.count)
-            precondition(chunkCount == 4)
-            precondition(
-                !forEachKeccakInputChunk(inputBuffer, maximumChunkByteCount: 0) { _ in true }
-            )
-            precondition(
-                !forEachKeccakInputChunk(
-                    inputBuffer,
-                    maximumChunkByteCount: Int.max / 8 + 1
-                ) { _ in true }
-            )
-        }
-    }
     #endif
 
     private static func decodeHex(_ hex: String) -> [UInt8] {

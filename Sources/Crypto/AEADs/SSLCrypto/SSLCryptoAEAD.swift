@@ -96,9 +96,6 @@ enum OpenSSLAESGCMImpl {
         authenticatedData: AuthenticatedData? = nil
     ) throws(CryptoKitMetaError) -> AES.GCM.SealedBox {
         let nonce = nonce ?? AES.GCM.Nonce()
-        guard nonce.count == SSLCrypto.AESGCM.nonceByteCount else {
-            throw CryptoKitError.incorrectParameterSize
-        }
         do {
             return try key.withUnsafeBytes { keyBytes in
                 return try withDataProtocolSSLSpan(message) { messageSpan in
@@ -161,9 +158,6 @@ enum OpenSSLAESGCMImpl {
         authenticatedData: RawSpan?,
         tag: inout OutputRawSpan
     ) throws(CryptoKitMetaError) {
-        guard nonce.byteCount == SSLCrypto.AESGCM.nonceByteCount else {
-            throw CryptoKitError.incorrectParameterSize
-        }
         var combined = Data(repeating: 0, count: message.byteCount + SSLCrypto.AESGCM.tagByteCount)
         do {
             try key.withUnsafeBytes { keyBytes in
@@ -265,7 +259,7 @@ enum OpenSSLAESGCMImpl {
         authenticatedData: RawSpan?,
         tag: RawSpan
     ) throws(CryptoKitMetaError) {
-        guard nonce.byteCount == SSLCrypto.AESGCM.nonceByteCount, tag.byteCount == SSLCrypto.AESGCM.tagByteCount else {
+        guard tag.byteCount == SSLCrypto.AESGCM.tagByteCount else {
             throw CryptoKitError.incorrectParameterSize
         }
         var ciphertextAndTag = Data(repeating: 0, count: message.byteCount + tag.byteCount)

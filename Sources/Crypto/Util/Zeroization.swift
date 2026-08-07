@@ -20,6 +20,8 @@ import Foundation
 
 #if os(WASI)
 import WASILibc
+#elseif os(Linux)
+import Glibc
 #endif
 
 #if canImport(CryptoKit) && !CRYPTO_SHA256_STATE_STANDALONE_VALIDATION && !SWIFT_CRYPTO_PURE_SWIFT
@@ -35,9 +37,9 @@ extension UnsafeMutableRawBufferPointer: Zeroization {
         guard let baseAddress, count > 0 else {
             return
         }
-        #if os(WASI)
-        // WASI exposes an optimizer-resistant libc primitive. Keeping this
-        // path in WASILibc keeps Pure Swift digest state self-contained.
+        #if os(WASI) || os(Linux)
+        // WASI and glibc expose an optimizer-resistant libc primitive. Keeping
+        // this path in the platform libc keeps Pure Swift storage self-contained.
         explicit_bzero(baseAddress, count)
         #else
         memset_s(baseAddress, count, 0, count)

@@ -228,11 +228,19 @@ struct SSLCryptoXWingPublicKeyImpl: Sendable {
             throw CryptoKitError.invalidParameter
         }
 
+        return try encapsulate(entropy: ephemeralEntropy)
+    }
+
+    func encapsulate(entropy: Data) throws(CryptoKitMetaError) -> KEM.EncapsulationResult {
+        guard entropy.count == 64 else {
+            throw CryptoKitError.incorrectParameterSize
+        }
+
         var ciphertext = ContiguousArray<UInt8>(repeating: 0, count: XWingConstants.ciphertextByteCount)
         var sharedSecret = ContiguousArray<UInt8>(repeating: 0, count: XWingConstants.sharedSecretByteCount)
         do {
             try bytes.withUnsafeBytes { publicRaw in
-                try ephemeralEntropy.withUnsafeBytes { entropyRaw in
+                try entropy.withUnsafeBytes { entropyRaw in
                     var ciphertextSpan = ciphertext.mutableSpan
                     let publicSpan = Span(_unsafeElements: publicRaw.bindMemory(to: UInt8.self))
                     let entropySpan = Span(_unsafeElements: entropyRaw.bindMemory(to: UInt8.self))

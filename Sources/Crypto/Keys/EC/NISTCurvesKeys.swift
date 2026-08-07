@@ -27,9 +27,6 @@ import CryptoKit
 extension P256 { static let coordinateByteCount = 32 }
 extension P384 { static let coordinateByteCount = 48 }
 extension P521 { static let coordinateByteCount = 66 }
-typealias SupportedCurveDetailsImpl = SSLCryptoNISTCurvePublicKeyImpl
-#else
-typealias SupportedCurveDetailsImpl = OpenSSLSupportedNISTCurve
 #endif
 
 protocol ECPublicKey {

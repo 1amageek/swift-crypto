@@ -63,7 +63,11 @@ class NISTECDHTests: XCTestCase {
                 bundleType: self,
                 jsonName: "ecdh_secp256r1_test",
                 testFunction: { (group: ECDHTestGroup) in
-                    testGroup(group: group, privateKeys: P256.KeyAgreement.PrivateKey.self, onCurve: P256.self)
+                    testGroup(
+                        group: group,
+                        privateKeys: P256.KeyAgreement.PrivateKey.self,
+                        coordinateByteCount: P256.coordinateByteCount
+                    )
                 })
         }
         try orFail {
@@ -71,7 +75,11 @@ class NISTECDHTests: XCTestCase {
                 bundleType: self,
                 jsonName: "ecdh_secp384r1_test",
                 testFunction: { (group: ECDHTestGroup) in
-                    testGroup(group: group, privateKeys: P384.KeyAgreement.PrivateKey.self, onCurve: P384.self)
+                    testGroup(
+                        group: group,
+                        privateKeys: P384.KeyAgreement.PrivateKey.self,
+                        coordinateByteCount: P384.coordinateByteCount
+                    )
                 })
         }
         try orFail {
@@ -79,7 +87,11 @@ class NISTECDHTests: XCTestCase {
                 bundleType: self,
                 jsonName: "ecdh_secp521r1_test",
                 testFunction: { (group: ECDHTestGroup) in
-                    testGroup(group: group, privateKeys: P521.KeyAgreement.PrivateKey.self, onCurve: P521.self)
+                    testGroup(
+                        group: group,
+                        privateKeys: P521.KeyAgreement.PrivateKey.self,
+                        coordinateByteCount: P521.coordinateByteCount
+                    )
                 })
         }
 
@@ -88,7 +100,11 @@ class NISTECDHTests: XCTestCase {
                 bundleType: self,
                 jsonName: "ecdh_secp256r1_ecpoint_test",
                 testFunction: { (group: ECDHTestGroup) in
-                    testGroupPoint(group: group, privateKeys: P256.KeyAgreement.PrivateKey.self, onCurve: P256.self)
+                    testGroupPoint(
+                        group: group,
+                        privateKeys: P256.KeyAgreement.PrivateKey.self,
+                        coordinateByteCount: P256.coordinateByteCount
+                    )
                 })
         }
         try orFail {
@@ -96,7 +112,11 @@ class NISTECDHTests: XCTestCase {
                 bundleType: self,
                 jsonName: "ecdh_secp384r1_ecpoint_test",
                 testFunction: { (group: ECDHTestGroup) in
-                    testGroupPoint(group: group, privateKeys: P384.KeyAgreement.PrivateKey.self, onCurve: P384.self)
+                    testGroupPoint(
+                        group: group,
+                        privateKeys: P384.KeyAgreement.PrivateKey.self,
+                        coordinateByteCount: P384.coordinateByteCount
+                    )
                 })
         }
         try orFail {
@@ -104,17 +124,137 @@ class NISTECDHTests: XCTestCase {
                 bundleType: self,
                 jsonName: "ecdh_secp521r1_ecpoint_test",
                 testFunction: { (group: ECDHTestGroup) in
-                    testGroupPoint(group: group, privateKeys: P521.KeyAgreement.PrivateKey.self, onCurve: P521.self)
+                    testGroupPoint(
+                        group: group,
+                        privateKeys: P521.KeyAgreement.PrivateKey.self,
+                        coordinateByteCount: P521.coordinateByteCount
+                    )
                 })
         }
     }
     
-    func testGroup<PrivKey: NISTECPrivateKey & DiffieHellmanKeyAgreement, Curve: SupportedCurveDetailsImpl>(group: ECDHTestGroup, privateKeys: PrivKey.Type, onCurve curve: Curve.Type) {
-        self.testGroupOpenSSL(group: group, privateKeys: privateKeys, onCurve: curve)
+    func testGroup<PrivKey: NISTECPrivateKey & DiffieHellmanKeyAgreement>(
+        group: ECDHTestGroup,
+        privateKeys: PrivKey.Type,
+        coordinateByteCount: Int,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        for testVector in group.tests {
+            do {
+                let publicKeyBytes = try Array(hexString: testVector.publicKey)
+                let publicKey = try PrivKey.PK(derBytes: publicKeyBytes)
+                let privateKeyBytes = try paddedPrivateKey(
+                    testVector.privateKey,
+                    coordinateByteCount: coordinateByteCount
+                )
+                let privateKey = try PrivKey(rawRepresentation: privateKeyBytes)
+                let agreement = try XCTUnwrap(publicKey as? PrivKey.PublicKey, file: file, line: line)
+                let result = try privateKey.sharedSecretFromKeyAgreement(with: agreement)
+                let expectedResult = try Array(hexString: testVector.shared)
+
+                XCTAssertEqual(Array(result.ss), expectedResult, file: file, line: line)
+            } catch ECDHTestErrors.PublicKeyFailure {
+                XCTAssert(
+                    testVector.flags.contains("CompressedPoint")
+                        || testVector.result == "invalid"
+                        || testVector.flags.contains("InvalidPublic")
+                        || testVector.flags.contains("InvalidAsn"),
+                    file: file,
+                    line: line
+                )
+            } catch ECDHTestErrors.ParseSPKIFailure {
+                XCTAssert(
+                    testVector.flags.contains("InvalidAsn")
+                        || testVector.flags.contains("UnnamedCurve"),
+                    file: file,
+                    line: line
+                )
+            } catch {
+                if testVector.result == "valid" {
+                    XCTAssert(
+                        testVector.tcId == 31 || testVector.tcId == 20 || testVector.tcId == 25,
+                        file: file,
+                        line: line
+                    )
+                }
+            }
+        }
     }
 
-    func testGroupPoint<PrivKey: NISTECPrivateKey & DiffieHellmanKeyAgreement, Curve: SupportedCurveDetailsImpl>(group: ECDHTestGroup, privateKeys: PrivKey.Type, onCurve curve: Curve.Type) {
-        self.testGroupPointOpenSSL(group: group, privateKeys: privateKeys, onCurve: curve)
+    func testGroupPoint<PrivKey: NISTECPrivateKey & DiffieHellmanKeyAgreement>(
+        group: ECDHTestGroup,
+        privateKeys: PrivKey.Type,
+        coordinateByteCount: Int,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        for testVector in group.tests {
+            do {
+                let publicKeyBytes = try Array(hexString: testVector.publicKey)
+                let publicKey: PrivKey.PK
+                if testVector.flags.contains("CompressedPoint") {
+                    publicKey = try PrivKey.PK(compressedRepresentation: publicKeyBytes)
+                } else {
+                    publicKey = try PrivKey.PK(x963Representation: publicKeyBytes)
+                }
+
+                let privateKeyBytes = try paddedPrivateKey(
+                    testVector.privateKey,
+                    coordinateByteCount: coordinateByteCount
+                )
+                let privateKey = try PrivKey(rawRepresentation: privateKeyBytes)
+                let agreement = try XCTUnwrap(publicKey as? PrivKey.PublicKey, file: file, line: line)
+                let result = try privateKey.sharedSecretFromKeyAgreement(with: agreement)
+                let expectedResult = try Array(hexString: testVector.shared)
+
+                XCTAssertEqual(Array(result.ss), expectedResult, file: file, line: line)
+                XCTAssertTrue(
+                    testVector.result == "valid" || testVector.result == "acceptable",
+                    file: file,
+                    line: line
+                )
+            } catch {
+                XCTAssertEqual(testVector.result, "invalid", file: file, line: line)
+            }
+        }
+    }
+
+    private func paddedPrivateKey(
+        _ vector: String,
+        coordinateByteCount: Int
+    ) throws -> [UInt8] {
+        var privateKeyBytes = [UInt8](repeating: 0, count: coordinateByteCount)
+        let normalizedVector = vector.count.isMultiple(of: 2) ? vector : "0\(vector)"
+        let vectorBytes = try Array(hexString: normalizedVector)
+
+        if vectorBytes.count >= coordinateByteCount {
+            privateKeyBytes = Array(vectorBytes.suffix(coordinateByteCount))
+        } else {
+            privateKeyBytes.replaceSubrange(
+                (coordinateByteCount - vectorBytes.count)..<coordinateByteCount,
+                with: vectorBytes
+            )
+        }
+        return privateKeyBytes
+    }
+}
+
+extension NISTECPublicKey {
+    init(derBytes: [UInt8]) throws {
+        let subjectPublicKeyInfo = try ASN1.SubjectPublicKeyInfo(asn1Encoded: derBytes)
+        guard
+            subjectPublicKeyInfo.algorithmIdentifier.algorithm
+                == ASN1.ASN1ObjectIdentifier.AlgorithmIdentifier.idEcPublicKey
+        else {
+            throw ECDHTestErrors.ParseSPKIFailure
+        }
+
+        do {
+            try self.init(x963Representation: subjectPublicKeyInfo.key)
+        } catch {
+            throw ECDHTestErrors.PublicKeyFailure
+        }
     }
 }
 #endif // canImport(CryptoKit)

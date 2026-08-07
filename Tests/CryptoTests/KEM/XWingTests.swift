@@ -61,17 +61,35 @@ final class XWingTests: XCTestCase {
     func testXWingMLKEM768X25519TestVectors() throws {
         let katTests = try processKATFile(filename:"test-vectors")
         for katTest in katTests {
-            let privateKeyDrbg = try SequenceDrbg(katTest.seed)
-            let privateKey = try XWingMLKEM768X25519.PrivateKey.generateWithRng(rngState: privateKeyDrbg)
+            let privateKey = try XWingMLKEM768X25519.PrivateKey(
+                seedRepresentation: katTest.seed,
+                publicKey: nil
+            )
             XCTAssertEqual(privateKey.publicKey.rawRepresentation, katTest.pk)
 
-            let encapDrbg = try SequenceDrbg(katTest.eseed)
-            let encapsulatedKey = try privateKey.publicKey.encapsulateWithRng(rngState: encapDrbg)
+            let encapsulatedKey = try privateKey.publicKey.impl.encapsulate(entropy: katTest.eseed)
             XCTAssertEqual(encapsulatedKey.encapsulated, katTest.ct)
-            XCTAssertEqual(encapsulatedKey.sharedSecret.dataRepresentation, katTest.ss)
+            XCTAssertEqual(
+                encapsulatedKey.sharedSecret.withUnsafeBytes { Data($0) },
+                katTest.ss
+            )
             let retrievedSharedSecret = try privateKey.decapsulate(encapsulatedKey.encapsulated)
-            XCTAssertEqual(retrievedSharedSecret.dataRepresentation, katTest.ss)
+            XCTAssertEqual(
+                retrievedSharedSecret.withUnsafeBytes { Data($0) },
+                katTest.ss
+            )
         }
+    }
+
+    func testDeterministicEncapsulationRejectsInvalidEntropyLength() throws {
+        let privateKey = try XWingMLKEM768X25519.PrivateKey.generate()
+
+        XCTAssertThrowsError(
+            try privateKey.publicKey.impl.encapsulate(
+                entropy: Data(repeating: 0, count: 63)
+            ),
+            error: CryptoKitError.incorrectParameterSize
+        )
     }
 
     func testPrivateKeyRepresentations() throws {
