@@ -52,6 +52,26 @@ protocol SSLCryptoMLKEMParameters {
   ) throws(SSLCrypto.KEMError)
 }
 
+// Unsafe boundary invariants:
+// - storage points to one allocated, uninitialized Pair slot owned by the caller.
+// - seed remains valid for this synchronous call and does not alias storage.
+// - success initializes storage exactly once; failure leaves it uninitialized.
+// - neither pointer nor Span escapes this function or crosses a Sendable boundary.
+private func initializeSSLCryptoMLKEMKeyPair<Parameters: SSLCryptoMLKEMParameters>(
+  for _: Parameters.Type,
+  seed: Span<UInt8>,
+  at storage: UnsafeMutablePointer<
+    SSLCrypto.KEMKeyPair<Parameters.BackendPublicKey, Parameters.BackendPrivateKey>
+  >
+) -> SSLCrypto.KEMError? {
+  do {
+    storage.initialize(to: try Parameters.generateKeyPair(seed: seed))
+    return nil
+  } catch {
+    return error
+  }
+}
+
 /// Materializes a move-only backend key pair without returning it through the
 /// `ContiguousBytes` borrow closure. Embedded Swift keeps that closure's result
 /// copyable, so the temporary pointer is the explicit owner for this boundary.
@@ -71,12 +91,17 @@ func generateSSLCryptoMLKEMKeyPair<Parameters: SSLCryptoMLKEMParameters>(
     storage.deallocate()
   }
 
-  try seed.withUnsafeBytes { rawBytes throws(SSLCrypto.KEMError) in
-    storage.initialize(to: try Parameters.generateKeyPair(
-      seed: Span(_unsafeElements: rawBytes.bindMemory(to: UInt8.self))
-    ))
-    initialized = true
+  let generationError = seed.withUnsafeBytes { rawBytes in
+    initializeSSLCryptoMLKEMKeyPair(
+      for: Parameters.self,
+      seed: Span(_unsafeElements: rawBytes.bindMemory(to: UInt8.self)),
+      at: storage
+    )
   }
+  if let error = generationError {
+    throw error
+  }
+  initialized = true
 
   let pair = storage.move()
   initialized = false
