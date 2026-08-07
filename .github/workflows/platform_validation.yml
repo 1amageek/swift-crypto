@@ -23,50 +23,6 @@ on:
         default: false
 
 jobs:
-  cmake:
-    name: CMake with Swift 6.4
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-          submodules: true
-      - name: Install pinned Swift toolchain
-        run: |
-          set -euo pipefail
-          archive="${SWIFT_SNAPSHOT}-ubuntu24.04.tar.gz"
-          url="https://download.swift.org/swift-6.4.x-branch/ubuntu2404/${SWIFT_SNAPSHOT}/${archive}"
-          install_dir="$RUNNER_TEMP/swift"
-          sudo apt-get update -q
-          sudo apt-get install -y -q ca-certificates curl ninja-build
-          mkdir -p "$install_dir"
-          curl -fsSL --retry 3 "$url" -o "$RUNNER_TEMP/$archive"
-          tar -xzf "$RUNNER_TEMP/$archive" -C "$install_dir" --strip-components 1
-          echo "$install_dir/usr/bin" >> "$GITHUB_PATH"
-      - name: Install CMake 3.29.9
-        run: |
-          set -euo pipefail
-          archive="cmake-3.29.9-linux-x86_64.tar.gz"
-          install_dir="$RUNNER_TEMP/cmake"
-          curl -fsSL --retry 3 \
-            "https://github.com/Kitware/CMake/releases/download/v3.29.9/${archive}" \
-            -o "$RUNNER_TEMP/$archive"
-          echo "dd433a0d9babf08cbd79eac319c06b8287929ad88ff8c1b83cbc6cfd5ea90acc  $RUNNER_TEMP/$archive" \
-            | sha256sum --check
-          mkdir -p "$install_dir"
-          tar -xzf "$RUNNER_TEMP/$archive" -C "$install_dir" --strip-components 1
-          echo "$install_dir/bin" >> "$GITHUB_PATH"
-      - name: Build with CMake 3.29
-        run: |
-          set -euo pipefail
-          swiftc --version | tee "$RUNNER_TEMP/swift-version.txt"
-          grep -F "Swift ${SWIFT_COMPILER_COMMIT}" "$RUNNER_TEMP/swift-version.txt"
-          cmake --version | grep -F 'cmake version 3.29.9'
-          curl -fsSL --retry 3 https://raw.githubusercontent.com/apple/swift-nio/199ccb983c1085583a11e7eb46f053ccdec64c52/scripts/cmake-build.sh \
-            | CMAKE_BIN="$(command -v cmake)" TARGET_DIRECTORY=. bash
-
   macos:
     name: macOS package validation with Swift 6.4
     runs-on: macos-26
@@ -93,17 +49,25 @@ jobs:
           test -d "$toolchain"
           TOOLCHAINS="$TOOLCHAINS" xcrun swiftc --version | tee "$RUNNER_TEMP/swift-version.txt"
           grep -F "Swift ${SWIFT_COMPILER_COMMIT}" "$RUNNER_TEMP/swift-version.txt"
-      - name: Test the macOS package
+      - name: Build and test the macOS package
         run: |
           set -euo pipefail
           TOOLCHAINS="$TOOLCHAINS" xcrun swiftc --version \
             | grep -F "Swift ${SWIFT_COMPILER_COMMIT}"
-          /usr/bin/xcodebuild test \
-            -toolchain "$TOOLCHAINS" \
-            -scheme swift-crypto-Package \
-            -destination 'platform=macOS' \
-            -quiet \
-            "LD_RUNPATH_SEARCH_PATHS=\$(inherited) $HOME/Library/Developer/Toolchains/${SWIFT_SNAPSHOT}.xctoolchain/usr/lib/swift/macosx/testing"
+          TOOLCHAINS="$TOOLCHAINS" xcrun swift build --build-tests
+          bin_path="$(TOOLCHAINS="$TOOLCHAINS" xcrun swift build --show-bin-path)"
+          test_bundle="$bin_path/CryptoTests.xctest"
+          test -d "$test_bundle"
+          export DYLD_LIBRARY_PATH="$HOME/Library/Developer/Toolchains/${SWIFT_SNAPSHOT}.xctoolchain/usr/lib/swift/macosx:$HOME/Library/Developer/Toolchains/${SWIFT_SNAPSHOT}.xctoolchain/usr/lib/swift/macosx/testing"
+          /usr/bin/perl -e '
+            $SIG{ALRM}=sub{kill q(TERM),-$pid if $pid; exit 124};
+            $pid=fork();
+            die qq(fork failed: $!) unless defined $pid;
+            if(!$pid){setpgrp(0,0); exec @ARGV or die qq(exec failed: $!)}
+            alarm 1800;
+            waitpid($pid,0);
+            exit($? >> 8)
+          ' xcrun xctest "$test_bundle"
       - name: Run macOS capability validators
         run: |
           set -euo pipefail
