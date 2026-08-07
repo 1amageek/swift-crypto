@@ -20,13 +20,13 @@ jobs:
       linux_6_2_enabled: false
       linux_6_3_enabled: false
       linux_nightly_next_enabled: true
-      linux_nightly_next_arguments_override: "--explicit-target-dependency-import-check error"
+      linux_nightly_next_arguments_override: "--configuration release --explicit-target-dependency-import-check error"
       linux_nightly_main_enabled: false
       windows_6_1_enabled: false
       windows_6_2_enabled: false
       windows_6_3_enabled: false
       windows_nightly_next_enabled: true
-      windows_nightly_next_arguments_override: "--explicit-target-dependency-import-check error"
+      windows_nightly_next_arguments_override: "--configuration release --explicit-target-dependency-import-check error"
       windows_nightly_main_enabled: false
 
   release-builds:
