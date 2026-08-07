@@ -70,6 +70,23 @@ private func materialize<D: DataProtocol>(_ value: D) -> Data {
   return data
 }
 
+// Unsafe boundary invariants:
+// - storage points to one allocated, uninitialized X25519 key slot.
+// - seed remains valid for this synchronous call and does not alias storage.
+// - success initializes storage exactly once; failure leaves it uninitialized.
+// - neither pointer nor Span escapes this function or crosses a Sendable boundary.
+private func initializeX25519PrivateKey(
+    seed: Span<UInt8>,
+    at storage: UnsafeMutablePointer<SSLCrypto.X25519PrivateKey>
+) -> CryptoInputError? {
+    do {
+        storage.initialize(to: try SSLCrypto.X25519PrivateKey(bytes: seed))
+        return nil
+    } catch {
+        return error
+    }
+}
+
 /// Creates a move-only X25519 key without returning it through a
 /// `ContiguousBytes` borrow closure. The allocated slot owns the key until
 /// `move()` transfers it, and the slot is deallocated exactly once.
@@ -83,12 +100,16 @@ private func makeX25519PrivateKey(_ seed: Data) throws(CryptoInputError) -> SSLC
     storage.deallocate()
   }
 
-  try seed.withUnsafeBytes { bytes throws(CryptoInputError) in
-    storage.initialize(to: try SSLCrypto.X25519PrivateKey(
-      bytes: Span(_unsafeElements: bytes.bindMemory(to: UInt8.self))
-    ))
-    initialized = true
+  let initializationError = seed.withUnsafeBytes { bytes in
+    initializeX25519PrivateKey(
+      seed: Span(_unsafeElements: bytes.bindMemory(to: UInt8.self)),
+      at: storage
+    )
   }
+  if let error = initializationError {
+    throw error
+  }
+  initialized = true
 
   let key = storage.move()
   initialized = false
