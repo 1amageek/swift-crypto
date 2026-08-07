@@ -24,6 +24,8 @@ import Musl
 import Android
 #elseif canImport(WASILibc)
 import WASILibc
+#elseif canImport(ucrt)
+import ucrt
 #else
 #error("Unsupported platform")
 #endif

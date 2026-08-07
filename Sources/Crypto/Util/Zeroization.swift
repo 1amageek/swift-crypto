@@ -20,13 +20,40 @@ import Foundation
 
 #if os(WASI)
 import WASILibc
-#elseif os(Linux)
+#elseif canImport(Glibc)
 import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif os(Windows)
+import WinSDK
 #endif
 
 #if canImport(CryptoKit) && !CRYPTO_SHA256_STATE_STANDALONE_VALIDATION && !SWIFT_CRYPTO_PURE_SWIFT
 import CryptoKit
 #else
+
+// Unsafe boundary invariants:
+// - The caller owns initialized storage for exactly byteCount bytes.
+// - The caller retains exclusive mutable access until this function returns.
+// - byteCount is nonnegative and the pointer is nonnull when byteCount is positive.
+// - The platform primitive performs optimizer-resistant byte stores synchronously.
+// - No pointer escapes or crosses a Sendable boundary.
+@inline(never)
+func zeroizeMemory(
+    _ baseAddress: UnsafeMutableRawPointer,
+    byteCount: Int
+) {
+    precondition(byteCount >= 0)
+    guard byteCount > 0 else { return }
+
+    #if os(WASI) || os(Linux)
+    explicit_bzero(baseAddress, byteCount)
+    #elseif os(Windows)
+    _ = RtlSecureZeroMemory(baseAddress, SIZE_T(byteCount))
+    #else
+    _ = memset_s(baseAddress, byteCount, 0, byteCount)
+    #endif
+}
 
 protocol Zeroization {
     mutating func zeroize()
@@ -37,13 +64,7 @@ extension UnsafeMutableRawBufferPointer: Zeroization {
         guard let baseAddress, count > 0 else {
             return
         }
-        #if os(WASI) || os(Linux)
-        // WASI and glibc expose an optimizer-resistant libc primitive. Keeping
-        // this path in the platform libc keeps Pure Swift storage self-contained.
-        explicit_bzero(baseAddress, count)
-        #else
-        memset_s(baseAddress, count, 0, count)
-        #endif
+        zeroizeMemory(baseAddress, byteCount: count)
     }
 }
 

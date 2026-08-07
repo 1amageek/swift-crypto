@@ -230,7 +230,7 @@ struct SSLCryptoNISTCurvePrivateKeyImpl<Curve>: Sendable {
             }
             preconditionFailure("Unable to generate a compact-representable Pure Swift NIST key")
         } catch {
-            preconditionFailure("Unable to generate a Pure Swift NIST key: \(error)")
+            preconditionFailure("Unable to generate Pure Swift NIST key material")
         }
     }
 

@@ -18,13 +18,6 @@ import FoundationEssentials
 import Foundation
 #endif
 
-#if os(WASI)
-import WASILibc
-#elseif os(Linux)
-import Glibc
-#endif
-
-
 #if canImport(CryptoKit) && !SWIFT_CRYPTO_PURE_SWIFT
 import CryptoKit
 #else
@@ -364,11 +357,7 @@ extension SecureBytes {
             let bytesToClear = self.header.capacity
 
             self.withUnsafeMutablePointerToElements { elementsPtr in
-#if os(WASI) || os(Linux)
-                explicit_bzero(elementsPtr, bytesToClear)
-#else
-                _ = memset_s(elementsPtr, bytesToClear, 0, bytesToClear)
-#endif
+                zeroizeMemory(elementsPtr, byteCount: bytesToClear)
             }
         }
 
@@ -528,11 +517,9 @@ extension SecureBytes {
 
         deinit {
             // We always clear the whole capacity, even if we don't think we used it all.
-#if os(WASI) || os(Linux)
-            explicit_bzero(storage.baseAddress!, storage.count)
-#else
-            memset_s(storage.baseAddress!, storage.count, 0, storage.count)
-#endif
+            if let baseAddress = storage.baseAddress {
+                zeroizeMemory(baseAddress, byteCount: storage.count)
+            }
             storage.deallocate()
         }
 
