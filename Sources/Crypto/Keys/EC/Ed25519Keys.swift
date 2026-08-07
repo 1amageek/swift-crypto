@@ -44,7 +44,7 @@ extension Curve25519 {
 
         /// A Curve25519 private key used to create cryptographic signatures.
         public struct PrivateKey: ECPrivateKey, Sendable {
-            private var baseKey: Curve25519.Signing.Curve25519PrivateKeyImpl
+            var baseKey: Curve25519.Signing.Curve25519PrivateKeyImpl
             
             /// Creates a random Curve25519 private key for signing.
             public init() {
@@ -83,7 +83,7 @@ extension Curve25519 {
 
         /// A Curve25519 public key used to verify cryptographic signatures.
         public struct PublicKey: Sendable {
-            private var baseKey: Curve25519.Signing.Curve25519PublicKeyImpl
+            var baseKey: Curve25519.Signing.Curve25519PublicKeyImpl
 
             /// Creates a Curve25519 public key from a data representation.
             ///

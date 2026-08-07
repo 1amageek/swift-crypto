@@ -17,7 +17,7 @@ import FoundationEssentials
 import Foundation
 #endif
 
-import SSLCrypto
+@_spi(PureSwiftCrypto) import SSLCrypto
 
 private func withOwnedByteSpan<Result: ~Copyable>(
     _ bytes: [UInt8],
@@ -192,15 +192,16 @@ extension Curve25519.Signing {
         func sign(message: Span<UInt8>) throws(CryptoKitMetaError) -> Data {
             do {
                 assert(message.count == 0 || message.count > 0)
-                // `rawRepresentation` is a value-boundary copy. This avoids
-                // handing the SSLCrypto constructor the facade's secure-owner
-                // storage while retaining exactly-once wiping in SecureBytes.
-                let seedData = rawRepresentation
-                return try seedData.withUnsafeBytes { seed in
+                return try _privateKey.withUnsafeBytes { seed in
                     let privateKey = try SSLCrypto.Ed25519PrivateKey(
                         seed: Span(_unsafeElements: seed.bindMemory(to: UInt8.self))
                     )
-                    return Data(try privateKey.sign(message: message))
+                    return try withOwnedByteSpan(_publicKey) { publicKey in
+                        Data(try privateKey.sign(
+                            message: message,
+                            precomputedPublicKey: publicKey
+                        ))
+                    }
                 }
             } catch is CryptoInputError {
                 throw CryptoKitError.invalidParameter
@@ -213,20 +214,49 @@ extension Curve25519.Signing {
     @usableFromInline
     struct SSLCryptoCurve25519SigningPublicKeyImpl: Sendable {
         @usableFromInline var keyBytes: [UInt8]
+        @usableFromInline var validatedKey: SSLCrypto.Ed25519PublicKey?
 
-        @inlinable
         init<D: ContiguousBytes>(rawRepresentation: D) throws(CryptoKitError) {
             let bytes = rawRepresentation.withUnsafeBytes { Array($0) }
             guard bytes.count == 32 else { throw .incorrectKeySize }
             keyBytes = bytes
+            do {
+                validatedKey = try withOwnedByteSpan(bytes) { span in
+                    try SSLCrypto.Ed25519PublicKey(bytes: span)
+                }
+            } catch {
+                // CryptoKit accepts any correctly sized Ed25519 public-key
+                // representation. Invalid point encodings fail verification.
+                validatedKey = nil
+            }
         }
 
         @usableFromInline init(_ keyBytes: [UInt8]) {
             precondition(keyBytes.count == 32)
             self.keyBytes = keyBytes
+            do {
+                validatedKey = try withOwnedByteSpan(keyBytes) { span in
+                    try SSLCrypto.Ed25519PublicKey(bytes: span)
+                }
+            } catch {
+                preconditionFailure("Derived Ed25519 public key is invalid")
+            }
         }
 
         var rawRepresentation: Data { Data(keyBytes) }
+
+        func isValidSignature(signature: Span<UInt8>, message: Span<UInt8>) -> Bool {
+            guard let validatedKey else { return false }
+            do {
+                return try SSLCrypto.Ed25519.verify(
+                    signature: signature,
+                    message: message,
+                    using: validatedKey
+                )
+            } catch {
+                return false
+            }
+        }
     }
 }
 
@@ -253,23 +283,10 @@ extension Curve25519.Signing.PublicKey {
         for data: D
     ) -> Bool {
         guard signature.count == 64 else { return false }
-        do {
-            let publicKey = try self.rawRepresentation.withUnsafeBytes { raw in
-                try SSLCrypto.Ed25519PublicKey(
-                    bytes: Span(_unsafeElements: raw.bindMemory(to: UInt8.self))
-                )
+        return withSSLCryptoDataSpan(signature) { signatureSpan in
+            withSSLCryptoDataSpan(data) { dataSpan in
+                self.baseKey.isValidSignature(signature: signatureSpan, message: dataSpan)
             }
-            return try withSSLCryptoDataSpan(signature) { signatureSpan in
-                try withSSLCryptoDataSpan(data) { dataSpan in
-                    return try SSLCrypto.Ed25519.verify(
-                        signature: signatureSpan,
-                        message: dataSpan,
-                        using: publicKey
-                    )
-                }
-            }
-        } catch {
-            return false
         }
     }
 }
@@ -283,16 +300,8 @@ extension Curve25519.Signing.PrivateKey: Signer {}
 extension Curve25519.Signing.PrivateKey {
     public func signature<D: DataProtocol>(for data: D) throws(CryptoKitMetaError) -> Data {
         do {
-            let contiguous = Data(data)
-            return try self.rawRepresentation.withUnsafeBytes { privateRaw in
-                let privateKey = try SSLCrypto.Ed25519PrivateKey(
-                    seed: Span(_unsafeElements: privateRaw.bindMemory(to: UInt8.self))
-                )
-                return try contiguous.withUnsafeBytes { raw in
-                    Data(try privateKey.sign(
-                        message: Span(_unsafeElements: raw.bindMemory(to: UInt8.self))
-                    ))
-                }
+            return try withSSLCryptoDataSpan(data) { message in
+                try self.baseKey.sign(message: message)
             }
         } catch {
             throw error

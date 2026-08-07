@@ -50,7 +50,11 @@ let package = Package(
     ],
     dependencies: [
         // The Pure Swift backend is provided by swift-ssl/SSLCrypto.
-        .package(url: "https://github.com/1amageek/swift-ssl.git", branch: "main"),
+        .package(
+            name: "swift-ssl",
+            url: "https://github.com/1amageek/swift-ssl.git",
+            from: "0.1.1"
+        ),
     ],
     targets: [
         .target(
